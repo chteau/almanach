@@ -10,11 +10,11 @@
     "@almanach/shared": "workspace:*",
     "drizzle-orm": "0.45.4",
     "hono": "4.13.19",
-    "nodemailer": "7.0.10",
+    "nodemailer": "10.3.1",
     "pdf-lib": "1.17.1",
     "zod": "4.6.7"
   },
   "devDependencies": {
-    "@types/nodemailer": "7.0.3"
+    "@types/nodemailer": "8.0.2"
   }
 }
