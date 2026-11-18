@@ -1,0 +1,328 @@
+# France — année 2026, micro-entrepreneurs (régime micro-social et micro-fiscal).
+# Chaque valeur a été vérifiée sur une source officielle (service-public, impots.gouv.fr, BOFiP, Légifrance, Urssaf)
+# à la date indiquée dans verified_on. L'art. 293 B du CGI reste la référence de la franchise en 2026 :
+# le transfert vers le CIBS est reporté au 1er janvier 2027 (BOFiP ACTU-2026-00126).
+year: 2026
+# Urssaf : une date d'exigibilité tombant un samedi, un dimanche ou un jour férié est reportée au jour ouvré suivant.
+shift: next_business_day
+shiftSource: https://www.autoentrepreneur.urssaf.fr/portail/accueil/sinformer-sur-le-statut/lessentiel-du-statut.html
+holidaysSource: https://www.service-public.gouv.fr/particuliers/vosdroits/F2405
+# Jours fériés nationaux (hors Alsace-Moselle, qui ajoute le Vendredi saint et le 26 décembre).
+holidays:
+  - { date: "2026-01-01", name: Jour de l'an }
+  - { date: "2026-04-06", name: Lundi de Pâques }
+  - { date: "2026-05-01", name: Fête du Travail }
+  - { date: "2026-05-08", name: Victoire 1945 }
+  - { date: "2026-05-14", name: Ascension }
+  - { date: "2026-05-25", name: Lundi de Pentecôte }
+  - { date: "2026-07-14", name: Fête nationale }
+  - { date: "2026-08-15", name: Assomption }
+  - { date: "2026-11-01", name: Toussaint }
+  - { date: "2026-11-11", name: Armistice 1918 }
+  - { date: "2026-12-25", name: Noël }
+  - { date: "2027-01-01", name: Jour de l'an }
+
+thresholds:
+  - id: micro_ceiling_services
+    label:
+      {
+        fr: "Plafond du régime micro (services, BNC)",
+        en: "Micro regime ceiling (services, BNC)",
+        de: "Obergrenze Mikro-Regime (Dienstleistungen, BNC)",
+      }
+    appliesTo: { statuses: [micro_bnc, micro_bic_services] }
+    window: fiscal_year
+    limitCents: 8360000
+    consequence:
+      fr: "Au-delà de 83 600 € de chiffre d'affaires hors taxes deux années civiles consécutives, vous quittez le régime micro au 1er janvier de l'année suivante. Un seul dépassement n'a pas de conséquence immédiate."
+      en: "Above €83,600 of revenue (excluding VAT) two calendar years in a row, you leave the micro regime on 1 January of the following year. A single year above has no immediate effect."
+      de: "Bei mehr als 83.600 € Nettoumsatz in zwei aufeinanderfolgenden Kalenderjahren endet das Mikro-Regime am 1. Januar des Folgejahres. Ein einzelnes Jahr darüber bleibt ohne sofortige Folge."
+    source: https://www.impots.gouv.fr/professionnel/questions/pour-rester-micro-entrepreneur-quel-montant-de-chiffre-daffaires-ou-de
+    verified_on: "2026-11-18"
+  - id: micro_ceiling_sales
+    label:
+      {
+        fr: "Plafond du régime micro (ventes)",
+        en: "Micro regime ceiling (sales)",
+        de: "Obergrenze Mikro-Regime (Warenverkauf)",
+      }
+    appliesTo: { statuses: [micro_bic_sales] }
+    window: fiscal_year
+    limitCents: 20310000
+    consequence:
+      fr: "Au-delà de 203 100 € de chiffre d'affaires hors taxes deux années civiles consécutives, vous quittez le régime micro au 1er janvier de l'année suivante."
+      en: "Above €203,100 of revenue (excluding VAT) two calendar years in a row, you leave the micro regime on 1 January of the following year."
+      de: "Bei mehr als 203.100 € Nettoumsatz in zwei aufeinanderfolgenden Kalenderjahren endet das Mikro-Regime am 1. Januar des Folgejahres."
+    source: https://www.impots.gouv.fr/professionnel/questions/pour-rester-micro-entrepreneur-quel-montant-de-chiffre-daffaires-ou-de
+    verified_on: "2026-11-18"
+  - id: vat_franchise_services
+    label:
+      {
+        fr: "Franchise en base de TVA (services)",
+        en: "VAT franchise (services)",
+        de: "Umsatzsteuerbefreiung (Dienstleistungen)",
+      }
+    appliesTo: { statuses: [micro_bnc, micro_bic_services], withoutOptions: [vat_liable] }
+    window: fiscal_year
+    limitCents: 3750000
+    toleranceCents: 4125000
+    consequence:
+      fr: "Entre 37 500 € et 41 250 €, vous restez en franchise cette année et devenez redevable de la TVA au 1er janvier suivant. Au-delà de 41 250 €, la TVA est due dès le jour du dépassement : facturez-la à partir de cette opération."
+      en: "Between €37,500 and €41,250 you keep the franchise this year and become liable for VAT on 1 January. Above €41,250, VAT is due from the day the threshold is crossed: charge it from that sale onwards."
+      de: "Zwischen 37.500 € und 41.250 € bleibt die Befreiung dieses Jahr bestehen; ab 1. Januar wird Umsatzsteuer fällig. Über 41.250 € ist sie ab dem Tag der Überschreitung geschuldet."
+    source: https://bofip.impots.gouv.fr/bofip/849-PGP.html/identifiant=BOI-TVA-DECLA-40-10-10-20260701
+    verified_on: "2026-11-18"
+  - id: vat_franchise_sales
+    label:
+      {
+        fr: "Franchise en base de TVA (ventes)",
+        en: "VAT franchise (sales)",
+        de: "Umsatzsteuerbefreiung (Warenverkauf)",
+      }
+    appliesTo: { statuses: [micro_bic_sales], withoutOptions: [vat_liable] }
+    window: fiscal_year
+    limitCents: 8500000
+    toleranceCents: 9350000
+    consequence:
+      fr: "Entre 85 000 € et 93 500 €, vous restez en franchise cette année et devenez redevable de la TVA au 1er janvier suivant. Au-delà de 93 500 €, la TVA est due dès le jour du dépassement."
+      en: "Between €85,000 and €93,500 you keep the franchise this year and become liable for VAT on 1 January. Above €93,500, VAT is due from the day the threshold is crossed."
+      de: "Zwischen 85.000 € und 93.500 € bleibt die Befreiung dieses Jahr bestehen; ab 1. Januar wird Umsatzsteuer fällig. Über 93.500 € ist sie ab dem Tag der Überschreitung geschuldet."
+    source: https://bofip.impots.gouv.fr/bofip/849-PGP.html/identifiant=BOI-TVA-DECLA-40-10-10-20260701
+    verified_on: "2026-11-18"
+
+estimates:
+  - id: contributions_bnc
+    label:
+      {
+        fr: "Cotisations sociales (libéral, SSI)",
+        en: "Social contributions (liberal, SSI)",
+        de: "Sozialbeiträge (freier Beruf, SSI)",
+      }
+    appliesTo: { statuses: [micro_bnc], withoutOptions: [cipav] }
+    base: revenue
+    formula: &acre
+      kind: flat
+      rates: [{ from: "2026-01-01", rateBp: 2560 }]
+      reduction:
+        option: acre
+        # Décret 2026-69 : 50 % du taux normal pour une création avant le 1er juillet 2026, 75 % ensuite.
+        steps:
+          [{ startedFrom: "2020-01-01", dueShareBp: 5000 }, { startedFrom: "2026-07-01", dueShareBp: 7500 }]
+        quarters: 3
+        note:
+          fr: "ACRE : taux réduit jusqu'à la fin du 3e trimestre civil suivant le début d'activité (50 % du taux normal si création avant le 1er juillet 2026, 75 % ensuite)."
+          en: "ACRE: reduced rate until the end of the 3rd calendar quarter after the start (50 % of the normal rate for a start before 1 July 2026, 75 % afterwards)."
+          de: "ACRE: ermäßigter Satz bis zum Ende des 3. Kalenderquartals nach Beginn (50 % des Normalsatzes bei Gründung vor dem 1. Juli 2026, danach 75 %)."
+    source: https://entreprendre.service-public.gouv.fr/vosdroits/F36232
+    verified_on: "2026-11-18"
+  - id: contributions_cipav
+    label:
+      {
+        fr: "Cotisations sociales (libéral, Cipav)",
+        en: "Social contributions (liberal, Cipav)",
+        de: "Sozialbeiträge (freier Beruf, Cipav)",
+      }
+    appliesTo: { statuses: [micro_bnc], options: [cipav] }
+    base: revenue
+    formula:
+      <<: *acre
+      rates: [{ from: "2026-01-01", rateBp: 2320 }]
+    source: https://www.legifrance.gouv.fr/jorf/id/JORFTEXT000052211971
+    verified_on: "2026-11-18"
+  - id: contributions_bic_services
+    label:
+      {
+        fr: "Cotisations sociales (prestations de services BIC)",
+        en: "Social contributions (BIC services)",
+        de: "Sozialbeiträge (BIC-Dienstleistungen)",
+      }
+    appliesTo: { statuses: [micro_bic_services] }
+    base: revenue
+    formula:
+      <<: *acre
+      rates: [{ from: "2026-01-01", rateBp: 2120 }]
+    source: https://entreprendre.service-public.gouv.fr/vosdroits/F36232
+    verified_on: "2026-11-18"
+  - id: contributions_sales
+    label:
+      {
+        fr: "Cotisations sociales (ventes)",
+        en: "Social contributions (sales)",
+        de: "Sozialbeiträge (Warenverkauf)",
+      }
+    appliesTo: { statuses: [micro_bic_sales] }
+    base: revenue
+    formula:
+      <<: *acre
+      rates: [{ from: "2026-01-01", rateBp: 1230 }]
+    source: https://entreprendre.service-public.gouv.fr/vosdroits/F36232
+    verified_on: "2026-11-18"
+  - id: income_tax_bnc
+    label:
+      {
+        fr: "Versement libératoire de l'impôt (BNC)",
+        en: "Flat-rate income tax (BNC)",
+        de: "Pauschale Einkommensteuer (BNC)",
+      }
+    appliesTo: { statuses: [micro_bnc], options: [versement_liberatoire] }
+    base: revenue
+    formula: { kind: flat, rates: [{ from: "2026-01-01", rateBp: 220 }] }
+    source: https://www.impots.gouv.fr/professionnel/questions/en-tant-que-micro-entrepreneur-sous-quelles-conditions-puis-je-opter-pour-l
+    verified_on: "2026-11-18"
+  - id: income_tax_bic_services
+    label:
+      {
+        fr: "Versement libératoire de l'impôt (services BIC)",
+        en: "Flat-rate income tax (BIC services)",
+        de: "Pauschale Einkommensteuer (BIC-Dienstleistungen)",
+      }
+    appliesTo: { statuses: [micro_bic_services], options: [versement_liberatoire] }
+    base: revenue
+    formula: { kind: flat, rates: [{ from: "2026-01-01", rateBp: 170 }] }
+    source: https://www.impots.gouv.fr/professionnel/questions/en-tant-que-micro-entrepreneur-sous-quelles-conditions-puis-je-opter-pour-l
+    verified_on: "2026-11-18"
+  - id: income_tax_sales
+    label:
+      {
+        fr: "Versement libératoire de l'impôt (ventes)",
+        en: "Flat-rate income tax (sales)",
+        de: "Pauschale Einkommensteuer (Warenverkauf)",
+      }
+    appliesTo: { statuses: [micro_bic_sales], options: [versement_liberatoire] }
+    base: revenue
+    formula: { kind: flat, rates: [{ from: "2026-01-01", rateBp: 100 }] }
+    source: https://www.impots.gouv.fr/professionnel/questions/en-tant-que-micro-entrepreneur-sous-quelles-conditions-puis-je-opter-pour-l
+    verified_on: "2026-11-18"
+  # Contribution à la formation professionnelle : non comprise dans les taux ci-dessus (F37353).
+  # Son calendrier de paiement diffère selon les sources officielles ; elle n'est donc rattachée à aucune échéance.
+  - id: cfp_liberal
+    label:
+      {
+        fr: "Contribution à la formation professionnelle",
+        en: "Vocational training contribution (CFP)",
+        de: "Berufsbildungsbeitrag (CFP)",
+      }
+    appliesTo: { statuses: [micro_bnc] }
+    base: revenue
+    formula: { kind: flat, rates: [{ from: "2026-01-01", rateBp: 20 }] }
+    source: https://entreprendre.service-public.gouv.fr/vosdroits/F23459
+    verified_on: "2026-11-18"
+  - id: cfp_commercial
+    label:
+      {
+        fr: "Contribution à la formation professionnelle",
+        en: "Vocational training contribution (CFP)",
+        de: "Berufsbildungsbeitrag (CFP)",
+      }
+    appliesTo: { statuses: [micro_bic_services, micro_bic_sales], withoutOptions: [artisan] }
+    base: revenue
+    formula: { kind: flat, rates: [{ from: "2026-01-01", rateBp: 10 }] }
+    source: https://entreprendre.service-public.gouv.fr/vosdroits/F23459
+    verified_on: "2026-11-18"
+  - id: cfp_artisan
+    label:
+      {
+        fr: "Contribution à la formation professionnelle (artisan)",
+        en: "Vocational training contribution (craft)",
+        de: "Berufsbildungsbeitrag (Handwerk)",
+      }
+    appliesTo: { statuses: [micro_bic_services, micro_bic_sales], options: [artisan] }
+    base: revenue
+    formula: { kind: flat, rates: [{ from: "2026-01-01", rateBp: 30 }] }
+    source: https://entreprendre.service-public.gouv.fr/vosdroits/F23459
+    verified_on: "2026-11-18"
+
+deadlines:
+  - id: urssaf_monthly
+    kind: social
+    label:
+      {
+        fr: "Déclaration Urssaf du chiffre d'affaires",
+        en: "Urssaf revenue declaration",
+        de: "Urssaf-Umsatzmeldung",
+      }
+    description:
+      fr: "Déclarer le chiffre d'affaires encaissé du mois et payer les cotisations (et le versement libératoire si vous l'avez choisi), même si le chiffre d'affaires est nul."
+      en: "Declare the revenue collected during the month and pay contributions (and the flat-rate income tax if chosen), even when revenue is zero."
+      de: "Den im Monat vereinnahmten Umsatz melden und die Beiträge zahlen (und ggf. die pauschale Einkommensteuer), auch bei null Umsatz."
+    appliesTo: { periods: [monthly] }
+    schedule:
+      type: dates
+      dates:
+        - { due: "2026-02-28", periodStart: "2026-01-01", periodEnd: "2026-01-31" }
+        - { due: "2026-03-31", periodStart: "2026-02-01", periodEnd: "2026-02-28" }
+        - { due: "2026-04-30", periodStart: "2026-03-01", periodEnd: "2026-03-31" }
+        - { due: "2026-05-31", periodStart: "2026-04-01", periodEnd: "2026-04-30" }
+        - { due: "2026-06-30", periodStart: "2026-05-01", periodEnd: "2026-05-31" }
+        - { due: "2026-07-31", periodStart: "2026-06-01", periodEnd: "2026-06-30" }
+        - { due: "2026-08-31", periodStart: "2026-07-01", periodEnd: "2026-07-31" }
+        - { due: "2026-09-30", periodStart: "2026-08-01", periodEnd: "2026-08-31" }
+        # Urssaf : l'échéance du samedi 31 octobre 2026 n'est exceptionnellement pas reportée au 2 novembre.
+        - { due: "2026-10-31", periodStart: "2026-09-01", periodEnd: "2026-09-30", fixed: true }
+        - { due: "2026-11-30", periodStart: "2026-10-01", periodEnd: "2026-10-31" }
+        - { due: "2026-12-31", periodStart: "2026-11-01", periodEnd: "2026-11-30" }
+        - { due: "2027-01-31", periodStart: "2026-12-01", periodEnd: "2026-12-31" }
+    estimates:
+      [
+        contributions_bnc,
+        contributions_cipav,
+        contributions_bic_services,
+        contributions_sales,
+        income_tax_bnc,
+        income_tax_bic_services,
+        income_tax_sales,
+      ]
+    declaresRevenue: true
+    link: https://www.autoentrepreneur.urssaf.fr
+    source: https://entreprendre.service-public.gouv.fr/vosdroits/F23257
+    verified_on: "2026-11-18"
+  - id: urssaf_quarterly
+    kind: social
+    label:
+      {
+        fr: "Déclaration Urssaf du chiffre d'affaires",
+        en: "Urssaf revenue declaration",
+        de: "Urssaf-Umsatzmeldung",
+      }
+    description:
+      fr: "Déclarer le chiffre d'affaires encaissé du trimestre et payer les cotisations (et le versement libératoire si vous l'avez choisi), même si le chiffre d'affaires est nul."
+      en: "Declare the revenue collected during the quarter and pay contributions (and the flat-rate income tax if chosen), even when revenue is zero."
+      de: "Den im Quartal vereinnahmten Umsatz melden und die Beiträge zahlen (und ggf. die pauschale Einkommensteuer), auch bei null Umsatz."
+    appliesTo: { periods: [quarterly] }
+    schedule:
+      type: dates
+      dates:
+        - { due: "2026-04-30", periodStart: "2026-01-01", periodEnd: "2026-03-31" }
+        - { due: "2026-07-31", periodStart: "2026-04-01", periodEnd: "2026-06-30" }
+        - { due: "2026-10-31", periodStart: "2026-07-01", periodEnd: "2026-09-30", fixed: true }
+        - { due: "2027-01-31", periodStart: "2026-10-01", periodEnd: "2026-12-31" }
+    estimates:
+      [
+        contributions_bnc,
+        contributions_cipav,
+        contributions_bic_services,
+        contributions_sales,
+        income_tax_bnc,
+        income_tax_bic_services,
+        income_tax_sales,
+      ]
+    declaresRevenue: true
+    link: https://www.autoentrepreneur.urssaf.fr
+    source: https://entreprendre.service-public.gouv.fr/vosdroits/F23257
+    verified_on: "2026-11-18"
+  - id: cfe
+    kind: tax
+    label:
+      {
+        fr: "Cotisation foncière des entreprises (CFE)",
+        en: "Business property tax (CFE)",
+        de: "Gewerbegrundsteuer (CFE)",
+      }
+    description:
+      fr: "Paiement de la CFE sur votre espace professionnel impots.gouv.fr. Exonération l'année de création (déposer le formulaire 1447-C-SD avant le 31 décembre) et si le chiffre d'affaires de l'année N-2 ne dépasse pas 5 000 €."
+      en: "Pay the CFE from your professional account on impots.gouv.fr. Exempt in the year of creation (file form 1447-C-SD by 31 December) and when revenue two years earlier did not exceed €5,000."
+      de: "Zahlung der CFE im Unternehmenskonto auf impots.gouv.fr. Befreit im Gründungsjahr (Formular 1447-C-SD bis 31. Dezember) und wenn der Umsatz von vor zwei Jahren 5.000 € nicht überstieg."
+    schedule: { type: dates, dates: [{ due: "2026-12-15" }] }
+    link: https://www.impots.gouv.fr/professionnel
+    source: https://entreprendre.service-public.gouv.fr/vosdroits/F23547
+    verified_on: "2026-11-18"

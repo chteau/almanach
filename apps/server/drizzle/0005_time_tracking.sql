@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "time_entries_running_idx" ON "time_entries" USING btree ("user_id") WHERE "time_entries"."started_at" IS NOT NULL;

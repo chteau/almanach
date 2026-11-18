@@ -1,0 +1,175 @@
+# United Kingdom — tax year 2026-27 (6 April 2026 to 5 April 2027).
+# Every figure was checked on gov.uk or legislation.gov.uk on the date given in verified_on.
+year: 2026
+# HMRC deadlines do not move when they fall on a weekend or bank holiday.
+shift: none
+shiftSource: https://www.gov.uk/pay-self-assessment-tax-bill
+holidaysSource: https://www.gov.uk/bank-holidays
+holidays:
+  - { date: "2026-04-06", name: Easter Monday, appliesTo: { withoutOptions: [scotland] } }
+  - { date: "2026-05-04", name: Early May bank holiday }
+  - { date: "2026-05-25", name: Spring bank holiday }
+  - { date: "2026-06-15", name: World Cup bank holiday, appliesTo: { options: [scotland] } }
+  - { date: "2026-07-13", name: Battle of the Boyne, appliesTo: { options: [northern_ireland] } }
+  - { date: "2026-08-03", name: Summer bank holiday, appliesTo: { options: [scotland] } }
+  - { date: "2026-08-31", name: Summer bank holiday, appliesTo: { withoutOptions: [scotland] } }
+  - { date: "2026-11-30", name: St Andrew’s Day, appliesTo: { options: [scotland] } }
+  - { date: "2026-12-25", name: Christmas Day }
+  - { date: "2026-12-28", name: Boxing Day (substitute day) }
+  - { date: "2027-01-01", name: New Year’s Day }
+  - { date: "2027-01-04", name: 2nd January (substitute day), appliesTo: { options: [scotland] } }
+  - { date: "2027-03-17", name: St Patrick’s Day, appliesTo: { options: [northern_ireland] } }
+  - { date: "2027-03-26", name: Good Friday }
+  - { date: "2027-03-29", name: Easter Monday, appliesTo: { withoutOptions: [scotland] } }
+
+thresholds:
+  - id: vat_registration
+    label:
+      {
+        fr: "Seuil d'immatriculation à la TVA",
+        en: VAT registration threshold,
+        de: Umsatzsteuer-Registrierungsschwelle,
+      }
+    appliesTo: { withoutOptions: [vat_registered] }
+    window: rolling_12_months
+    limitCents: 9000000
+    consequence:
+      fr: "Au-delà de 90 000 £ de chiffre d'affaires imposable sur 12 mois glissants, vous devez vous immatriculer à la TVA dans les 30 jours suivant la fin du mois de dépassement. L'immatriculation prend effet le 1er jour du deuxième mois suivant."
+      en: "Above £90,000 of VAT taxable turnover in the last 12 months, you must register for VAT within 30 days of the end of the month you went over. Registration takes effect from the first day of the second month after."
+      de: "Über 90.000 £ steuerpflichtigem Umsatz in den letzten 12 Monaten müssen Sie sich innerhalb von 30 Tagen nach Ende des Überschreitungsmonats für die Umsatzsteuer registrieren. Die Registrierung gilt ab dem ersten Tag des übernächsten Monats."
+    source: https://www.gov.uk/register-for-vat
+    verified_on: "2026-11-18"
+
+estimates:
+  - id: income_tax
+    label: { fr: Impôt sur le revenu, en: Income Tax, de: Einkommensteuer }
+    appliesTo: { withoutOptions: [scotland] }
+    base: profit
+    formula:
+      kind: brackets
+      allowanceCents: 1257000
+      taper: { aboveCents: 10000000, reducePerCents: 200, byCents: 100 }
+      bands:
+        - { upToCents: 3770000, rateBp: 2000 }
+        - { upToCents: 12514000, rateBp: 4000 }
+        - { upToCents: null, rateBp: 4500 }
+    source: https://www.gov.uk/income-tax-rates
+    verified_on: "2026-11-18"
+  - id: income_tax_scotland
+    label: { fr: "Impôt sur le revenu (Écosse)", en: Scottish Income Tax, de: Einkommensteuer (Schottland) }
+    appliesTo: { options: [scotland] }
+    base: profit
+    formula:
+      kind: brackets
+      allowanceCents: 1257000
+      taper: { aboveCents: 10000000, reducePerCents: 200, byCents: 100 }
+      bands:
+        - { upToCents: 396700, rateBp: 1900 }
+        - { upToCents: 1695600, rateBp: 2000 }
+        - { upToCents: 3109200, rateBp: 2100 }
+        - { upToCents: 6243000, rateBp: 4200 }
+        - { upToCents: 12514000, rateBp: 4500 }
+        - { upToCents: null, rateBp: 4800 }
+    source: https://www.gov.uk/scottish-income-tax
+    verified_on: "2026-11-18"
+  - id: class4_nic
+    label:
+      {
+        fr: "Cotisations Class 4 (National Insurance)",
+        en: Class 4 National Insurance,
+        de: National Insurance Klasse 4,
+      }
+    base: profit
+    formula:
+      kind: profit_bands
+      bands:
+        - { fromCents: 1257000, rateBp: 600 }
+        - { fromCents: 5027000, rateBp: 200 }
+    source: https://www.gov.uk/self-employed-national-insurance-rates
+    verified_on: "2026-11-18"
+
+deadlines:
+  - id: mtd_quarterly_update
+    kind: tax
+    label:
+      {
+        fr: "Mise à jour trimestrielle MTD",
+        en: Making Tax Digital quarterly update,
+        de: MTD-Quartalsmeldung,
+      }
+    description:
+      fr: "Envoyer à HMRC, avec un logiciel compatible, le cumul des recettes et dépenses depuis le début de l'année fiscale. Un retard ajoute un point de pénalité ; 4 points entraînent une amende de 200 £."
+      en: "Send HMRC your income and expenses since the start of the tax year with compatible software. A late update earns a penalty point; 4 points lead to a £200 penalty."
+      de: "Einnahmen und Ausgaben seit Beginn des Steuerjahres mit kompatibler Software an HMRC melden. Verspätung bringt einen Strafpunkt; 4 Punkte führen zu 200 £ Strafe."
+    appliesTo: { options: [mtd_itsa] }
+    schedule:
+      type: dates
+      dates:
+        - { due: "2026-08-07", periodStart: "2026-04-06", periodEnd: "2026-07-05" }
+        - { due: "2026-11-07", periodStart: "2026-04-06", periodEnd: "2026-10-05" }
+        - { due: "2027-02-07", periodStart: "2026-04-06", periodEnd: "2027-01-05" }
+        - { due: "2027-05-07", periodStart: "2026-04-06", periodEnd: "2027-04-05" }
+    declaresRevenue: true
+    link: https://www.gov.uk/guidance/use-making-tax-digital-for-income-tax/send-quarterly-updates
+    source: https://www.gov.uk/guidance/use-making-tax-digital-for-income-tax/send-quarterly-updates
+    verified_on: "2026-11-18"
+  - id: payment_on_account_1
+    kind: tax
+    label:
+      { fr: "Premier acompte (payment on account)", en: First payment on account, de: Erste Vorauszahlung }
+    description:
+      fr: "Premier acompte de l'impôt 2026-27, égal à la moitié de l'impôt de l'année précédente. Non dû si l'impôt de l'an dernier était inférieur à 1 000 £."
+      en: "First advance payment towards your 2026-27 tax bill, half of last year's bill. Not due if last year's bill was under £1,000."
+      de: "Erste Vorauszahlung auf die Steuer 2026-27, die Hälfte der Vorjahressteuer. Entfällt, wenn die Vorjahressteuer unter 1.000 £ lag."
+    schedule: { type: dates, dates: [{ due: "2027-01-31" }] }
+    link: https://www.gov.uk/understand-self-assessment-bill/payments-on-account
+    source: https://www.gov.uk/understand-self-assessment-bill/payments-on-account
+    verified_on: "2026-11-18"
+  - id: payment_on_account_2
+    kind: tax
+    label:
+      { fr: "Second acompte (payment on account)", en: Second payment on account, de: Zweite Vorauszahlung }
+    description:
+      fr: "Second acompte de l'impôt 2026-27."
+      en: "Second advance payment towards your 2026-27 tax bill."
+      de: "Zweite Vorauszahlung auf die Steuer 2026-27."
+    schedule: { type: dates, dates: [{ due: "2027-07-31" }] }
+    link: https://www.gov.uk/understand-self-assessment-bill/payments-on-account
+    source: https://www.gov.uk/understand-self-assessment-bill/payments-on-account
+    verified_on: "2026-11-18"
+  - id: self_assessment_paper
+    kind: tax
+    label:
+      {
+        fr: "Déclaration Self Assessment papier",
+        en: Paper Self Assessment return,
+        de: Self-Assessment-Erklärung auf Papier,
+      }
+    description:
+      fr: "Date limite de dépôt de la déclaration papier pour l'année fiscale 2026-27."
+      en: "Deadline for the 2026-27 paper tax return."
+      de: "Frist für die Papiererklärung des Steuerjahres 2026-27."
+    schedule:
+      { type: dates, dates: [{ due: "2027-10-31", periodStart: "2026-04-06", periodEnd: "2027-04-05" }] }
+    link: https://www.gov.uk/self-assessment-tax-returns/deadlines
+    source: https://www.gov.uk/self-assessment-tax-returns/deadlines
+    verified_on: "2026-11-18"
+  - id: self_assessment_online
+    kind: tax
+    label:
+      {
+        fr: "Déclaration en ligne et solde",
+        en: Online return and balancing payment,
+        de: Online-Erklärung und Restzahlung,
+      }
+    description:
+      fr: "Déclaration en ligne de l'année fiscale 2026-27 et paiement du solde (plus le premier acompte de 2027-28)."
+      en: "Online tax return for 2026-27 and balancing payment (with the first payment on account for 2027-28)."
+      de: "Online-Erklärung für 2026-27 und Restzahlung (mit der ersten Vorauszahlung für 2027-28)."
+    schedule:
+      { type: dates, dates: [{ due: "2028-01-31", periodStart: "2026-04-06", periodEnd: "2027-04-05" }] }
+    estimates: [income_tax, income_tax_scotland, class4_nic]
+    declaresRevenue: true
+    link: https://www.gov.uk/self-assessment-tax-returns/deadlines
+    source: https://www.gov.uk/self-assessment-tax-returns/deadlines
+    verified_on: "2026-11-18"

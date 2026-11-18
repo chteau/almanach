@@ -1,0 +1,55 @@
+# United Kingdom — tax year 2025-26 (6 April 2025 to 5 April 2026).
+# Only the obligations still falling due are listed; figures for estimates start with 2026.yaml.
+year: 2025
+shift: none
+shiftSource: https://www.gov.uk/pay-self-assessment-tax-bill
+holidaysSource: https://www.gov.uk/bank-holidays
+holidays: []
+deadlines:
+  - id: payment_on_account_2
+    kind: tax
+    label:
+      { fr: "Second acompte (payment on account)", en: Second payment on account, de: Zweite Vorauszahlung }
+    description:
+      fr: "Second acompte de l'impôt 2025-26."
+      en: "Second advance payment towards your 2025-26 tax bill."
+      de: "Zweite Vorauszahlung auf die Steuer 2025-26."
+    schedule: { type: dates, dates: [{ due: "2026-07-31" }] }
+    link: https://www.gov.uk/understand-self-assessment-bill/payments-on-account
+    source: https://www.gov.uk/understand-self-assessment-bill/payments-on-account
+    verified_on: "2026-11-18"
+  - id: self_assessment_paper
+    kind: tax
+    label:
+      {
+        fr: "Déclaration Self Assessment papier",
+        en: Paper Self Assessment return,
+        de: Self-Assessment-Erklärung auf Papier,
+      }
+    description:
+      fr: "Date limite de dépôt de la déclaration papier pour l'année fiscale 2025-26."
+      en: "Deadline for the 2025-26 paper tax return."
+      de: "Frist für die Papiererklärung des Steuerjahres 2025-26."
+    schedule:
+      { type: dates, dates: [{ due: "2026-10-31", periodStart: "2025-04-06", periodEnd: "2026-04-05" }] }
+    link: https://www.gov.uk/self-assessment-tax-returns/deadlines
+    source: https://www.gov.uk/self-assessment-tax-returns/deadlines
+    verified_on: "2026-11-18"
+  - id: self_assessment_online
+    kind: tax
+    label:
+      {
+        fr: "Déclaration en ligne et solde",
+        en: Online return and balancing payment,
+        de: Online-Erklärung und Restzahlung,
+      }
+    description:
+      fr: "Déclaration en ligne de l'année fiscale 2025-26, paiement du solde et du premier acompte de 2026-27."
+      en: "Online tax return for 2025-26, balancing payment and first payment on account for 2026-27."
+      de: "Online-Erklärung für 2025-26, Restzahlung und erste Vorauszahlung für 2026-27."
+    schedule:
+      { type: dates, dates: [{ due: "2027-01-31", periodStart: "2025-04-06", periodEnd: "2026-04-05" }] }
+    declaresRevenue: true
+    link: https://www.gov.uk/self-assessment-tax-returns/deadlines
+    source: https://www.gov.uk/self-assessment-tax-returns/deadlines
+    verified_on: "2026-11-18"

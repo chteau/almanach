@@ -1,0 +1,239 @@
+.shell {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+}
+
+.skip {
+  position: absolute;
+  left: 8px;
+  top: -48px;
+  z-index: 10;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: var(--ink);
+  color: var(--on-ink);
+}
+
+.skip:focus {
+  top: 8px;
+}
+
+.sidebar {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding: 20px 14px;
+  border-right: 1px solid var(--line);
+}
+
+.brand {
+  padding: 0 10px;
+}
+
+.nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+}
+
+.link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  padding: 0 10px;
+  border-radius: 10px;
+  color: var(--ink-2);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.menuLink {
+  display: none;
+}
+
+.bell {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  padding: 0 10px;
+  border-radius: 10px;
+  color: var(--ink-2);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.bell:hover {
+  background: var(--surface-2);
+}
+
+.count {
+  min-width: 22px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--err-fg);
+  color: var(--bg);
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.link:hover {
+  background: var(--surface-2);
+}
+
+.link[aria-current="page"] {
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
+.icon {
+  width: 20px;
+  height: 20px;
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.account {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 10px 0;
+  border-top: 1px solid var(--line);
+  font-size: 13px;
+}
+
+.language select {
+  width: 100%;
+  min-height: 40px;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+}
+
+.email {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+}
+
+.logout {
+  align-self: flex-start;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink-2);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.main {
+  min-width: 0;
+  width: 100%;
+  max-width: 1120px;
+  padding: 32px clamp(16px, 4vw, 48px) 64px;
+}
+
+@media (max-width: 899px) {
+  .shell {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* Phones: brand and account on a top bar, sections on a bottom tab bar within thumb reach. */
+  .sidebar {
+    position: static;
+    height: auto;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 16px;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .nav {
+    position: fixed;
+    inset: auto 0 0;
+    z-index: 5;
+    flex-direction: row;
+    gap: 0;
+    padding: 0 4px env(safe-area-inset-bottom);
+    border-top: 1px solid var(--line);
+    background: var(--bg);
+  }
+
+  .link {
+    flex: 1;
+    min-width: 0;
+    flex-direction: column;
+    justify-content: center;
+    gap: 2px;
+    min-height: 60px;
+    padding: 0 2px;
+    font-size: 11px;
+  }
+
+  .link[aria-current="page"] {
+    box-shadow: none;
+    background: none;
+    color: var(--ink);
+  }
+
+  .account {
+    flex-direction: row;
+    align-items: center;
+    gap: 12px;
+    padding: 0;
+    border-top: 0;
+  }
+
+  .email,
+  .bellLabel,
+  .secondaryLink,
+  .language,
+  .logout {
+    display: none;
+  }
+
+  .menuLink {
+    display: flex;
+  }
+
+  .bell {
+    min-width: 44px;
+    justify-content: center;
+    padding: 0 6px;
+  }
+
+  .count {
+    position: absolute;
+    top: 2px;
+    right: -2px;
+  }
+
+  .logout {
+    font-size: 13px;
+  }
+
+  .main {
+    padding: 20px 16px 96px;
+  }
+}

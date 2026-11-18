@@ -1,0 +1,158 @@
+<br/>
+<div align="center">
+    <h1 align="center">
+        Almanach
+    </h1>
+    <br>
+    <a href="https://github.com/chteau/almanach">
+        <img src="assets/brand/almanach-logo.svg" alt="Logo Almanach" width="100">
+    </a>
+    <br>
+    <br>
+    <p align="center"><i>Toutes tes échéances de freelance au même endroit, sur ton serveur.</i></p>
+    <div align="center">
+        <img src="https://img.shields.io/badge/Bun-000000?style=for-the-badge&logo=bun&logoColor=white" alt="Badge Bun" />
+        <img src="https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white" alt="Badge TypeScript" />
+        <img src="https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB" alt="Badge React" />
+        <img src="https://img.shields.io/badge/PostgreSQL-4169E1?style=for-the-badge&logo=postgresql&logoColor=white" alt="Badge PostgreSQL" />
+        <img src="https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white" alt="Badge Docker" />
+        <img src="https://img.shields.io/badge/Licence-AGPL--3.0-green?style=for-the-badge" alt="Badge licence AGPL-3.0" />
+    </div>
+    <br/>
+    <p align="center">Français · <a href="README.en.md">English</a></p>
+</div>
+
+Almanach est un tableau de bord libre et auto-hébergé pour les indépendants : clients, missions,
+devis, factures, temps passé, et surtout toutes les échéances administratives de ton pays
+(déclarations, cotisations, seuils de TVA), avec ce qu'il faut mettre de côté.
+
+Les outils qui connaissent tes obligations sont des services en ligne payants qui gardent tes
+données. Les outils libres, eux, ne connaissent pas les règles de ton pays. Almanach fait les deux.
+
+<p align="center">
+    <img src="docs/screenshots/desktop-30-tableau-de-bord.png" alt="Tableau de bord d'Almanach" width="800">
+</p>
+
+## État
+
+En développement, proche de la 1.0, pas encore de release. La France est le pays de référence :
+ses règles 2026 sont **vérifiées**, chaque chiffre cite sa source officielle et sa date de
+vérification. L'Allemagne, le Royaume-Uni et les États-Unis sont **expérimentaux**, et
+l'application le dit à l'inscription. Le détail est dans le
+[cahier des charges](docs/cahier-des-charges.md).
+
+| Pays | Pack | Ce qui est couvert |
+|---|---|---|
+| France | Vérifié | Micro-entreprise (BNC, BIC services et ventes), URSSAF mensuelle ou trimestrielle, versement libératoire, ACRE, CIPAV, CFE, franchise de TVA |
+| Allemagne | Expérimental | Freiberufler et Gewerbe, Kleinunternehmer, Umsatzsteuer-Voranmeldung, Vorauszahlungen (ESt, GewSt) |
+| Royaume-Uni | Expérimental | Sole trader, Self Assessment, Class 4 NIC, payments on account, Making Tax Digital, seuil de TVA |
+| États-Unis | Expérimental | Sole proprietor et single-member LLC, self-employment tax, estimated taxes, Form 1040 |
+
+## Ce que ça fait
+
+- **Ne rate plus une échéance.** Calendrier (mois, semaine, liste, agenda) des déclarations, des
+  paiements, des fins de mission et des factures à relancer. Rappels par e-mail, par ntfy, et un
+  flux iCal à ajouter dans ton agenda.
+- **Sache combien mettre de côté.** Le tableau de bord estime les cotisations et l'impôt de
+  l'année, suit les seuils (plafond micro, franchise de TVA) et simule « et si je facture X de
+  plus ? ».
+- **Facture proprement.** Devis, factures, acomptes et avoirs en PDF, en français, anglais ou
+  allemand, avec les mentions légales de ton pays et de celui du client. Numérotation, logo,
+  couleur, mise en page et police se règlent dans les réglages. Changer la numérotation après la
+  première facture attend le 1er janvier, pour ne pas casser la série de l'année.
+- **Compte ton temps.** Minuteur, saisie manuelle, grille de la semaine, facturation du temps pas
+  encore facturé en un clic.
+- **Suis ta situation.** Changement de statut ou de pays à une date donnée : chaque échéance suit
+  la situation de la période qu'elle couvre. Une cessation d'activité garde les dernières
+  déclarations et passe le compte en lecture seule.
+- **Arrive avec tes clients.** Import CSV depuis ton ancien outil, avec un rapport des lignes
+  refusées avant d'importer quoi que ce soit ([format](docs/import-csv.md)).
+- **Garde la main sur les règles.** Les mises à jour de packs sont signées (Ed25519). Une mise à
+  jour reçue n'est jamais appliquée d'office : tu lis ce qui change, en clair (« le taux passe de
+  25,6 % à 26 % au 1er juillet 2026 »), puis tu appliques ou tu reportes. Retour au pack livré en
+  un clic.
+- **Garde tes données.** Export JSON complet, réimport dans une instance neuve. Double
+  authentification (TOTP), sessions révocables, verrouillage après plusieurs échecs.
+
+## Engagements
+
+- Gratuit et libre, pour toujours, sous licence [AGPL-3.0](LICENSE).
+- Pas de version hébergée, pas d'offre payante, pas de télémétrie.
+- Aucune requête vers l'extérieur tant qu'un administrateur ne l'a pas activée (mises à jour de
+  packs, annonce de nouvelle version).
+
+## Installation
+
+Il faut Docker et Docker Compose. Ça tourne sur un serveur, un NAS ou un Raspberry Pi.
+
+```sh
+git clone https://github.com/chteau/almanach.git
+cd almanach
+cp .env.example .env   # puis remplis tes paramètres
+docker compose up -d
+```
+
+Ouvre ensuite `http://localhost:8080`. L'assistant d'installation demande le jeton affiché dans les
+logs (`docker compose logs almanach`), puis crée le compte administrateur.
+
+Pendant les migrations au démarrage, le serveur répond déjà avec une page de maintenance (503) qui
+se recharge toute seule.
+
+### Configuration
+
+Tout est facultatif.
+
+| Variable | Rôle |
+|---|---|
+| `SMTP_URL` | Serveur d'e-mail des rappels (`smtps://utilisateur:mot-de-passe@hote:465`). |
+| `SMTP_FROM` | Expéditeur des rappels. |
+| `REMINDERS` | `false` coupe la tâche des rappels (active par défaut, toutes les 10 minutes). |
+| `PACK_PUBLIC_KEYS` | Clés publiques Ed25519 autorisées à signer des packs, séparées par des virgules. Sans elles, aucune mise à jour n'est acceptée et seuls les packs livrés servent. |
+| `PACK_UPDATE_URL` | Dossier HTTPS qui publie `index.json` et les packs signés. Vérifié une fois par jour, seulement si un administrateur l'active dans les réglages. |
+| `MAINTENANCE` | `true` ne sert que la page de maintenance, par exemple pendant une restauration de sauvegarde. |
+| `RELEASE_CHECK_URL` | Adresse interrogée une fois par jour pour annoncer une nouvelle version, seulement si un administrateur l'active. |
+
+### Publier une mise à jour de pack
+
+```sh
+bun apps/server/src/cli/pack-keygen.ts cles/almanach.pem            # une fois ; garde la clé privée hors ligne
+bun apps/server/src/cli/pack-sign.ts packs/fr cles/almanach.pem 3 "Taux 2027" > fr-3.json
+```
+
+Importe `fr-3.json` depuis **Réglages → Packs de règles par pays**, ou publie-le à côté d'un
+`index.json` (`{ "bundles": ["fr-3.json"] }`) dans le dossier `PACK_UPDATE_URL`. Le numéro doit
+augmenter à chaque publication : une instance refuse toujours un pack plus ancien que le sien.
+
+## Développement
+
+Il faut [Bun](https://bun.sh) 1.3 ou plus récent, et PostgreSQL 16 pour les tests de bout en bout.
+
+```sh
+bun install
+bun run lint && bun run typecheck && bun run test
+E2E_ADMIN_URL=postgres://postgres:postgres@127.0.0.1:5432/postgres bun run test:e2e
+```
+
+| Dossier | Contenu |
+|---|---|
+| `apps/server` | API Hono, base PostgreSQL (Drizzle), calcul des échéances, PDF, rappels. |
+| `apps/web` | Interface React 19, en français, anglais et allemand. |
+| `packages/shared` | Schémas Zod et calculs partagés entre le serveur et l'interface. |
+| `packs/` | Règles par pays et par année, en YAML, chaque chiffre avec sa source. |
+| `e2e/` | Tests Playwright sur ordinateur et mobile, avec vérification d'accessibilité (axe). |
+
+## Contribuer
+
+Les contributions sont les bienvenues, surtout les **packs pays** et les **traductions**. Une règle
+fiscale doit citer sa source officielle et sa date de vérification, sinon elle n'est pas acceptée.
+Un pack que personne n'a vérifié reste marqué expérimental.
+
+## Avertissement
+
+Almanach t'aide à ne rien oublier et donne des **estimations**. Ce n'est pas un conseil fiscal ou
+comptable : vérifie toujours auprès des sources officielles de ton pays, indiquées dans
+l'application.
+
+## Licence
+
+AGPL-3.0, voir [LICENSE](LICENSE).

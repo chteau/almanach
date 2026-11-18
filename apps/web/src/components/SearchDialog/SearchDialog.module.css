@@ -1,0 +1,78 @@
+.dialog {
+  width: min(560px, calc(100vw - 32px));
+  max-height: min(80vh, 640px);
+  margin: 10vh auto auto;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.dialog::backdrop {
+  background: rgb(0 0 0 / 40%);
+}
+
+.field input {
+  width: 100%;
+  padding: 16px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 17px;
+}
+
+.results {
+  padding: 8px;
+  overflow-y: auto;
+}
+
+.group {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 8px;
+}
+
+.group h3 {
+  margin: 8px 8px 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.group a {
+  padding: 10px 8px;
+  border-radius: 6px;
+  color: inherit;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
+.group a:hover,
+.group a:focus-visible {
+  background: var(--surface-2);
+}
+
+.withAction {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.group .action {
+  font-size: 13px;
+  color: var(--accent);
+  white-space: nowrap;
+}
+
+.empty,
+.hint {
+  margin: 8px;
+  font-size: 13px;
+  color: var(--muted);
+}

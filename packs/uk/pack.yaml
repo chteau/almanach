@@ -1,0 +1,47 @@
+country: GB
+maturity: experimental
+name: { fr: Royaume-Uni, en: United Kingdom, de: Vereinigtes Königreich }
+currency: GBP
+fiscalYearStart: "04-06"
+bank: uk
+statuses:
+  - id: sole_trader
+    label: { fr: Entrepreneur individuel (sole trader), en: Sole trader, de: Einzelunternehmer (sole trader) }
+declarationPeriods: [yearly]
+options:
+  - id: vat_registered
+    label: { fr: Assujetti à la TVA, en: VAT registered, de: Umsatzsteuerpflichtig }
+  - id: scotland
+    label: { fr: "Résident fiscal en Écosse", en: "Scottish taxpayer", de: "In Schottland steuerpflichtig" }
+  - id: northern_ireland
+    label:
+      { fr: "Résident en Irlande du Nord", en: "Living in Northern Ireland", de: "Wohnsitz in Nordirland" }
+  - id: mtd_itsa
+    label:
+      {
+        fr: "Concerné par Making Tax Digital (revenus éligibles > 50 000 £ en 2024-25)",
+        en: "Within Making Tax Digital for Income Tax (qualifying income over £50,000 in 2024-25)",
+        de: "Making Tax Digital für Einkommensteuer (qualifizierte Einkünfte über 50.000 £ in 2024-25)",
+      }
+identifiers:
+  - id: utr
+    label: { fr: UTR, en: Unique Taxpayer Reference (UTR), de: UTR }
+    pattern: "^\\d{10}$"
+    example: "1234567890"
+    required: true
+  - id: vat
+    label: { fr: N° de TVA, en: VAT number, de: USt-Nummer }
+    pattern: "^GB(\\d{9}|\\d{12})$"
+    example: "GB123456789"
+    required: false
+invoice:
+  vatRateBp: 2000
+  defaultMode: none
+  toggle: { option: vat_registered, mode: standard }
+  requiredIdentifiers: []
+  requireClientAddress: true
+  mentions:
+    export:
+      fr: "Hors du champ de la TVA britannique (lieu de prestation : pays du client)"
+      en: "Outside the scope of UK VAT (place of supply: customer's country)"
+      de: "Nicht im Anwendungsbereich der britischen Umsatzsteuer (Leistungsort: Land des Kunden)"

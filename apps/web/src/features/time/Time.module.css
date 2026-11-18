@@ -1,0 +1,34 @@
+.clock {
+  margin: 0;
+  font-size: 40px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.timerBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+.timerBar > :first-child {
+  flex: 1 1 240px;
+}
+
+.weekNav {
+  display: flex;
+  gap: 4px;
+}
+
+.today {
+  color: var(--accent);
+}
+
+.unbilledRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}

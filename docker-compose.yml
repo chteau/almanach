@@ -1,0 +1,38 @@
+services:
+  almanach:
+    build: .
+    image: almanach:local
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://almanach:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@db:5432/almanach
+    ports:
+      - "8080:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: almanach
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: almanach
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U almanach -d almanach"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  db-data:

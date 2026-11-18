@@ -1,0 +1,33 @@
+{
+  "name": "almanach",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:server": "bun --watch apps/server/src/index.ts",
+    "dev:web": "cd apps/web && bun run dev",
+    "build": "cd apps/web && bun run build",
+    "start": "bun apps/server/src/index.ts",
+    "lint": "biome check .",
+    "format": "biome check --write .",
+    "typecheck": "tsc -p packages/shared && tsc -p apps/server && tsc -p apps/web && tsc -p e2e",
+    "test": "bun test packages apps",
+    "test:e2e": "bun run build && playwright test",
+    "db:generate": "drizzle-kit generate --config apps/server/drizzle.config.ts",
+    "audit": "bun audit --ignore GHSA-fc5q-39xc-vjpf"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "4.14.0",
+    "@biomejs/biome": "2.6.8",
+    "@playwright/test": "1.65.1",
+    "@types/bun": "1.4.4",
+    "drizzle-kit": "0.31.11",
+    "typescript": "7.0.2"
+  },
+  "overrides": {
+    "esbuild": "0.28.2"
+  }
+}

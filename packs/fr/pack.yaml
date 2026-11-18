@@ -1,0 +1,109 @@
+# Pack France — metadata used by onboarding. Yearly rules live in <year>.yaml.
+country: FR
+maturity: verified
+name: { fr: France, en: France, de: Frankreich }
+currency: EUR
+fiscalYearStart: "01-01"
+bank: iban
+statuses:
+  - id: micro_bnc
+    label:
+      {
+        fr: "Micro-entrepreneur — libéral (BNC)",
+        en: "Micro-entrepreneur — liberal profession (BNC)",
+        de: "Kleinstunternehmer — freier Beruf (BNC)",
+      }
+    hint:
+      {
+        fr: "Développement, conseil, design, formation…",
+        en: "Software, consulting, design, training…",
+        de: "Softwareentwicklung, Beratung, Design, Schulung…",
+      }
+  - id: micro_bic_services
+    label:
+      {
+        fr: "Micro-entrepreneur — prestations de services (BIC)",
+        en: "Micro-entrepreneur — commercial services (BIC)",
+        de: "Kleinstunternehmer — gewerbliche Dienstleistungen (BIC)",
+      }
+  - id: micro_bic_sales
+    label:
+      {
+        fr: "Micro-entrepreneur — vente de marchandises (BIC)",
+        en: "Micro-entrepreneur — sale of goods (BIC)",
+        de: "Kleinstunternehmer — Warenverkauf (BIC)",
+      }
+declarationPeriods: [monthly, quarterly]
+options:
+  - id: versement_liberatoire
+    label:
+      {
+        fr: "Versement libératoire de l'impôt sur le revenu",
+        en: "Flat-rate income tax payment (versement libératoire)",
+        de: "Pauschale Einkommensteuer (versement libératoire)",
+      }
+  - id: vat_liable
+    label:
+      {
+        fr: "Assujetti à la TVA (franchise en base dépassée ou option)",
+        en: "VAT liable (threshold exceeded or opted in)",
+        de: "Umsatzsteuerpflichtig (Schwelle überschritten oder Option)",
+      }
+  - id: cipav
+    label:
+      {
+        fr: "Affilié à la Cipav (profession libérale réglementée)",
+        en: "Member of the Cipav pension fund (regulated profession)",
+        de: "Mitglied der Cipav (reglementierter freier Beruf)",
+      }
+  - id: artisan
+    label:
+      {
+        fr: "Activité artisanale (inscrite au registre des métiers)",
+        en: "Craft business (trades register)",
+        de: "Handwerksbetrieb (Handwerksregister)",
+      }
+  - id: acre
+    label:
+      {
+        fr: "ACRE (aide à la création d'entreprise)",
+        en: "ACRE (start-up contribution relief)",
+        de: "ACRE (Gründungsentlastung)",
+      }
+identifiers:
+  - id: siret
+    label: { fr: SIRET, en: SIRET, de: SIRET }
+    pattern: "^\\d{14}$"
+    example: "732 829 320 00074"
+    required: true
+    checksum: luhn
+  - id: vat
+    label: { fr: "N° de TVA intracommunautaire", en: "EU VAT number", de: "USt-IdNr." }
+    pattern: "^FR[0-9A-Z]{2}\\d{9}$"
+    example: "FR40732829320"
+    required: false
+invoice:
+  vatRateBp: 2000
+  defaultMode: franchise
+  toggle: { option: vat_liable, mode: standard }
+  requiredIdentifiers: [siret]
+  requireClientAddress: true
+  # Art. R526-27 du Code de commerce : « EI » ou « entrepreneur individuel » à côté du nom.
+  sellerNameMention: EI
+  mentions:
+    franchise:
+      fr: "TVA non applicable, art. 293 B du CGI"
+      en: "VAT not applicable, article 293 B of the French General Tax Code (CGI)"
+      de: "Keine Umsatzsteuer gemäß Art. 293 B CGI (französisches Steuergesetzbuch)"
+    reverse_charge:
+      fr: "Autoliquidation — article 196 de la directive 2006/112/CE"
+      en: "Reverse charge — Article 196 of Directive 2006/112/EC"
+      de: "Steuerschuldnerschaft des Leistungsempfängers — Art. 196 der Richtlinie 2006/112/EG"
+    export:
+      fr: "TVA non applicable, art. 259-1 du CGI"
+      en: "VAT not applicable, article 259-1 of the French General Tax Code (CGI)"
+      de: "Keine französische Umsatzsteuer gemäß Art. 259-1 CGI"
+    b2b_late:
+      fr: "En cas de retard de paiement : pénalités au taux de trois fois le taux d'intérêt légal et indemnité forfaitaire pour frais de recouvrement de 40 € (art. L441-10 du Code de commerce). Pas d'escompte pour paiement anticipé."
+      en: "Late payment: penalties at three times the French statutory interest rate and a fixed recovery fee of €40 (art. L441-10 of the French Commercial Code). No discount for early payment."
+      de: "Bei Zahlungsverzug: Verzugszinsen in Höhe des dreifachen gesetzlichen Zinssatzes und eine Pauschale von 40 € für Beitreibungskosten (Art. L441-10 Code de commerce). Kein Skonto bei vorzeitiger Zahlung."

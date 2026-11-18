@@ -1,0 +1,13 @@
+.logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--ink);
+}
+
+.name {
+  font-weight: 600;
+  font-size: 19px;
+  line-height: 1;
+  letter-spacing: -0.03em;
+}

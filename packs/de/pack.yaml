@@ -1,0 +1,56 @@
+country: DE
+maturity: experimental
+name: { fr: Allemagne, en: Germany, de: Deutschland }
+currency: EUR
+fiscalYearStart: "01-01"
+bank: iban
+statuses:
+  - id: freiberufler
+    label:
+      { fr: "Profession libérale (Freiberufler)", en: "Liberal profession (Freiberufler)", de: Freiberufler }
+  - id: gewerbe
+    label:
+      {
+        fr: "Activité commerciale (Gewerbetreibender)",
+        en: "Trade (Gewerbetreibender)",
+        de: Gewerbetreibender,
+      }
+declarationPeriods: [monthly, quarterly, yearly]
+options:
+  - id: kleinunternehmer
+    label:
+      {
+        fr: "Régime des petites entreprises (§ 19 UStG)",
+        en: "Small business scheme (§ 19 UStG)",
+        de: "Kleinunternehmerregelung (§ 19 UStG)",
+      }
+identifiers:
+  - id: steuernummer
+    label: { fr: Steuernummer, en: Tax number (Steuernummer), de: Steuernummer }
+    pattern: "^\\d{2,3}/?\\d{3,4}/?\\d{4,5}$"
+    example: "21/815/08150"
+    required: true
+  - id: vat
+    label: { fr: "N° de TVA (USt-IdNr.)", en: "VAT ID (USt-IdNr.)", de: USt-IdNr. }
+    pattern: "^DE\\d{9}$"
+    example: "DE123456789"
+    required: false
+invoice:
+  vatRateBp: 1900
+  defaultMode: standard
+  toggle: { option: kleinunternehmer, mode: franchise }
+  requiredIdentifiers: [steuernummer]
+  requireClientAddress: true
+  mentions:
+    franchise:
+      fr: "Petite entreprise exonérée de TVA en application du § 19 UStG"
+      en: "Small business exempt from VAT under § 19 UStG"
+      de: "Steuerbefreiung für Kleinunternehmer gemäß § 19 UStG – keine Umsatzsteuer ausgewiesen."
+    reverse_charge:
+      fr: "Autoliquidation — la TVA est due par le preneur"
+      en: "Reverse charge — VAT payable by the recipient"
+      de: "Steuerschuldnerschaft des Leistungsempfängers"
+    export:
+      fr: "Prestation non imposable en Allemagne"
+      en: "Service not taxable in Germany"
+      de: "Nicht im Inland steuerbare Leistung"

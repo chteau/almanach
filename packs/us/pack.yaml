@@ -1,0 +1,37 @@
+country: US
+maturity: experimental
+name: { fr: États-Unis, en: United States, de: Vereinigte Staaten }
+currency: USD
+fiscalYearStart: "01-01"
+bank: us
+statuses:
+  - id: sole_proprietor
+    label:
+      {
+        fr: Entreprise individuelle (sole proprietor),
+        en: Sole proprietor,
+        de: Einzelunternehmer (sole proprietor),
+      }
+  - id: single_member_llc
+    label: { fr: LLC à associé unique, en: Single-member LLC, de: Einpersonen-LLC }
+declarationPeriods: [quarterly]
+options:
+  - id: married_joint
+    label:
+      {
+        fr: "Déclaration commune (married filing jointly)",
+        en: Married filing jointly,
+        de: "Gemeinsame Veranlagung (married filing jointly)",
+      }
+identifiers:
+  - id: ein
+    label: { fr: EIN, en: EIN, de: EIN }
+    pattern: "^\\d{2}-?\\d{7}$"
+    example: "12-3456789"
+    required: false
+invoice:
+  vatRateBp: 0
+  defaultMode: none
+  requiredIdentifiers: []
+  requireClientAddress: false
+  mentions: {}

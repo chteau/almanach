@@ -1,0 +1,23 @@
+.notice {
+  padding: 14px 16px;
+  border-radius: var(--radius);
+  font-size: 14px;
+  line-height: 1.55;
+  border: 1px solid var(--line);
+}
+
+.info {
+  background: var(--surface);
+}
+
+.warn {
+  background: var(--warn-bg);
+  color: var(--warn-fg);
+  border-color: transparent;
+}
+
+.error {
+  background: var(--err-bg);
+  color: var(--err-fg);
+  border-color: transparent;
+}

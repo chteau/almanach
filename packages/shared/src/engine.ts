@@ -1,0 +1,510 @@
+import { addDays, daysBetween } from './documents.ts';
+import type { DeclarationPeriod } from './packs.ts';
+import type { AppliesTo, DeadlineRule, EstimateRule, Localized, ThresholdRule, YearRules } from './rules.ts';
+
+/** Profile facts the rules depend on. */
+export interface RuleProfile {
+  status: string | null;
+  options: string[];
+  declarationPeriod: DeclarationPeriod | null;
+  activityStart: string;
+}
+
+/** Money received on a date, in the main currency. */
+export interface Receipt {
+  date: string;
+  cents: number;
+}
+
+/**
+ * Tells whether a rule concerns a profile
+ *
+ * @param appliesTo {AppliesTo | undefined} - rule conditions
+ * @param profile {RuleProfile} - the person's situation
+ * @returns {boolean} - true when every condition holds
+ */
+export function applies(appliesTo: AppliesTo | undefined, profile: RuleProfile): boolean {
+  if (!appliesTo) return true;
+  if (appliesTo.statuses && !appliesTo.statuses.includes(profile.status ?? '')) return false;
+  if (appliesTo.options?.some((option) => !profile.options.includes(option))) return false;
+  if (appliesTo.withoutOptions?.some((option) => profile.options.includes(option))) return false;
+  if (appliesTo.periods && !appliesTo.periods.includes(profile.declarationPeriod ?? 'yearly')) return false;
+  return true;
+}
+
+/**
+ * First and last day of the fiscal year containing a date
+ *
+ * @param date {string} - YYYY-MM-DD
+ * @param fiscalYearStart {string} - MM-DD the fiscal year starts on, e.g. "04-06" in the UK
+ * @returns {{ year: number; start: string; end: string }} - year is the calendar year the fiscal year starts in
+ */
+export function fiscalYearOf(
+  date: string,
+  fiscalYearStart: string,
+): { year: number; start: string; end: string } {
+  const calendarYear = Number(date.slice(0, 4));
+  const year = date.slice(5) >= fiscalYearStart ? calendarYear : calendarYear - 1;
+  const start = `${year}-${fiscalYearStart}`;
+  return { year, start, end: addDays(`${year + 1}-${fiscalYearStart}`, -1) };
+}
+
+/**
+ * Last day of a month
+ *
+ * @param year {number} - calendar year
+ * @param month {number} - month from 1 to 12, may overflow into following years
+ * @returns {string} - YYYY-MM-DD
+ */
+function lastDayOfMonth(year: number, month: number): string {
+  return new Date(Date.UTC(year, month, 0)).toISOString().slice(0, 10);
+}
+
+/**
+ * Moves a date to the next business day when it falls on a weekend or a public holiday (S-062)
+ *
+ * @param date {string} - legal due date
+ * @param holidays {Set<string>} - public holidays as YYYY-MM-DD
+ * @returns {string} - the date the obligation is actually due
+ */
+export function nextBusinessDay(date: string, holidays: Set<string>): string {
+  let current = date;
+  for (let guard = 0; guard < 14; guard += 1) {
+    const day = new Date(`${current}T00:00:00Z`).getUTCDay();
+    if (day !== 0 && day !== 6 && !holidays.has(current)) return current;
+    current = addDays(current, 1);
+  }
+  return current;
+}
+
+/** One dated occurrence of a pack obligation. */
+export interface DeadlineOccurrence {
+  /** Stable key: rule id and period start (or due date), used to store "done" marks. */
+  key: string;
+  ruleId: string;
+  kind: DeadlineRule['kind'];
+  label: Localized;
+  description: Localized;
+  link: string;
+  source: string;
+  verifiedOn: string;
+  /** Date it is actually due, after moving off weekends and holidays. */
+  due: string;
+  /** Legal date when it was moved, otherwise null. */
+  movedFrom: string | null;
+  periodStart: string | null;
+  periodEnd: string | null;
+  estimates: string[];
+  declaresRevenue: boolean;
+}
+
+/**
+ * Lists every occurrence of the pack obligations that concern a profile for one rules year
+ *
+ * @param rules {YearRules} - rules of the year
+ * @param profile {RuleProfile} - the person's situation
+ * @param holidays {Set<string>} - public holidays of every loaded year, for dates spilling into the next one
+ * @returns {DeadlineOccurrence[]} - occurrences sorted by due date
+ */
+export function expandDeadlines(
+  rules: YearRules,
+  profile: RuleProfile,
+  holidays: Set<string>,
+): DeadlineOccurrence[] {
+  const out: DeadlineOccurrence[] = [];
+  for (const rule of rules.deadlines) {
+    if (!applies(rule.appliesTo, profile)) continue;
+    const dates: { due: string; periodStart?: string; periodEnd?: string; fixed?: boolean }[] = [];
+    if (rule.schedule.type === 'monthly') {
+      for (let month = 1; month <= 12; month += 1) {
+        const target = month + rule.schedule.monthOffset;
+        const due =
+          rule.schedule.day === 'last'
+            ? lastDayOfMonth(rules.year, target)
+            : `${lastDayOfMonth(rules.year, target).slice(0, 8)}${String(rule.schedule.day).padStart(2, '0')}`;
+        dates.push({
+          due,
+          periodStart: `${rules.year}-${String(month).padStart(2, '0')}-01`,
+          periodEnd: lastDayOfMonth(rules.year, month),
+        });
+      }
+    } else dates.push(...rule.schedule.dates);
+    for (const entry of dates) {
+      const due =
+        rules.shift === 'next_business_day' && !entry.fixed
+          ? nextBusinessDay(entry.due, holidays)
+          : entry.due;
+      out.push({
+        key: `${rule.id}:${entry.periodStart ?? entry.due}`,
+        ruleId: rule.id,
+        kind: rule.kind,
+        label: rule.label,
+        description: rule.description,
+        link: rule.link,
+        source: rule.source,
+        verifiedOn: rule.verified_on,
+        due,
+        movedFrom: due === entry.due ? null : entry.due,
+        periodStart: entry.periodStart ?? null,
+        periodEnd: entry.periodEnd ?? null,
+        estimates: rule.estimates,
+        declaresRevenue: rule.declaresRevenue,
+      });
+    }
+  }
+  return out.sort((a, b) => a.due.localeCompare(b.due));
+}
+
+/** Result of an estimate, with the steps shown to the person (S-046, S-082). */
+export interface EstimateResult {
+  id: string;
+  label: Localized;
+  cents: number;
+  /** Human-checkable steps, e.g. "12 000,00 × 26.1 %". Amounts in cents, rates in basis points. */
+  steps: { baseCents: number; rateBp: number; cents: number; from?: string; reducedShareBp?: number }[];
+  source: string;
+  verifiedOn: string;
+}
+
+/**
+ * Rounds cents × basis points to the nearest cent
+ *
+ * @param cents {number} - amount
+ * @param rateBp {number} - rate in basis points
+ * @returns {number} - rounded product
+ */
+function applyRate(cents: number, rateBp: number): number {
+  return Math.round((cents * rateBp) / 10_000);
+}
+
+/**
+ * End of the reduced-rate window: last day of the n-th calendar quarter after the start quarter
+ *
+ * @param activityStart {string} - YYYY-MM-DD
+ * @param quarters {number} - quarters after the start quarter
+ * @returns {string} - last day of the window
+ */
+export function reductionEnd(activityStart: string, quarters: number): string {
+  const year = Number(activityStart.slice(0, 4));
+  const startQuarter = Math.floor((Number(activityStart.slice(5, 7)) - 1) / 3);
+  return lastDayOfMonth(year, (startQuarter + quarters + 1) * 3);
+}
+
+/**
+ * Flat-rate contributions on collected revenue, with mid-year rate changes and a temporary
+ * reduction such as ACRE (S-215)
+ *
+ * @param rule {EstimateRule} - estimate whose formula kind is "flat"
+ * @param receipts {Receipt[]} - money collected in the period
+ * @param profile {RuleProfile} - the person's situation
+ * @returns {EstimateResult} - amount and steps
+ */
+function flat(rule: EstimateRule, receipts: Receipt[], profile: RuleProfile): EstimateResult {
+  if (rule.formula.kind !== 'flat') throw new Error('not a flat estimate');
+  const { rates, reduction } = rule.formula;
+  const groups = new Map<
+    string,
+    { baseCents: number; rateBp: number; from: string; reducedShareBp?: number }
+  >();
+  const step = reduction
+    ? [...reduction.steps].reverse().find((candidate) => candidate.startedFrom <= profile.activityStart)
+    : undefined;
+  const reducedUntil =
+    reduction && step && profile.options.includes(reduction.option)
+      ? reductionEnd(profile.activityStart, reduction.quarters)
+      : null;
+  for (const receipt of receipts) {
+    const rate = [...rates].reverse().find((candidate) => candidate.from <= receipt.date) ?? rates[0];
+    if (!rate) continue;
+    const reduced =
+      reducedUntil !== null && receipt.date <= reducedUntil && receipt.date >= profile.activityStart;
+    const key = `${rate.from}:${reduced}`;
+    const group = groups.get(key) ?? {
+      baseCents: 0,
+      rateBp: reduced && step ? Math.round((rate.rateBp * step.dueShareBp) / 10_000) : rate.rateBp,
+      from: rate.from,
+      ...(reduced && step ? { reducedShareBp: step.dueShareBp } : {}),
+    };
+    group.baseCents += receipt.cents;
+    groups.set(key, group);
+  }
+  const steps = [...groups.values()].map((group) => ({
+    ...group,
+    cents: applyRate(group.baseCents, group.rateBp),
+  }));
+  return {
+    id: rule.id,
+    label: rule.label,
+    cents: steps.reduce((sum, item) => sum + item.cents, 0),
+    steps,
+    source: rule.source,
+    verifiedOn: rule.verified_on,
+  };
+}
+
+/**
+ * Progressive tax over bands after an allowance (UK income tax, US federal income tax)
+ *
+ * @param rule {EstimateRule} - estimate whose formula kind is "brackets"
+ * @param baseCents {number} - yearly income before the allowance
+ * @param deductionsCents {number} - other deductions (half of self-employment tax in the US)
+ * @returns {EstimateResult} - amount and one step per band used
+ */
+function brackets(rule: EstimateRule, baseCents: number, deductionsCents: number): EstimateResult {
+  if (rule.formula.kind !== 'brackets') throw new Error('not a bracket estimate');
+  const { allowanceCents, taper, bands } = rule.formula;
+  // Taper (UK) reduces the allowance by `byCents` for every `reducePerCents` above the limit.
+  let allowance = allowanceCents;
+  if (taper && baseCents > taper.aboveCents) {
+    const reduction = Math.floor((baseCents - taper.aboveCents) / taper.reducePerCents) * taper.byCents;
+    allowance = Math.max(0, allowance - reduction);
+  }
+  let taxable = Math.max(0, baseCents - deductionsCents - allowance);
+  if (rule.formula.businessIncomeDeductionBp) {
+    const share = rule.formula.businessIncomeDeductionBp;
+    taxable -= Math.min(
+      applyRate(Math.max(0, baseCents - deductionsCents), share),
+      applyRate(taxable, share),
+    );
+  }
+  let previous = 0;
+  const steps: EstimateResult['steps'] = [];
+  for (const band of bands) {
+    if (taxable <= 0) break;
+    const width = band.upToCents === null ? taxable : Math.max(0, band.upToCents - previous);
+    const portion = Math.min(taxable, width);
+    if (portion > 0)
+      steps.push({ baseCents: portion, rateBp: band.rateBp, cents: applyRate(portion, band.rateBp) });
+    taxable -= portion;
+    previous = band.upToCents ?? previous;
+  }
+  return {
+    id: rule.id,
+    label: rule.label,
+    cents: steps.reduce((sum, item) => sum + item.cents, 0),
+    steps,
+    source: rule.source,
+    verifiedOn: rule.verified_on,
+  };
+}
+
+/**
+ * Contributions on profits between limits (UK Class 4 National Insurance)
+ *
+ * @param rule {EstimateRule} - estimate whose formula kind is "profit_bands"
+ * @param baseCents {number} - yearly profit
+ * @returns {EstimateResult} - amount and one step per band used
+ */
+function profitBands(rule: EstimateRule, baseCents: number): EstimateResult {
+  if (rule.formula.kind !== 'profit_bands') throw new Error('not a profit band estimate');
+  const bands = rule.formula.bands;
+  const steps: EstimateResult['steps'] = [];
+  bands.forEach((band, index) => {
+    const upper = bands[index + 1]?.fromCents ?? Number.POSITIVE_INFINITY;
+    const portion = Math.max(0, Math.min(baseCents, upper) - band.fromCents);
+    if (portion > 0)
+      steps.push({ baseCents: portion, rateBp: band.rateBp, cents: applyRate(portion, band.rateBp) });
+  });
+  return {
+    id: rule.id,
+    label: rule.label,
+    cents: steps.reduce((sum, item) => sum + item.cents, 0),
+    steps,
+    source: rule.source,
+    verifiedOn: rule.verified_on,
+  };
+}
+
+/**
+ * US self-employment tax (Schedule SE)
+ *
+ * @param rule {EstimateRule} - estimate whose formula kind is "us_self_employment"
+ * @param baseCents {number} - yearly net profit
+ * @returns {EstimateResult} - Social Security and Medicare parts
+ */
+function usSelfEmployment(rule: EstimateRule, baseCents: number): EstimateResult {
+  if (rule.formula.kind !== 'us_self_employment') throw new Error('not a self-employment estimate');
+  const formula = rule.formula;
+  const net = applyRate(baseCents, formula.netEarningsShareBp);
+  const steps: EstimateResult['steps'] = [];
+  if (net >= formula.minimumNetEarningsCents) {
+    const social = Math.min(net, formula.wageBaseCents);
+    steps.push({
+      baseCents: social,
+      rateBp: formula.socialSecurityBp,
+      cents: applyRate(social, formula.socialSecurityBp),
+    });
+    steps.push({ baseCents: net, rateBp: formula.medicareBp, cents: applyRate(net, formula.medicareBp) });
+  }
+  return {
+    id: rule.id,
+    label: rule.label,
+    cents: steps.reduce((sum, item) => sum + item.cents, 0),
+    steps,
+    source: rule.source,
+    verifiedOn: rule.verified_on,
+  };
+}
+
+/**
+ * German income tax for a single person under § 32a EStG, rounded down to whole euros as the law requires
+ *
+ * @param rule {EstimateRule} - estimate whose formula kind is "de_income_tax"
+ * @param baseCents {number} - taxable income (zu versteuerndes Einkommen)
+ * @returns {EstimateResult} - amount with one step showing the average rate
+ */
+function deIncomeTax(rule: EstimateRule, baseCents: number): EstimateResult {
+  if (rule.formula.kind !== 'de_income_tax') throw new Error('not a German income tax estimate');
+  const { zones, zone2, zone3, zone4, zone5 } = rule.formula;
+  const x = Math.floor(baseCents / 100);
+  let tax = 0;
+  if (x > zones[3]) tax = zone5[0] * x - zone5[1];
+  else if (x > zones[2]) tax = zone4[0] * x - zone4[1];
+  else if (x > zones[1]) {
+    const z = (x - zones[1]) / 10_000;
+    tax = (zone3[0] * z + zone3[1]) * z + zone3[2];
+  } else if (x > zones[0]) {
+    const y = (x - zones[0]) / 10_000;
+    tax = (zone2[0] * y + zone2[1]) * y;
+  }
+  const cents = Math.max(0, Math.floor(tax)) * 100;
+  return {
+    id: rule.id,
+    label: rule.label,
+    cents,
+    steps: cents > 0 ? [{ baseCents, rateBp: Math.round((cents * 10_000) / baseCents), cents }] : [],
+    source: rule.source,
+    verifiedOn: rule.verified_on,
+  };
+}
+
+/**
+ * Computes every estimate of the year that concerns a profile. Revenue-based estimates use the receipts
+ * given; profit-based ones use their total, as Almanach does not track expenses yet.
+ *
+ * @param rules {YearRules} - rules of the year
+ * @param profile {RuleProfile} - the person's situation
+ * @param receipts {Receipt[]} - money collected in the period of interest
+ * @param only {string[] | undefined} - restrict to these estimate ids
+ * @returns {EstimateResult[]} - results in rule order
+ */
+export function computeEstimates(
+  rules: YearRules,
+  profile: RuleProfile,
+  receipts: Receipt[],
+  only?: string[],
+): EstimateResult[] {
+  const total = receipts.reduce((sum, receipt) => sum + receipt.cents, 0);
+  const results = new Map<string, EstimateResult>();
+  const ordered = [...rules.estimates].sort(
+    (a, b) => Number(a.formula.kind === 'brackets') - Number(b.formula.kind === 'brackets'),
+  );
+  for (const rule of ordered) {
+    if (!applies(rule.appliesTo, profile)) continue;
+    const formula = rule.formula;
+    let result: EstimateResult;
+    if (formula.kind === 'flat') result = flat(rule, receipts, profile);
+    else if (formula.kind === 'brackets') {
+      const deductions = formula.deductHalfOf.reduce(
+        (sum, id) => sum + Math.round((results.get(id)?.cents ?? 0) / 2),
+        0,
+      );
+      result = brackets(rule, total, deductions);
+    } else if (formula.kind === 'profit_bands') result = profitBands(rule, total);
+    else if (formula.kind === 'us_self_employment') result = usSelfEmployment(rule, total);
+    else result = deIncomeTax(rule, total);
+    results.set(rule.id, result);
+  }
+  return rules.estimates
+    .map((rule) => results.get(rule.id))
+    .filter(
+      (result): result is EstimateResult => result !== undefined && (!only || only.includes(result.id)),
+    );
+}
+
+/** Progress towards a revenue ceiling (S-044, S-211, S-212). */
+export interface ThresholdProgress {
+  id: string;
+  label: Localized;
+  consequence: Localized;
+  window: ThresholdRule['window'];
+  windowStart: string;
+  windowEnd: string;
+  limitCents: number;
+  toleranceCents: number | null;
+  reachedCents: number;
+  /** Percentage reached, in basis points of the limit. */
+  reachedBp: number;
+  remainingCents: number;
+  /** Date the limit would be crossed at the current pace, if within the window. */
+  projectedDate: string | null;
+  /** Above the base limit. */
+  exceeded: boolean;
+  /** Above the higher tolerance limit, when the country has one: consequences apply at once. */
+  toleranceExceeded: boolean;
+  source: string;
+  verifiedOn: string;
+}
+
+/**
+ * Measures each threshold that concerns a profile
+ *
+ * @param rules {YearRules} - rules of the current fiscal year
+ * @param profile {RuleProfile} - the person's situation
+ * @param receipts {Receipt[]} - every receipt of the current and previous fiscal years
+ * @param fiscalYear {{ start: string; end: string }} - current fiscal year
+ * @param today {string} - YYYY-MM-DD
+ * @param priorYearCents {number | null} - revenue declared at onboarding for the previous year, used when no receipt exists
+ * @returns {ThresholdProgress[]} - one entry per applicable threshold
+ */
+export function measureThresholds(
+  rules: YearRules,
+  profile: RuleProfile,
+  receipts: Receipt[],
+  fiscalYear: { start: string; end: string },
+  today: string,
+  priorYearCents: number | null,
+): ThresholdProgress[] {
+  return rules.thresholds
+    .filter((rule) => applies(rule.appliesTo, profile))
+    .map((rule) => {
+      let start = fiscalYear.start;
+      let end = fiscalYear.end;
+      if (rule.window === 'previous_fiscal_year') {
+        start = `${Number(fiscalYear.start.slice(0, 4)) - 1}${fiscalYear.start.slice(4)}`;
+        end = addDays(fiscalYear.start, -1);
+      } else if (rule.window === 'rolling_12_months') {
+        start = addDays(`${Number(today.slice(0, 4)) - 1}${today.slice(4)}`, 1);
+        end = today;
+      }
+      const inWindow = receipts.filter((receipt) => receipt.date >= start && receipt.date <= end);
+      let reached = inWindow.reduce((sum, receipt) => sum + receipt.cents, 0);
+      if (rule.window === 'previous_fiscal_year' && inWindow.length === 0 && priorYearCents !== null) {
+        reached = priorYearCents;
+      }
+      let projected: string | null = null;
+      if (rule.window === 'fiscal_year' && reached > 0 && reached < rule.limitCents) {
+        const elapsed = Math.max(1, daysBetween(start, today) + 1);
+        const date = addDays(start, Math.ceil((rule.limitCents * elapsed) / reached) - 1);
+        if (date <= end) projected = date;
+      }
+      return {
+        id: rule.id,
+        label: rule.label,
+        consequence: rule.consequence,
+        window: rule.window,
+        windowStart: start,
+        windowEnd: end,
+        limitCents: rule.limitCents,
+        toleranceCents: rule.toleranceCents ?? null,
+        reachedCents: reached,
+        reachedBp: rule.limitCents === 0 ? 0 : Math.round((reached * 10_000) / rule.limitCents),
+        remainingCents: Math.max(0, rule.limitCents - reached),
+        projectedDate: projected,
+        exceeded: reached > rule.limitCents,
+        toleranceExceeded: rule.toleranceCents !== undefined && reached > rule.toleranceCents,
+        source: rule.source,
+        verifiedOn: rule.verified_on,
+      };
+    });
+}

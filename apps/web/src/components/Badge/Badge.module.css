@@ -1,0 +1,34 @@
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.neutral {
+  color: var(--ink-2);
+  background: var(--surface-2);
+}
+
+.ok {
+  color: var(--ok-fg);
+  background: var(--ok-bg);
+}
+
+.warn {
+  color: var(--warn-fg);
+  background: var(--warn-bg);
+}
+
+.err {
+  color: var(--err-fg);
+  background: var(--err-bg);
+}
+
+.accent {
+  color: var(--on-ink);
+  background: var(--ink);
+}

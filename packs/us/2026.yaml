@@ -1,0 +1,132 @@
+# United States (federal only) — tax year 2026.
+# Figures from IRS Rev. Proc. 2025-32 (2026 inflation adjustments, including the 2025 One Big Beautiful Bill Act),
+# Form 1040-ES (2026) and the Internal Revenue Code. State taxes are not covered.
+year: 2026
+# 26 USC 7503: a deadline on a Saturday, Sunday or legal holiday moves to the next business day.
+shift: next_business_day
+shiftSource: https://www.law.cornell.edu/uscode/text/26/7503
+holidaysSource: https://www.irs.gov/pub/irs-pdf/p509.pdf
+holidays:
+  - { date: "2026-01-01", name: New Year's Day }
+  - { date: "2026-01-19", name: Martin Luther King Jr. Day }
+  - { date: "2026-02-16", name: Washington's Birthday }
+  - { date: "2026-04-16", name: District of Columbia Emancipation Day }
+  - { date: "2026-05-25", name: Memorial Day }
+  - { date: "2026-06-19", name: Juneteenth National Independence Day }
+  - { date: "2026-07-03", name: Independence Day (observed) }
+  - { date: "2026-09-07", name: Labor Day }
+  - { date: "2026-10-12", name: Columbus Day }
+  - { date: "2026-11-11", name: Veterans Day }
+  - { date: "2026-11-26", name: Thanksgiving Day }
+  - { date: "2026-12-25", name: Christmas Day }
+  - { date: "2027-01-01", name: New Year's Day }
+
+estimates:
+  - id: self_employment_tax
+    label:
+      {
+        fr: "Self-employment tax (Social Security et Medicare)",
+        en: Self-employment tax,
+        de: "Self-Employment Tax (Sozialversicherung)",
+      }
+    base: profit
+    formula:
+      kind: us_self_employment
+      netEarningsShareBp: 9235
+      socialSecurityBp: 1240
+      wageBaseCents: 18450000
+      medicareBp: 290
+      minimumNetEarningsCents: 40000
+    source: https://www.irs.gov/businesses/small-businesses-self-employed/self-employment-tax-social-security-and-medicare-taxes
+    verified_on: "2026-11-18"
+  - id: income_tax_single
+    label:
+      {
+        fr: "Impôt fédéral sur le revenu (célibataire)",
+        en: Federal income tax (single),
+        de: "Bundeseinkommensteuer (ledig)",
+      }
+    appliesTo: { withoutOptions: [married_joint] }
+    base: profit
+    formula:
+      kind: brackets
+      allowanceCents: 1610000
+      deductHalfOf: [self_employment_tax]
+      businessIncomeDeductionBp: 2000
+      bands:
+        - { upToCents: 1240000, rateBp: 1000 }
+        - { upToCents: 5040000, rateBp: 1200 }
+        - { upToCents: 10570000, rateBp: 2200 }
+        - { upToCents: 20177500, rateBp: 2400 }
+        - { upToCents: 25622500, rateBp: 3200 }
+        - { upToCents: 64060000, rateBp: 3500 }
+        - { upToCents: null, rateBp: 3700 }
+    source: https://www.irs.gov/pub/irs-drop/rp-25-32.pdf
+    verified_on: "2026-11-18"
+  - id: income_tax_joint
+    label:
+      {
+        fr: "Impôt fédéral sur le revenu (déclaration commune)",
+        en: Federal income tax (married filing jointly),
+        de: "Bundeseinkommensteuer (gemeinsam)",
+      }
+    appliesTo: { options: [married_joint] }
+    base: profit
+    formula:
+      kind: brackets
+      allowanceCents: 3220000
+      deductHalfOf: [self_employment_tax]
+      businessIncomeDeductionBp: 2000
+      bands:
+        - { upToCents: 2480000, rateBp: 1000 }
+        - { upToCents: 10080000, rateBp: 1200 }
+        - { upToCents: 21140000, rateBp: 2200 }
+        - { upToCents: 40355000, rateBp: 2400 }
+        - { upToCents: 51245000, rateBp: 3200 }
+        - { upToCents: 76870000, rateBp: 3500 }
+        - { upToCents: null, rateBp: 3700 }
+    source: https://www.irs.gov/pub/irs-drop/rp-25-32.pdf
+    verified_on: "2026-11-18"
+
+deadlines:
+  - id: estimated_tax
+    kind: tax
+    label:
+      {
+        fr: "Acompte d'impôt estimé (1040-ES)",
+        en: Estimated tax payment (1040-ES),
+        de: "Steuervorauszahlung (1040-ES)",
+      }
+    description:
+      fr: "Paiement trimestriel de l'impôt sur le revenu et de la self-employment tax de 2026, si vous prévoyez de devoir au moins 1 000 $."
+      en: "Quarterly payment of 2026 income tax and self-employment tax, if you expect to owe at least $1,000."
+      de: "Vierteljährliche Vorauszahlung der Einkommensteuer und Self-Employment Tax 2026, wenn Sie mindestens 1.000 $ schulden werden."
+    schedule:
+      type: dates
+      dates:
+        - { due: "2026-04-15", periodStart: "2026-01-01", periodEnd: "2026-03-31" }
+        - { due: "2026-06-15", periodStart: "2026-04-01", periodEnd: "2026-05-31" }
+        - { due: "2026-09-15", periodStart: "2026-06-01", periodEnd: "2026-08-31" }
+        - { due: "2027-01-15", periodStart: "2026-09-01", periodEnd: "2026-12-31" }
+    link: https://www.irs.gov/payments
+    source: https://www.irs.gov/pub/irs-pdf/f1040es.pdf
+    verified_on: "2026-11-18"
+  - id: form_1040
+    kind: tax
+    label:
+      {
+        fr: "Déclaration annuelle (Form 1040, Schedule C et SE)",
+        en: "Annual return (Form 1040, Schedules C and SE)",
+        de: "Jahreserklärung (Form 1040, Schedule C und SE)",
+      }
+    description:
+      fr: "Déclaration de l'année 2026 et paiement du solde."
+      en: "Tax return for 2026 and payment of any balance due."
+      de: "Steuererklärung 2026 und Zahlung des Restbetrags."
+    schedule:
+      { type: dates, dates: [{ due: "2027-04-15", periodStart: "2026-01-01", periodEnd: "2026-12-31" }] }
+    estimates: [self_employment_tax, income_tax_single, income_tax_joint]
+    declaresRevenue: true
+    link: https://www.irs.gov/filing
+    source: https://www.law.cornell.edu/uscode/text/26/6072
+    verified_on: "2026-11-18"

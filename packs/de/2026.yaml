@@ -1,0 +1,168 @@
+# Deutschland — Steuerjahr 2026. Werte aus UStG, EStG, AO, GewStG (gesetze-im-internet.de) und BMF-Schreiben.
+# Gewerbesteuer wird nicht geschätzt: der Hebesatz hängt von der Gemeinde ab.
+year: 2026
+# § 108 Abs. 3 AO: Fällt das Ende einer Frist auf einen Sonntag, Feiertag oder Sonnabend, endet sie mit dem nächsten Werktag.
+shift: next_business_day
+shiftSource: https://www.gesetze-im-internet.de/ao_1977/__108.html
+holidaysSource: https://www.balm.bund.de/DE/Themen/RechtsentwicklungRechtsvorschriften/Rechtsvorschriften/Strassenverkehrsrecht/LKW-Fahrverbote/Feiertagsfahrverbote2024/Feiertagsfahrverbote2026neu.html
+# Nur bundesweite Feiertage; Landesfeiertage (z. B. Fronleichnam) verschieben Fristen nur im jeweiligen Land.
+holidays:
+  - { date: "2026-01-01", name: Neujahr }
+  - { date: "2026-04-03", name: Karfreitag }
+  - { date: "2026-04-06", name: Ostermontag }
+  - { date: "2026-05-01", name: Tag der Arbeit }
+  - { date: "2026-05-14", name: Christi Himmelfahrt }
+  - { date: "2026-05-25", name: Pfingstmontag }
+  - { date: "2026-10-03", name: Tag der Deutschen Einheit }
+  - { date: "2026-12-25", name: 1. Weihnachtstag }
+  - { date: "2026-12-26", name: 2. Weihnachtstag }
+  - { date: "2027-01-01", name: Neujahr }
+
+thresholds:
+  - id: kleinunternehmer_previous_year
+    label:
+      {
+        fr: "Petite entreprise : CA de l'année précédente",
+        en: "Small business: previous-year revenue",
+        de: "Kleinunternehmer: Vorjahresumsatz",
+      }
+    appliesTo: { options: [kleinunternehmer] }
+    window: previous_fiscal_year
+    limitCents: 2500000
+    consequence:
+      fr: "Si le chiffre d'affaires 2025 dépassait 25 000 €, le régime du § 19 UStG ne s'applique pas en 2026 : facturez la TVA et déposez des déclarations."
+      en: "If 2025 revenue was above €25,000, the § 19 UStG scheme does not apply in 2026: charge VAT and file returns."
+      de: "Lag der Gesamtumsatz 2025 über 25.000 €, gilt § 19 UStG 2026 nicht: Umsatzsteuer ausweisen und Voranmeldungen abgeben."
+    source: https://www.gesetze-im-internet.de/ustg_1980/__19.html
+    verified_on: "2026-11-18"
+  - id: kleinunternehmer_current_year
+    label:
+      {
+        fr: "Petite entreprise : CA de l'année en cours",
+        en: "Small business: current-year revenue",
+        de: "Kleinunternehmer: laufendes Jahr",
+      }
+    appliesTo: { options: [kleinunternehmer] }
+    window: fiscal_year
+    limitCents: 10000000
+    consequence:
+      fr: "Dès l'opération qui fait dépasser 100 000 €, la TVA est due sur cette opération et toutes les suivantes. Les opérations antérieures restent exonérées."
+      en: "From the very sale that takes revenue over €100,000, VAT is due on it and on every later sale. Earlier sales stay exempt."
+      de: "Bereits der Umsatz, mit dem die Grenze von 100.000 € überschritten wird, ist steuerpflichtig, ebenso alle folgenden. Frühere Umsätze bleiben steuerfrei."
+    source: https://www.bundesfinanzministerium.de/Content/DE/Downloads/BMF_Schreiben/Steuerarten/Umsatzsteuer/Umsatzsteuer-Anwendungserlass/2025-03-18-sonderregelung-kleinunternehmer.pdf
+    verified_on: "2026-11-18"
+
+estimates:
+  - id: income_tax
+    label:
+      {
+        fr: "Impôt sur le revenu (barème § 32a EStG)",
+        en: "Income tax (§ 32a EStG tariff)",
+        de: "Einkommensteuer (Tarif § 32a EStG)",
+      }
+    base: profit
+    formula:
+      kind: de_income_tax
+      zones: [12348, 17799, 69878, 277825]
+      zone2: [914.51, 1400]
+      zone3: [173.10, 2397, 1034.87]
+      zone4: [0.42, 11135.63]
+      zone5: [0.45, 19470.38]
+    source: https://www.gesetze-im-internet.de/estg/__32a.html
+    verified_on: "2026-11-18"
+
+deadlines:
+  - id: ust_voranmeldung_monthly
+    kind: tax
+    label:
+      {
+        fr: "Déclaration de TVA mensuelle (USt-VA)",
+        en: Monthly VAT return (USt-VA),
+        de: Umsatzsteuer-Voranmeldung (monatlich),
+      }
+    description:
+      fr: "Déclarer et payer la TVA du mois via ELSTER. Le délai est prolongé d'un mois avec la Dauerfristverlängerung."
+      en: "File and pay the month's VAT through ELSTER. A permanent one-month extension (Dauerfristverlängerung) can be requested."
+      de: "Umsatzsteuer des Monats über ELSTER anmelden und zahlen. Mit Dauerfristverlängerung einen Monat später."
+    appliesTo: { periods: [monthly], withoutOptions: [kleinunternehmer] }
+    schedule: { type: monthly, day: 10, monthOffset: 1 }
+    declaresRevenue: true
+    link: https://www.elster.de
+    source: https://www.gesetze-im-internet.de/ustg_1980/__18.html
+    verified_on: "2026-11-18"
+  - id: ust_voranmeldung_quarterly
+    kind: tax
+    label:
+      {
+        fr: "Déclaration de TVA trimestrielle (USt-VA)",
+        en: Quarterly VAT return (USt-VA),
+        de: Umsatzsteuer-Voranmeldung (vierteljährlich),
+      }
+    description:
+      fr: "Déclarer et payer la TVA du trimestre via ELSTER."
+      en: "File and pay the quarter's VAT through ELSTER."
+      de: "Umsatzsteuer des Quartals über ELSTER anmelden und zahlen."
+    appliesTo: { periods: [quarterly], withoutOptions: [kleinunternehmer] }
+    schedule:
+      type: dates
+      dates:
+        - { due: "2026-04-10", periodStart: "2026-01-01", periodEnd: "2026-03-31" }
+        - { due: "2026-07-10", periodStart: "2026-04-01", periodEnd: "2026-06-30" }
+        - { due: "2026-10-10", periodStart: "2026-07-01", periodEnd: "2026-09-30" }
+        - { due: "2027-01-10", periodStart: "2026-10-01", periodEnd: "2026-12-31" }
+    declaresRevenue: true
+    link: https://www.elster.de
+    source: https://www.gesetze-im-internet.de/ustg_1980/__18.html
+    verified_on: "2026-11-18"
+  - id: est_vorauszahlung
+    kind: tax
+    label:
+      { fr: "Acompte d'impôt sur le revenu", en: Income tax prepayment, de: Einkommensteuer-Vorauszahlung }
+    description:
+      fr: "Acompte trimestriel fixé par le Finanzamt dans l'avis de prépaiement."
+      en: "Quarterly prepayment set by the tax office in its prepayment notice."
+      de: "Vierteljährliche Vorauszahlung laut Vorauszahlungsbescheid des Finanzamts."
+    schedule:
+      type: dates
+      dates: [{ due: "2026-03-10" }, { due: "2026-06-10" }, { due: "2026-09-10" }, { due: "2026-12-10" }]
+    link: https://www.elster.de
+    source: https://www.gesetze-im-internet.de/estg/__37.html
+    verified_on: "2026-11-18"
+  - id: gewst_vorauszahlung
+    kind: tax
+    label:
+      {
+        fr: "Acompte de taxe professionnelle (Gewerbesteuer)",
+        en: Trade tax prepayment,
+        de: Gewerbesteuer-Vorauszahlung,
+      }
+    description:
+      fr: "Acompte trimestriel fixé par la commune. Les professions libérales n'y sont pas soumises."
+      en: "Quarterly prepayment set by the municipality. Liberal professions are exempt."
+      de: "Vierteljährliche Vorauszahlung laut Bescheid der Gemeinde. Freiberufler sind nicht gewerbesteuerpflichtig."
+    appliesTo: { statuses: [gewerbe] }
+    schedule:
+      type: dates
+      dates: [{ due: "2026-02-15" }, { due: "2026-05-15" }, { due: "2026-08-15" }, { due: "2026-11-15" }]
+    link: https://www.gesetze-im-internet.de/gewstg/__19.html
+    source: https://www.gesetze-im-internet.de/gewstg/__19.html
+    verified_on: "2026-11-18"
+  - id: annual_returns
+    kind: tax
+    label:
+      {
+        fr: "Déclarations annuelles 2026 (impôt sur le revenu, TVA)",
+        en: "2026 annual returns (income tax, VAT)",
+        de: "Jahressteuererklärungen 2026 (ESt, USt)",
+      }
+    description:
+      fr: "Dépôt sans conseiller fiscal des déclarations d'impôt sur le revenu (avec EÜR) et de TVA pour 2026 : sept mois après la fin de l'année."
+      en: "Filing of the 2026 income tax return (with EÜR profit statement) and VAT return without a tax advisor: seven months after year end."
+      de: "Abgabe der Einkommensteuer- (mit EÜR) und Umsatzsteuererklärung 2026 ohne Steuerberater: sieben Monate nach Jahresende."
+    schedule:
+      { type: dates, dates: [{ due: "2027-07-31", periodStart: "2026-01-01", periodEnd: "2026-12-31" }] }
+    estimates: [income_tax]
+    declaresRevenue: true
+    link: https://www.elster.de
+    source: https://www.gesetze-im-internet.de/ao_1977/__149.html
+    verified_on: "2026-11-18"
