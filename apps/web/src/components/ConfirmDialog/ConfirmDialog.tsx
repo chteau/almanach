@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useId, useRef } from 'react';
 import { useI18n } from '../../i18n/I18nProvider.tsx';
 import { Button } from '../Button/Button.tsx';
 import styles from './ConfirmDialog.module.css';
@@ -31,6 +31,8 @@ export function ConfirmDialog({
 }: ConfirmDialogProps) {
   const { t } = useI18n();
   const ref = useRef<HTMLDialogElement>(null);
+  // Several dialogs can share a page: each title needs its own id.
+  const titleId = useId();
 
   useEffect(() => {
     const dialog = ref.current;
@@ -39,8 +41,8 @@ export function ConfirmDialog({
   }, [open]);
 
   return (
-    <dialog ref={ref} className={styles.dialog} aria-labelledby="confirm-title" onCancel={onCancel}>
-      <h2 id="confirm-title" className={styles.title}>
+    <dialog ref={ref} className={styles.dialog} aria-labelledby={titleId} onCancel={onCancel}>
+      <h2 id={titleId} className={styles.title}>
         {title}
       </h2>
       <p className={styles.body}>{body}</p>

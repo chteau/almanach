@@ -17,7 +17,8 @@ export default defineConfig({
   testMatch: '**/*.e2e.ts',
   fullyParallel: false,
   forbidOnly: Boolean(process.env.CI),
-  retries: process.env.CI ? 1 : 0,
+  // The tests share one database per browser and run in order: a retry would start over on an installed instance.
+  retries: 0,
   reporter: process.env.CI ? [['github'], ['html', { open: 'never' }]] : 'list',
   use: { trace: 'retain-on-failure' },
   projects: selected.map((target) => ({
