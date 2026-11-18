@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Almanach, les échéances de freelance sur ton serveur</title>
+<meta name="description" content="Tableau de bord libre et auto-hébergé pour indépendants : clients, factures, temps passé et toutes les échéances administratives de ton pays, avec ce qu'il faut mettre de côté. AGPL-3.0.">
+<meta property="og:title" content="Almanach, les échéances de freelance sur ton serveur">
+<meta property="og:description" content="Clients, factures, temps passé et toutes les échéances de ton pays. Libre, auto-hébergé, AGPL-3.0.">
+<meta property="og:image" content="https://almanach.chteau.bzh/assets/og.jpg">
+<meta property="og:url" content="https://almanach.chteau.bzh/">
+<meta property="og:locale" content="fr_FR">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#f5f5f2" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#111214" media="(prefers-color-scheme: dark)">
+<link rel="canonical" href="https://almanach.chteau.bzh/">
+<link rel="alternate" hreflang="fr" href="https://almanach.chteau.bzh/">
+<link rel="alternate" hreflang="en" href="https://almanach.chteau.bzh/en/">
+<link rel="icon" href="assets/logo.svg" type="image/svg+xml">
+<link rel="preload" href="assets/fonts/geist-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<a class="skip" href="#main">Aller au contenu</a>
+
+<nav class="nav" aria-label="Principale">
+  <div class="wrap">
+    <a class="brand" href="#top"><img src="assets/logo.svg" alt="" width="26" height="26">Almanach</a>
+    <div class="nav-links">
+      <a class="opt" href="#fonctions">Fonctions</a>
+      <a class="opt" href="#pays">Pays</a>
+      <a class="opt" href="#installer">Installer</a>
+      <a href="https://github.com/chteau/almanach">GitHub</a>
+      <a class="lang" href="en/" hreflang="en" lang="en">English</a>
+    </div>
+  </div>
+</nav>
+
+<main id="main">
+<header class="hero" id="top">
+  <div class="wrap">
+    <p class="eyebrow">En développement, proche de la 1.0</p>
+    <h1>Toutes tes échéances de freelance, <em>sur ton serveur.</em></h1>
+    <p class="lead">Clients, devis, factures, temps passé, et surtout toutes les échéances administratives de ton pays, avec ce qu'il faut mettre de côté. Libre, gratuit, auto-hébergé.</p>
+    <div class="cta">
+      <a class="btn primary" href="#installer">Installer avec Docker</a>
+      <a class="btn" href="https://github.com/chteau/almanach"><svg viewBox="0 0 16 16" aria-hidden="true" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>Voir le code</a>
+    </div>
+    <p class="note">AGPL-3.0. Pas de version hébergée, pas d'offre payante, pas de télémétrie.</p>
+  </div>
+</header>
+
+<figure class="showcase wrap">
+  <img class="shot" src="assets/shots/dashboard.webp" width="1440" height="1017" alt="Le tableau de bord d'Almanach : prochaines échéances, montant à mettre de côté, factures à relancer et seuils de l'année.">
+  <figcaption>Le tableau de bord : ce qui arrive, ce qu'il faut mettre de côté, ce qui reste à encaisser.</figcaption>
+</figure>
+
+<section class="block" id="fonctions" aria-labelledby="fonctions-titre">
+  <div class="wrap">
+    <h2 id="fonctions-titre">Ce que ça fait</h2>
+    <p class="sub">Les outils qui connaissent tes obligations sont des services en ligne payants qui gardent tes données. Les outils libres, eux, ne connaissent pas les règles de ton pays. Almanach fait les deux.</p>
+
+    <article class="feature">
+      <div class="feature-text">
+        <h3>Ne rate plus une échéance</h3>
+        <p>Déclarations, paiements, fins de mission et factures à relancer, dans un calendrier en mois, semaine, liste ou agenda.</p>
+        <ul>
+          <li>Rappels par e-mail ou par ntfy, avec des heures calmes.</li>
+          <li>Un flux iCal à ajouter dans ton agenda.</li>
+          <li>Chaque échéance renvoie à sa source officielle.</li>
+        </ul>
+      </div>
+      <div class="pair">
+        <img class="shot" src="assets/shots/calendar.webp" width="1440" height="960" alt="Le calendrier du mois avec les déclarations Urssaf, la CFE et les factures à relancer." loading="lazy">
+        <img class="shot" src="assets/shots/mobile.webp" width="541" height="750" alt="Le calendrier en vue agenda sur téléphone." loading="lazy">
+      </div>
+    </article>
+
+    <article class="feature">
+      <div class="feature-text">
+        <h3>Sache combien mettre de côté</h3>
+        <p>Almanach estime les cotisations et l'impôt de l'année, mois par mois, et suit les seuils : plafond micro, franchise de TVA.</p>
+        <p>Un nouveau contrat en vue ? Tape le montant et regarde ce qui change. Rien n'est enregistré.</p>
+      </div>
+      <figure class="narrow">
+        <img class="shot" src="assets/shots/thresholds.webp" width="760" height="790" alt="La page Seuils : une simulation de 5 000 € de plus, le plafond micro à 43 % et la franchise de TVA à 96 %." loading="lazy">
+      </figure>
+    </article>
+
+    <article class="feature">
+      <div class="feature-text">
+        <h3>Facture proprement</h3>
+        <p>Devis, factures, acomptes et avoirs en PDF, en français, anglais ou allemand, avec les mentions légales de ton pays et de celui du client.</p>
+        <ul>
+          <li>Numérotation, logo, couleur, mise en page et police à ton goût.</li>
+          <li>Changer la numérotation après la première facture attend le 1er janvier, pour ne pas casser la série de l'année.</li>
+          <li>Le temps pas encore facturé passe sur une facture en un clic.</li>
+        </ul>
+      </div>
+      <figure class="narrow">
+        <img class="shot" src="assets/shots/invoice.webp" width="662" height="470" alt="Une facture en PDF avec un logo et un bandeau bleu, la mention de TVA non applicable et les coordonnées bancaires." loading="lazy">
+      </figure>
+    </article>
+
+    <article class="feature">
+      <div class="feature-text">
+        <h3>Garde la main sur les règles</h3>
+        <p>Les règles de chaque pays vivent dans des packs signés (Ed25519). Une mise à jour reçue n'est jamais appliquée d'office : tu lis ce qui change, en clair, puis tu appliques ou tu reportes.</p>
+        <p>Retour au pack livré en un clic.</p>
+      </div>
+      <figure class="narrow">
+        <img class="shot" src="assets/shots/pack.webp" width="720" height="731" alt="Une mise à jour de pack en attente : le taux passe de 25,6 % à 26 % au 1er juillet 2026, avec les boutons Plus tard et Appliquer." loading="lazy">
+      </figure>
+    </article>
+
+    <article class="feature">
+      <div class="feature-text">
+        <h3>Et le reste</h3>
+        <ul>
+          <li><strong>Ta situation suit le calendrier.</strong> Changement de statut ou de pays à une date donnée, cessation d'activité qui garde les dernières déclarations.</li>
+          <li><strong>Arrive avec tes clients.</strong> Import CSV depuis ton ancien outil, avec un rapport des lignes refusées avant d'importer quoi que ce soit.</li>
+          <li><strong>Garde tes données.</strong> Export JSON complet, réimport dans une instance neuve.</li>
+          <li><strong>Un compte bien gardé.</strong> Double authentification (TOTP), sessions révocables, verrouillage après plusieurs échecs.</li>
+          <li><strong>Partout.</strong> Ordinateur, tablette, téléphone, thème clair ou sombre, en français, anglais ou allemand.</li>
+        </ul>
+      </div>
+      <figure class="narrow">
+        <img class="shot" src="assets/shots/deadline.webp" width="1080" height="1060" alt="La fiche d'une déclaration Urssaf : ce qu'il faut faire, le montant estimé avec ses sources, et le formulaire pour la marquer comme faite." loading="lazy">
+      </figure>
+    </article>
+  </div>
+</section>
+
+<section class="block" id="pays" aria-labelledby="pays-titre">
+  <div class="wrap">
+    <h2 id="pays-titre">Pays couverts</h2>
+    <p class="sub">La France est le pays de référence : ses règles 2026 sont vérifiées, et chaque chiffre cite sa source officielle et sa date de vérification. Les autres pays sont expérimentaux, et l'application le dit à l'inscription.</p>
+    <div class="table-scroll" role="region" aria-labelledby="pays-titre" tabindex="0">
+      <table>
+        <thead><tr><th scope="col">Pays</th><th scope="col">Pack</th><th scope="col">Ce qui est couvert</th></tr></thead>
+        <tbody>
+          <tr><th scope="row">France</th><td><span class="badge ok">Vérifié</span></td><td>Micro-entreprise (BNC, BIC services et ventes), URSSAF mensuelle ou trimestrielle, versement libératoire, ACRE, CIPAV, CFE, franchise de TVA</td></tr>
+          <tr><th scope="row">Allemagne</th><td><span class="badge warn">Expérimental</span></td><td>Freiberufler et Gewerbe, Kleinunternehmer, Umsatzsteuer-Voranmeldung, Vorauszahlungen (ESt, GewSt)</td></tr>
+          <tr><th scope="row">Royaume-Uni</th><td><span class="badge warn">Expérimental</span></td><td>Sole trader, Self Assessment, Class 4 NIC, payments on account, Making Tax Digital, seuil de TVA</td></tr>
+          <tr><th scope="row">États-Unis</th><td><span class="badge warn">Expérimental</span></td><td>Sole proprietor et single-member LLC, self-employment tax, estimated taxes, Form 1040</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section class="block" id="engagements" aria-labelledby="engagements-titre">
+  <div class="wrap">
+    <h2 id="engagements-titre">Engagements</h2>
+    <div class="cards">
+      <div class="card"><h3>Libre, pour toujours</h3><p>Gratuit et open source sous licence AGPL-3.0. Pas d'offre payante.</p></div>
+      <div class="card"><h3>Chez toi</h3><p>Pas de version hébergée. Tes clients, tes factures et ton chiffre d'affaires restent sur ton serveur.</p></div>
+      <div class="card"><h3>Silencieux</h3><p>Pas de télémétrie. Aucune requête vers l'extérieur tant qu'un administrateur ne l'a pas activée.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="block" id="installer" aria-labelledby="installer-titre">
+  <div class="wrap">
+    <h2 id="installer-titre">Installer</h2>
+    <p class="sub">Il faut Docker et Docker Compose. Ça tourne sur un serveur, un NAS ou un Raspberry Pi.</p>
+    <div class="code">
+      <button type="button" data-copy="install" data-done="Copié">Copier</button>
+<pre id="install"><code>git clone https://github.com/chteau/almanach.git
+cd almanach
+cp .env.example .env   <span class="c"># puis remplis tes paramètres</span>
+docker compose up -d</code></pre>
+    </div>
+    <div class="steps">
+      <p>Ouvre ensuite <code>http://localhost:8080</code>. L'assistant d'installation demande le jeton affiché dans les logs (<code>docker compose logs almanach</code>), puis crée le compte administrateur.</p>
+      <p>Les variables (e-mail, packs, maintenance) sont détaillées dans le <a href="https://github.com/chteau/almanach#configuration">README</a>.</p>
+    </div>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <p class="disclaimer">Almanach t'aide à ne rien oublier et donne des estimations. Ce n'est pas un conseil fiscal ou comptable : vérifie toujours auprès des sources officielles de ton pays, indiquées dans l'application.</p>
+    <div class="row">
+      <span>Almanach, AGPL-3.0</span>
+      <a href="https://github.com/chteau/almanach">GitHub</a>
+      <a href="https://github.com/chteau/almanach#contribuer">Contribuer</a>
+      <a href="https://chteau.bzh">chteau.bzh</a>
+    </div>
+  </div>
+</footer>
+
+<script src="main.js" defer></script>
+</body>
+</html>

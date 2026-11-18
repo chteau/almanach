@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Almanach, freelance deadlines on your own server</title>
+<meta name="description" content="A free, self-hosted dashboard for freelancers: clients, invoices, time tracking and every administrative deadline of your country, with how much to set aside. AGPL-3.0.">
+<meta property="og:title" content="Almanach, freelance deadlines on your own server">
+<meta property="og:description" content="Clients, invoices, time tracking and every deadline of your country. Free, self-hosted, AGPL-3.0.">
+<meta property="og:image" content="https://almanach.chteau.bzh/assets/og.jpg">
+<meta property="og:url" content="https://almanach.chteau.bzh/en/">
+<meta property="og:locale" content="en_GB">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#f5f5f2" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#111214" media="(prefers-color-scheme: dark)">
+<link rel="canonical" href="https://almanach.chteau.bzh/en/">
+<link rel="alternate" hreflang="en" href="https://almanach.chteau.bzh/">
+<link rel="alternate" hreflang="en" href="https://almanach.chteau.bzh/en/">
+<link rel="icon" href="../assets/logo.svg" type="image/svg+xml">
+<link rel="preload" href="../assets/fonts/geist-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<nav class="nav" aria-label="Main">
+  <div class="wrap">
+    <a class="brand" href="#top"><img src="../assets/logo.svg" alt="" width="26" height="26">Almanach</a>
+    <div class="nav-links">
+      <a class="opt" href="#features">Features</a>
+      <a class="opt" href="#countries">Countries</a>
+      <a class="opt" href="#install">Install</a>
+      <a href="https://github.com/chteau/almanach">GitHub</a>
+      <a class="lang" href="../" hreflang="fr" lang="fr">Français</a>
+    </div>
+  </div>
+</nav>
+
+<main id="main">
+<header class="hero" id="top">
+  <div class="wrap">
+    <p class="eyebrow">In development, close to 1.0</p>
+    <h1>Every freelance deadline, <em>on your own server.</em></h1>
+    <p class="lead">Clients, quotes, invoices, time tracking, and above all every administrative deadline of your country, with how much to set aside. Free, open source, self-hosted.</p>
+    <div class="cta">
+      <a class="btn primary" href="#install">Install with Docker</a>
+      <a class="btn" href="https://github.com/chteau/almanach"><svg viewBox="0 0 16 16" aria-hidden="true" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>View the code</a>
+    </div>
+    <p class="note">AGPL-3.0. No hosted version, no paid plan, no telemetry.</p>
+  </div>
+</header>
+
+<figure class="showcase wrap">
+  <img class="shot" src="../assets/shots/dashboard.webp" width="1440" height="1017" alt="The Almanach dashboard: upcoming deadlines, the amount to set aside, invoices to chase and the year's thresholds (French interface).">
+  <figcaption>The dashboard: what's coming, what to set aside, what's still unpaid. Screenshots are in French, the app also speaks English and German.</figcaption>
+</figure>
+
+<section class="block" id="features" aria-labelledby="features-title">
+  <div class="wrap">
+    <h2 id="features-title">What it does</h2>
+    <p class="sub">The tools that know your obligations are paid online services that keep your data. The free tools don't know your country's rules. Almanach does both.</p>
+
+    <article class="feature">
+      <div class="feature-text">
+        <h3>Never miss a deadline</h3>
+        <p>Returns, payments, mission ends and invoices to chase, in a calendar by month, week, list or agenda.</p>
+        <ul>
+          <li>Reminders by e-mail or ntfy, with quiet hours.</li>
+          <li>An iCal feed for your calendar app.</li>
+          <li>Every deadline links to its official source.</li>
+        </ul>
+      </div>
+      <div class="pair">
+        <img class="shot" src="../assets/shots/calendar.webp" width="1440" height="960" alt="The month calendar with URSSAF returns, the CFE and invoices to chase." loading="lazy">
+        <img class="shot" src="../assets/shots/mobile.webp" width="541" height="750" alt="The calendar as an agenda on a phone." loading="lazy">
+      </div>
+    </article>
+
+    <article class="feature">
+      <div class="feature-text">
+        <h3>Know how much to set aside</h3>
+        <p>Almanach estimates the year's contributions and tax, month by month, and tracks thresholds: micro ceiling, VAT exemption.</p>
+        <p>A new contract coming? Type the amount and see what changes. Nothing is saved.</p>
+      </div>
+      <figure class="narrow">
+        <img class="shot" src="../assets/shots/thresholds.webp" width="760" height="790" alt="The Thresholds page: a simulation with €5,000 more, the micro ceiling at 43 % and the VAT exemption at 96 %." loading="lazy">
+      </figure>
+    </article>
+
+    <article class="feature">
+      <div class="feature-text">
+        <h3>Invoice properly</h3>
+        <p>Quotes, invoices, deposits and credit notes as PDFs, in French, English or German, with the legal mentions of your country and your client's.</p>
+        <ul>
+          <li>Numbering, logo, colour, layout and font, your way.</li>
+          <li>Changing the numbering after the first invoice waits for 1 January, so the year's series stays unbroken.</li>
+          <li>Time not billed yet goes on an invoice in one click.</li>
+        </ul>
+      </div>
+      <figure class="narrow">
+        <img class="shot" src="../assets/shots/invoice.webp" width="662" height="470" alt="A PDF invoice with a logo and a blue band, the VAT exemption mention and bank details." loading="lazy">
+      </figure>
+    </article>
+
+    <article class="feature">
+      <div class="feature-text">
+        <h3>Stay in control of the rules</h3>
+        <p>Each country's rules live in signed packs (Ed25519). A received update is never applied by itself: you read what changes, in plain words, then apply it or leave it for later.</p>
+        <p>Back to the shipped pack in one click.</p>
+      </div>
+      <figure class="narrow">
+        <img class="shot" src="../assets/shots/pack.webp" width="720" height="731" alt="A pending pack update: the rate goes from 25.6 % to 26 % on 1 July 2026, with Later and Apply buttons." loading="lazy">
+      </figure>
+    </article>
+
+    <article class="feature">
+      <div class="feature-text">
+        <h3>And the rest</h3>
+        <ul>
+          <li><strong>Your situation follows the calendar.</strong> Change status or country from a given date. Ending your activity keeps the last returns.</li>
+          <li><strong>Bring your clients.</strong> CSV import from your previous tool, with a report of rejected lines before anything is imported.</li>
+          <li><strong>Keep your data.</strong> Full JSON export, re-import into a fresh instance.</li>
+          <li><strong>A well-kept account.</strong> Two-factor authentication (TOTP), revocable sessions, lockout after repeated failures.</li>
+          <li><strong>Everywhere.</strong> Desktop, tablet, phone, light or dark theme, in French, English or German.</li>
+        </ul>
+      </div>
+      <figure class="narrow">
+        <img class="shot" src="../assets/shots/deadline.webp" width="1080" height="1060" alt="A URSSAF return: what to do, the estimated amount with its sources, and the form to mark it done." loading="lazy">
+      </figure>
+    </article>
+  </div>
+</section>
+
+<section class="block" id="countries" aria-labelledby="countries-title">
+  <div class="wrap">
+    <h2 id="countries-title">Countries</h2>
+    <p class="sub">France is the reference country: its 2026 rules are verified, and every figure cites its official source and the date it was checked. The other countries are experimental, and the app says so at sign-up.</p>
+    <div class="table-scroll" role="region" aria-labelledby="countries-title" tabindex="0">
+      <table>
+        <thead><tr><th scope="col">Country</th><th scope="col">Pack</th><th scope="col">What it covers</th></tr></thead>
+        <tbody>
+          <tr><th scope="row">France</th><td><span class="badge ok">Verified</span></td><td>Micro-entreprise (BNC, BIC services and sales), monthly or quarterly URSSAF, versement libératoire, ACRE, CIPAV, CFE, VAT exemption</td></tr>
+          <tr><th scope="row">Germany</th><td><span class="badge warn">Experimental</span></td><td>Freiberufler and Gewerbe, Kleinunternehmer, Umsatzsteuer-Voranmeldung, prepayments (ESt, GewSt)</td></tr>
+          <tr><th scope="row">United Kingdom</th><td><span class="badge warn">Experimental</span></td><td>Sole trader, Self Assessment, Class 4 NIC, payments on account, Making Tax Digital, VAT threshold</td></tr>
+          <tr><th scope="row">United States</th><td><span class="badge warn">Experimental</span></td><td>Sole proprietor and single-member LLC, self-employment tax, estimated taxes, Form 1040</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section class="block" id="commitments" aria-labelledby="commitments-title">
+  <div class="wrap">
+    <h2 id="commitments-title">Commitments</h2>
+    <div class="cards">
+      <div class="card"><h3>Free, forever</h3><p>Free and open source under the AGPL-3.0. No paid plan.</p></div>
+      <div class="card"><h3>At home</h3><p>No hosted version. Your clients, invoices and revenue stay on your server.</p></div>
+      <div class="card"><h3>Quiet</h3><p>No telemetry. No outgoing request until an administrator turns it on.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="block" id="install" aria-labelledby="install-title">
+  <div class="wrap">
+    <h2 id="install-title">Install</h2>
+    <p class="sub">You need Docker and Docker Compose. It runs on a server, a NAS or a Raspberry Pi.</p>
+    <div class="code">
+      <button type="button" data-copy="install" data-done="Copied">Copy</button>
+<pre id="install"><code>git clone https://github.com/chteau/almanach.git
+cd almanach
+cp .env.example .env   <span class="c"># then fill in your settings</span>
+docker compose up -d</code></pre>
+    </div>
+    <div class="steps">
+      <p>Then open <code>http://localhost:8080</code>. The setup wizard asks for the token printed in the logs (<code>docker compose logs almanach</code>), then creates the administrator account.</p>
+      <p>The variables (e-mail, packs, maintenance) are in the <a href="https://github.com/chteau/almanach/blob/main/README.en.md#configuration">README</a>.</p>
+    </div>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <p class="disclaimer">Almanach helps you not forget anything and gives estimates. It is not tax or accounting advice: always check with your country's official sources, linked in the app.</p>
+    <div class="row">
+      <span>Almanach, AGPL-3.0</span>
+      <a href="https://github.com/chteau/almanach">GitHub</a>
+      <a href="https://github.com/chteau/almanach/blob/main/README.en.md#contributing">Contributing</a>
+      <a href="https://chteau.bzh">chteau.bzh</a>
+    </div>
+  </div>
+</footer>
+
+<script src="../main.js" defer></script>
+</body>
+</html>
