@@ -77,6 +77,11 @@ picture is in the [specification](docs/cahier-des-charges.md) (French).
 - **Link two instances.** One micro-entreprise, two activities tracked in two instances (one behind a
   VPN, one personal): ceilings, VAT franchise and alerts count the sum. Only monthly totals per tax
   category travel, through Ed25519-signed requests ([details, French](docs/federation.md)).
+- **Add external sources.** Quotes and invoices from another tool, read from an `almanach-feed/1`
+  HTTPS feed, read-only and tagged with their source; test sources and Stripe test mode stay out of
+  every total ([details, French](docs/external-sources.md)).
+- **Ask an AI assistant.** MCP server on `/mcp`, with personal tokens for read or read + drafts
+  ([details, French](docs/mcp.md)).
 - **Keep your data.** Full JSON export, re-import into a fresh instance. Two-factor
   authentication (TOTP), revocable sessions, lockout after repeated failures.
 
@@ -84,7 +89,7 @@ picture is in the [specification](docs/cahier-des-charges.md) (French).
 
 - Free and open source, forever, under the [AGPL-3.0](LICENSE).
 - No hosted version, no paid plan, no telemetry.
-- No outgoing request until an administrator turns it on (pack updates, new-release notice, Stripe sync, links between instances), in Settings or, for Stripe and links, in the server configuration (`STRIPE_SYNC`, `FEDERATION`).
+- No outgoing request until an administrator turns it on (pack updates, new-release notice, Stripe sync, links between instances, external sources, MCP), in Settings or in the server configuration (`STRIPE_SYNC`, `FEDERATION`, `EXTERNAL_SOURCES`, `MCP`).
 
 ## Install
 
@@ -119,6 +124,9 @@ Everything is optional.
 | `RELEASE_CHECK_URL` | Endpoint asked once a day for a new release, only once an administrator turns it on. |
 | `STRIPE_SYNC` | `true` allows Stripe syncs on the instance, like the box in **Settings → Instance** (then shown checked and locked). When absent, the box decides. Each company still turns it on with its own key. |
 | `FEDERATION` | `true` allows links between instances, the same way. |
+| `EXTERNAL_SOURCES` | `true` allows external document sources, the same way. |
+| `MCP` | `true` opens the `/mcp` endpoint to personal access tokens, the same way. |
+| `FEDERATION_INTERVAL_MINUTES` | Minutes between two automatic exchanges with linked instances (15 by default). A local change also triggers an exchange about thirty seconds later. |
 
 ### Publish a pack update
 

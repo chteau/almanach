@@ -13,6 +13,7 @@ import { Skeleton } from '../../components/Skeleton/Skeleton.tsx';
 import { useI18n } from '../../i18n/I18nProvider.tsx';
 import { formatDate, formatMoney } from '../../lib/format.ts';
 import { useResource } from '../../lib/useResource.ts';
+import { linkedPath } from '../linked/activity.ts';
 import { LinkedActivities } from './LinkedActivities.tsx';
 import styles from './Planning.module.css';
 import { type CalendarItem, labelOf, type Outlook, TYPE_STYLE } from './types.ts';
@@ -41,7 +42,11 @@ interface Dashboard {
     dueDate: string;
     currency: string;
     dueCents: number;
+    /** Set for an invoice of a linked instance, shown read-only. */
+    link?: { id: string; label: string };
   }[];
+  /** Part of each linked activity in the collected amounts, from its monthly totals. */
+  linkedRevenue: { label: string; month: number; quarter: number; year: number }[];
   outlook: Outlook | null;
 }
 
@@ -150,6 +155,13 @@ export function DashboardPage() {
             <p className={styles.caption}>
               {t('dashboard.invoiced')} {money(totals.invoicedCents)}
             </p>
+            {data.linkedRevenue
+              .filter((link) => link[key] !== 0)
+              .map((link) => (
+                <p key={link.label} className={styles.caption}>
+                  {t('dashboard.linkedPart', { label: link.label, amount: money(link[key]) })}
+                </p>
+              ))}
           </section>
         ))}
       </div>
@@ -207,7 +219,14 @@ export function DashboardPage() {
             <ul className={list.list}>
               {data.overdueInvoices.map((invoice) => (
                 <li key={invoice.id} className={list.item}>
-                  <Link to={`/documents/${invoice.id}`} className={list.row}>
+                  <Link
+                    to={
+                      invoice.link
+                        ? linkedPath('document', invoice.link.id, invoice.id)
+                        : `/documents/${invoice.id}`
+                    }
+                    className={list.row}
+                  >
                     <span className={list.primary}>
                       <strong>{invoice.number}</strong>
                       <span className={list.secondary}>{invoice.clientName}</span>
@@ -216,6 +235,7 @@ export function DashboardPage() {
                       {formatMoney(invoice.dueCents, invoice.currency, locale)}
                     </span>
                     <span className={list.badges}>
+                      {invoice.link && <Badge tone="accent">{invoice.link.label}</Badge>}
                       <Badge tone="err">
                         {t('documents.lateDays', { days: daysBetween(invoice.dueDate, data.today) })}
                       </Badge>
@@ -227,6 +247,46 @@ export function DashboardPage() {
           )}
         </section>
       </div>
+
+      {outlook && outlook.linked.length > 0 && (
+        <section className={`${form.section} ${styles.spaced}`} aria-labelledby="business-title">
+          <h2 id="business-title" className={styles.sectionTitle}>
+            {t('dashboard.business')}
+          </h2>
+          <p className={styles.caption}>{t('dashboard.business.hint')}</p>
+          <ul className={styles.plain}>
+            <li className={styles.split}>
+              <span>{t('dashboard.business.here')}</span>
+              <strong>{money(data.revenue.year.collectedCents)}</strong>
+            </li>
+            {outlook.linked.map((link) => (
+              <li key={link.label} className={styles.split}>
+                <span>
+                  {link.label} <Badge tone="accent">{t('dashboard.business.linked')}</Badge>
+                  {link.receivedAt && (
+                    <span className={styles.caption}>
+                      {' '}
+                      {t('dashboard.business.received', {
+                        date: formatDate(link.receivedAt.slice(0, 10), locale),
+                      })}
+                    </span>
+                  )}
+                </span>
+                <strong>{money(link.cents)}</strong>
+              </li>
+            ))}
+            <li className={`${styles.split} ${styles.total}`}>
+              <span>{t('dashboard.business.total')}</span>
+              <strong>
+                {money(
+                  data.revenue.year.collectedCents +
+                    outlook.linked.reduce((sum, link) => sum + link.cents, 0),
+                )}
+              </strong>
+            </li>
+          </ul>
+        </section>
+      )}
 
       {outlook && (
         <div className={styles.columns}>

@@ -19,7 +19,9 @@ export function SystemSettings() {
     versionCheck: boolean;
     stripeSync: boolean;
     federation: boolean;
-    preset: { stripeSync: boolean; federation: boolean };
+    externalSources: boolean;
+    mcp: boolean;
+    preset: { stripeSync: boolean; federation: boolean; externalSources: boolean; mcp: boolean };
     update: { version: string; url: string } | null;
   }>('/api/system');
   const [failure, setFailure] = useState<string>();
@@ -51,6 +53,8 @@ export function SystemSettings() {
         [
           ['stripe-sync', 'stripeSync'],
           ['federation', 'federation'],
+          ['external-sources', 'externalSources'],
+          ['mcp', 'mcp'],
         ] as const
       ).map(([path, key]) => (
         <div key={key}>

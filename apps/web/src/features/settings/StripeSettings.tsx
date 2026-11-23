@@ -17,6 +17,8 @@ interface StripeStatus {
   allowed: boolean;
   secretsKey: boolean;
   keySet: boolean;
+  /** The saved key is a test key (sk_test_…, rk_test_…). */
+  testKey: boolean;
   enabled: boolean;
   syncedAt: string | null;
   error: string | null;
@@ -73,6 +75,9 @@ export function StripeSettings() {
       {data.allowed && !data.secretsKey && <Notice tone="warn">{t('stripe.noSecretsKey')}</Notice>}
       {message && <Notice tone={message.tone}>{message.text}</Notice>}
       {!message && data.error && <Notice tone="error">{explain(data.error)}</Notice>}
+      {(/^(sk|rk)_test_/.test(key) || (!key && data.testKey)) && (
+        <Notice tone="warn">{t('stripe.testKey')}</Notice>
+      )}
       {data.allowed && data.secretsKey && (
         <form
           className={form.form}

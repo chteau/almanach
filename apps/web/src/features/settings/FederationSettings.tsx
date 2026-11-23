@@ -14,6 +14,7 @@ import { formatDate } from '../../lib/format.ts';
 import { useResource } from '../../lib/useResource.ts';
 import { describeError } from '../install/errors.ts';
 import styles from '../planning/Planning.module.css';
+import local from './FederationSettings.module.css';
 
 const ERRORS = [
   'federation_not_allowed',
@@ -38,6 +39,7 @@ interface FederationStatus {
   enabled: boolean;
   label: string;
   publicUrl: string;
+  intervalMinutes: number;
   links: FederationLink[];
 }
 
@@ -60,6 +62,7 @@ export function FederationSettings() {
   const { data, reload } = useResource<FederationStatus>('/api/settings/federation');
   const [issued, setIssued] = useState<{ code: string; expiresAt: string; fingerprint: string }>();
   const [code, setCode] = useState('');
+  const [mode, setMode] = useState<'issue' | 'join'>('issue');
   const [revoking, setRevoking] = useState<string>();
   const [message, setMessage] = useState<{ tone: 'info' | 'error'; text: string }>();
   if (!data) return null;
@@ -116,125 +119,164 @@ export function FederationSettings() {
       {data.allowed && !data.secretsKey && <Notice tone="warn">{t('federation.noSecretsKey')}</Notice>}
       {message && <Notice tone={message.tone}>{message.text}</Notice>}
       {data.allowed && (
-        <form
-          className={form.form}
-          onSubmit={(event) => {
-            event.preventDefault();
-            const target = event.currentTarget;
-            const label = (target.elements.namedItem('label') as HTMLInputElement).value;
-            void run(async () => {
-              await api('/api/settings/federation', {
-                method: 'PUT',
-                body: { enabled: checked(target, 'enabled'), label },
+        <fieldset className={local.block}>
+          <legend>{t('federation.instance')}</legend>
+          <form
+            className={form.form}
+            onSubmit={(event) => {
+              event.preventDefault();
+              const target = event.currentTarget;
+              const label = (target.elements.namedItem('label') as HTMLInputElement).value;
+              void run(async () => {
+                await api('/api/settings/federation', {
+                  method: 'PUT',
+                  body: { enabled: checked(target, 'enabled'), label },
+                });
+                return undefined;
               });
-              return undefined;
-            });
-          }}
-        >
-          <TextField
-            name="label"
-            label={t('federation.label')}
-            hint={t('federation.label.hint')}
-            defaultValue={data.label}
-            maxLength={60}
-            required
-          />
-          <label className={styles.check}>
-            <input type="checkbox" name="enabled" defaultChecked={data.enabled} key={String(data.enabled)} />
-            {t('federation.enabled')}
-          </label>
-          <div className={form.actions}>
-            <Button type="submit">{t('federation.save')}</Button>
-          </div>
-        </form>
+            }}
+          >
+            <TextField
+              name="label"
+              label={t('federation.label')}
+              hint={t('federation.label.hint')}
+              defaultValue={data.label}
+              maxLength={60}
+              required
+            />
+            <label className={styles.check}>
+              <input
+                type="checkbox"
+                name="enabled"
+                defaultChecked={data.enabled}
+                key={String(data.enabled)}
+              />
+              {t('federation.enabled')}
+            </label>
+            <div className={form.actions}>
+              <Button type="submit">{t('federation.save')}</Button>
+            </div>
+          </form>
+        </fieldset>
       )}
 
       {data.links.length > 0 && (
-        <ul className={list.list}>
-          {data.links.map((link) => (
-            <li key={link.id} className={list.item}>
-              <p className={styles.text}>
-                <strong>{link.peerLabel ?? link.peerUrl ?? t('federation.waiting')}</strong>{' '}
-                <Badge tone={link.state === 'active' ? 'ok' : 'warn'}>
-                  {t(`federation.state.${link.state}`)}
-                </Badge>
-              </p>
-              {link.peerUrl && <p className={`${styles.caption} ${styles.wrap}`}>{link.peerUrl}</p>}
-              {link.state === 'pending' && link.codeExpiresAt && (
-                <p className={styles.caption}>
-                  {t('federation.expires', { time: time(link.codeExpiresAt) })}
-                </p>
-              )}
-              {link.state === 'imported' && <Notice tone="info">{t('federation.imported')}</Notice>}
-              {link.state === 'active' && (
-                <>
-                  <p className={`${styles.caption} ${styles.wrap}`}>
-                    {t('federation.fingerprints', {
-                      own: grouped(link.fingerprint),
-                      peer: grouped(link.peerFingerprint),
-                    })}
-                  </p>
-                  <p className={styles.caption}>
-                    {t('federation.syncedAt', {
-                      synced: date(link.syncedAt),
-                      received: date(link.receivedAt),
-                    })}
-                  </p>
-                  {link.error && <Notice tone="warn">{explain(link.error)}</Notice>}
-                  {(['share', 'receive', 'pulls'] as const).map((option) => (
-                    <label key={option} className={styles.check}>
-                      <input
-                        type="checkbox"
-                        checked={link[option]}
-                        disabled={!ready}
-                        onChange={(event) =>
+        <>
+          <h3 className={styles.subTitle}>{t('federation.links')}</h3>
+          <ul className={list.list}>
+            {data.links.map((link) => (
+              <li key={link.id} className={`${list.item} ${list.panel}`}>
+                <div className={local.head}>
+                  <div className={local.name}>
+                    <strong>{link.peerLabel ?? link.peerUrl ?? t('federation.waiting')}</strong>
+                    <Badge tone={link.state === 'active' ? 'ok' : 'warn'}>
+                      {t(`federation.state.${link.state}`)}
+                    </Badge>
+                  </div>
+                  <div className={form.actions}>
+                    {link.state === 'active' && ready && (
+                      <Button
+                        variant="ghost"
+                        onClick={() =>
                           void run(async () => {
-                            await api(`/api/settings/federation/links/${link.id}`, {
-                              method: 'PATCH',
-                              body: {
-                                share: link.share,
-                                receive: link.receive,
-                                pulls: link.pulls,
-                                [option]: event.target.checked,
-                              },
-                            });
-                            return undefined;
+                            await api(`/api/settings/federation/links/${link.id}/sync`, { method: 'POST' });
+                            return t('federation.synced');
                           })
                         }
-                      />
-                      {t(`federation.${option}`)}
-                    </label>
-                  ))}
-                </>
-              )}
-              <div className={form.actions}>
-                {link.state === 'active' && ready && (
-                  <Button
-                    variant="ghost"
-                    onClick={() =>
-                      void run(async () => {
-                        await api(`/api/settings/federation/links/${link.id}/sync`, { method: 'POST' });
-                        return t('federation.synced');
-                      })
-                    }
-                  >
-                    {t('federation.sync')}
-                  </Button>
+                      >
+                        {t('federation.sync')}
+                      </Button>
+                    )}
+                    <Button variant="ghost" onClick={() => setRevoking(link.id)}>
+                      {t('federation.revoke')}
+                    </Button>
+                  </div>
+                </div>
+                {link.peerUrl && <p className={`${styles.caption} ${styles.wrap}`}>{link.peerUrl}</p>}
+                {link.state === 'pending' && link.codeExpiresAt && (
+                  <p className={styles.caption}>
+                    {t('federation.expires', { time: time(link.codeExpiresAt) })}
+                  </p>
                 )}
-                <Button variant="ghost" onClick={() => setRevoking(link.id)}>
-                  {t('federation.revoke')}
-                </Button>
-              </div>
-            </li>
-          ))}
-        </ul>
+                {link.state === 'imported' && <Notice tone="info">{t('federation.imported')}</Notice>}
+                {link.state === 'active' && (
+                  <>
+                    <p className={styles.caption}>
+                      {t('federation.syncedAt', {
+                        synced: date(link.syncedAt),
+                        received: date(link.receivedAt),
+                      })}
+                    </p>
+                    {link.error && <Notice tone="warn">{explain(link.error)}</Notice>}
+                    <details className={local.details}>
+                      <summary>{t('federation.fingerprints.title')}</summary>
+                      <p className={`${styles.caption} ${styles.wrap}`}>
+                        {t('federation.fingerprints', {
+                          own: grouped(link.fingerprint),
+                          peer: grouped(link.peerFingerprint),
+                        })}
+                      </p>
+                    </details>
+                    <div className={local.options}>
+                      {(['share', 'receive', 'pulls', 'shareDetail', 'receiveDetail'] as const).map(
+                        (option) => (
+                          <label key={option} className={styles.check}>
+                            <input
+                              type="checkbox"
+                              checked={link[option]}
+                              disabled={!ready}
+                              onChange={(event) =>
+                                void run(async () => {
+                                  await api(`/api/settings/federation/links/${link.id}`, {
+                                    method: 'PATCH',
+                                    body: {
+                                      share: link.share,
+                                      receive: link.receive,
+                                      pulls: link.pulls,
+                                      shareDetail: link.shareDetail,
+                                      receiveDetail: link.receiveDetail,
+                                      [option]: event.target.checked,
+                                    },
+                                  });
+                                  return undefined;
+                                })
+                              }
+                            />
+                            {t(`federation.${option}`, { minutes: data.intervalMinutes })}
+                          </label>
+                        ),
+                      )}
+                      <p className={styles.caption}>{t('federation.detail.hint')}</p>
+                    </div>
+                  </>
+                )}
+              </li>
+            ))}
+          </ul>
+        </>
       )}
 
       {ready && (
-        <>
-          <h3 className={styles.subTitle}>{t('federation.issue')}</h3>
+        <fieldset className={local.block}>
+          <legend>{t('federation.issue')}</legend>
           <p className={styles.caption}>{t('federation.issue.hint')}</p>
-          {issued ? (
+          <div className={local.modes} role="radiogroup">
+            {(['issue', 'join'] as const).map((value) => (
+              <label key={value} className={local.mode}>
+                <input
+                  type="radio"
+                  name="federation-mode"
+                  checked={mode === value}
+                  onChange={() => setMode(value)}
+                />
+                <span>
+                  <strong>{t(`federation.mode.${value}`)}</strong>
+                  <span className={styles.caption}>{t(`federation.mode.${value}.hint`)}</span>
+                </span>
+              </label>
+            ))}
+          </div>
+          {mode === 'join' ? null : issued ? (
             <Notice tone="info">
               {t('federation.code', {
                 time: time(issued.expiresAt),
@@ -278,49 +320,50 @@ export function FederationSettings() {
             </form>
           )}
 
-          <h3 className={styles.subTitle}>{t('federation.join')}</h3>
-          <form
-            className={form.form}
-            onSubmit={(event) => {
-              event.preventDefault();
-              const target = event.currentTarget;
-              void run(async () => {
-                await api('/api/settings/federation/links/join', {
-                  method: 'POST',
-                  body: {
-                    code,
-                    url: (target.elements.namedItem('url') as HTMLInputElement).value,
-                    share: checked(target, 'share'),
-                    receive: checked(target, 'receive'),
-                  },
+          {mode === 'join' && (
+            <form
+              className={form.form}
+              onSubmit={(event) => {
+                event.preventDefault();
+                const target = event.currentTarget;
+                void run(async () => {
+                  await api('/api/settings/federation/links/join', {
+                    method: 'POST',
+                    body: {
+                      code,
+                      url: (target.elements.namedItem('url') as HTMLInputElement).value,
+                      share: checked(target, 'share'),
+                      receive: checked(target, 'receive'),
+                    },
+                  });
+                  setCode('');
+                  return t('federation.paired');
                 });
-                setCode('');
-                return t('federation.paired');
-              });
-            }}
-          >
-            <TextField
-              label={t('federation.code.field')}
-              value={code}
-              autoComplete="off"
-              spellCheck={false}
-              required
-              onChange={(event) => setCode(event.target.value.trim())}
-            />
-            <TextField
-              name="url"
-              type="url"
-              label={t('federation.ownUrl')}
-              hint={t('federation.ownUrl.hint')}
-              defaultValue={data.publicUrl}
-              required
-            />
-            <ShareChoices />
-            <div className={form.actions}>
-              <Button type="submit">{t('federation.join.submit')}</Button>
-            </div>
-          </form>
-        </>
+              }}
+            >
+              <TextField
+                label={t('federation.code.field')}
+                value={code}
+                autoComplete="off"
+                spellCheck={false}
+                required
+                onChange={(event) => setCode(event.target.value.trim())}
+              />
+              <TextField
+                name="url"
+                type="url"
+                label={t('federation.ownUrl')}
+                hint={t('federation.ownUrl.hint')}
+                defaultValue={data.publicUrl}
+                required
+              />
+              <ShareChoices />
+              <div className={form.actions}>
+                <Button type="submit">{t('federation.join.submit')}</Button>
+              </div>
+            </form>
+          )}
+        </fieldset>
       )}
       <ConfirmDialog
         open={revoking !== undefined}

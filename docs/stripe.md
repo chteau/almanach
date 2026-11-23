@@ -66,4 +66,14 @@ langue et délai de paiement viennent du client Stripe ou des réglages de l'ent
   client liste ses encaissements. La mise à jour 0012 fait relire tout l'historique au passage
   suivant pour rattacher les recettes déjà importées.
 
+## Mode test
+
+Chaque recette et chaque client importés gardent le `livemode` de l'objet Stripe (à défaut, le mode de
+la clé). En mode test (`livemode=false`), ils s'affichent grisés avec une pastille **DEV** et ne
+comptent dans aucun total : chiffre d'affaires, seuils, estimations, tableau de bord, totaux transmis
+aux instances liées. Les réglages avertissent quand la clé enregistrée ou saisie commence par
+`sk_test_` ou `rk_test_`. La mise à jour 0014 déduit le mode des recettes déjà importées du préfixe de
+la clé de l'entreprise (au démarrage, `SECRETS_KEY` étant nécessaire pour la lire), sinon les tient
+pour réelles.
+
 L'API Stripe est appelée en version `2024-06-20`, figée pour que les formats ne changent pas.

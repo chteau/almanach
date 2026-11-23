@@ -24,6 +24,7 @@ import {
 import { parseBody } from '../../http/errors.ts';
 import type { AppEnv } from '../../http/request.ts';
 import { randomToken, sha256 } from '../../security/tokens.ts';
+import { linkedOverdue, linkedRecords } from '../federation/linked.ts';
 import type { PackRegistry } from '../packs/packs.ts';
 import { renderIcal } from './ical.ts';
 import { type CalendarItem, occurrencesOf, type PlanningService } from './planning.service.ts';
@@ -317,6 +318,21 @@ export function planningRoutes(
     const calendar = await planning.calendar(companyId, addDays(today, -366), addDays(today, 30), today);
     const visible = calendar.filter((item) => !item.hidden && !item.done && item.type !== 'mission');
     const outlook = await planning.outlook(companyId, today);
+    // Part of the linked activities: collected per period from their monthly totals, late invoices from their detail.
+    const linkedTotals = await planning.linkedRevenue(companyId, profile.currency, earliest);
+    /**
+     * Sums receipts within a period
+     *
+     * @param receipts {{ date: string; cents: number }[]} - receipts
+     * @param range {{ start: string; end: string }} - period
+     * @returns {number} - total in the main currency
+     */
+    const within = (receipts: { date: string; cents: number }[], range: { start: string; end: string }) =>
+      receipts
+        .filter((receipt) => receipt.date >= range.start && receipt.date <= range.end)
+        .reduce((total, receipt) => total + receipt.cents, 0);
+    const linked = await linkedRecords(db, companyId);
+    const labels = new Map(linked.sources.map((source) => [source.id, source.label]));
     return c.json({
       today,
       currency: profile.currency,
@@ -328,9 +344,26 @@ export function planningRoutes(
       unconverted: collected.unconverted,
       overdueDeadlines: visible.filter((item) => item.overdue && item.type !== 'invoice'),
       upcoming: visible.filter((item) => item.date >= today).slice(0, 8),
-      overdueInvoices: (await planning.openInvoices(companyId, today)).filter(
-        (invoice) => invoice.status === 'overdue',
-      ),
+      overdueInvoices: [
+        ...(await planning.openInvoices(companyId, today)).filter((invoice) => invoice.status === 'overdue'),
+        ...linked.documents
+          .filter((doc) => linkedOverdue(doc, today))
+          .map((doc) => ({
+            id: doc.id,
+            number: doc.number ?? '',
+            clientName: doc.clientName,
+            dueDate: doc.dueDate,
+            currency: doc.currency,
+            dueCents: doc.dueCents,
+            link: { id: doc.linkId, label: labels.get(doc.linkId) ?? '' },
+          })),
+      ],
+      linkedRevenue: linkedTotals.map((link) => ({
+        label: link.label,
+        month: within(link.receipts, periods.month),
+        quarter: within(link.receipts, periods.quarter),
+        year: within(link.receipts, periods.year),
+      })),
       outlook,
     });
   });

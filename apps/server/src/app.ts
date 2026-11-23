@@ -1,4 +1,4 @@
-import { Hono } from 'hono';
+import { Hono, type MiddlewareHandler } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 import { secureHeaders } from 'hono/secure-headers';
 import type { Config } from './config.ts';
@@ -11,13 +11,16 @@ import { clientRoutes } from './features/clients/clients.routes.ts';
 import { companyRoutes, requireCompany } from './features/companies/companies.ts';
 import { documentRoutes } from './features/documents/documents.routes.ts';
 import type { DocumentService } from './features/documents/documents.service.ts';
+import { ExternalSources, externalSourceRoutes } from './features/external/external.ts';
 import {
   type Federation,
   federationRoutes,
   federationSettingsRoutes,
 } from './features/federation/federation.ts';
+import { linkedRoutes } from './features/federation/linked.ts';
 import { installRoutes } from './features/install/install.routes.ts';
 import type { InstallService } from './features/install/install.service.ts';
+import { mcpRoutes, tokenRoutes } from './features/mcp/mcp.ts';
 import { missionRoutes } from './features/missions/missions.routes.ts';
 import type { PackRegistry } from './features/packs/packs.ts';
 import { packAdminRoutes } from './features/packs/updates.routes.ts';
@@ -40,7 +43,14 @@ import { randomToken } from './security/tokens.ts';
 export interface AppDeps {
   config: Pick<
     Config,
-    'cookieSecure' | 'trustProxy' | 'webDist' | 'secretsKey' | 'stripeSync' | 'federation'
+    | 'cookieSecure'
+    | 'trustProxy'
+    | 'webDist'
+    | 'secretsKey'
+    | 'stripeSync'
+    | 'federation'
+    | 'externalSources'
+    | 'mcp'
   >;
   install: InstallService;
   db: Database;
@@ -53,6 +63,8 @@ export interface AppDeps {
   releases: ReleaseCheck;
   stripe: StripeSync;
   federation: Federation;
+  /** External document sources; a service without schedule by default (tests). */
+  externalSources?: ExternalSources;
 }
 
 /**
@@ -86,8 +98,10 @@ export function createApp(deps: AppDeps): Hono<AppEnv> {
     }),
   );
 
-  // Signed pack bundles, data imports and logos are the only large bodies the API accepts.
+  // Signed pack bundles, data imports, logos and federation exchanges carrying a detail snapshot (at most
+  // MAX_EXCHANGE_BYTES, the same 8 MiB) are the only large bodies the API accepts.
   const largePaths = new Set([
+    '/api/federation/exchange',
     '/api/admin/packs/import',
     '/api/account/import',
     '/api/billing/logo',
@@ -144,9 +158,21 @@ export function createApp(deps: AppDeps): Hono<AppEnv> {
     '/api/system/*',
     '/api/situation',
     '/api/situation/*',
+    '/api/linked',
   ]) {
     app.use(path, user, company);
   }
+  // Linked instances learn about local changes within the debounce delay, and the dashboard refreshes stale links.
+  const changed: MiddlewareHandler<AppEnv> = async (c, next) => {
+    await next();
+    if (c.req.method !== 'GET' && c.res.status < 400) deps.federation.touch(c.var.company.id);
+  };
+  app.use('/api/documents/*', changed);
+  app.use('/api/payments/*', changed);
+  app.use('/api/dashboard', async (c, next) => {
+    deps.federation.refresh(c.var.company.id);
+    await next();
+  });
   const readOnly = readOnlyAfterCessation(deps.db);
   for (const path of ['/api/clients/*', '/api/missions/*', '/api/documents/*', '/api/time/*']) {
     app.use(path, readOnly);
@@ -157,6 +183,12 @@ export function createApp(deps: AppDeps): Hono<AppEnv> {
     '/api/settings/federation',
     federationSettingsRoutes(deps.db, deps.federation, deps.config.secretsKey),
   );
+  const sources =
+    deps.externalSources ??
+    new ExternalSources(deps.db, deps.config.secretsKey, fetch, deps.config.externalSources);
+  app.route('/api/settings/external-sources', externalSourceRoutes(deps.db, sources, deps.config.secretsKey));
+  app.route('/api/settings/tokens', tokenRoutes(deps.db, deps.config.mcp));
+  app.route('/api/linked', linkedRoutes(deps.db));
   app.route('/api/account', accountRoutes(deps.db, deps.config));
   app.route('/api/time', timeRoutes(deps.db));
   app.route('/api/search', searchRoutes(deps.db));
@@ -166,6 +198,8 @@ export function createApp(deps: AppDeps): Hono<AppEnv> {
     systemRoutes(deps.db, deps.releases, {
       stripeSync: deps.config.stripeSync,
       federation: deps.config.federation,
+      externalSources: deps.config.externalSources,
+      mcp: deps.config.mcp,
     }),
   );
   app.route('/api/situation', situationRoutes(deps.db, deps.packs));
@@ -178,6 +212,7 @@ export function createApp(deps: AppDeps): Hono<AppEnv> {
   app.route('/api', planning.api);
   app.route('/api/ical', planning.feed);
   app.all('/api/*', (c) => c.json({ error: 'not_found' }, 404));
+  app.route('/mcp', mcpRoutes(deps));
 
   app.on(['GET', 'HEAD'], '*', serveWebApp(deps.config.webDist));
 

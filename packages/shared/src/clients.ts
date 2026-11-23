@@ -58,6 +58,8 @@ export interface Client extends Omit<z.output<typeof clientInputSchema>, 'allowD
   /** Stripe customer the client comes from, and when it was deleted there. */
   stripeId: string | null;
   stripeDeletedAt: string | null;
+  /** false for a client imported from Stripe test mode: shown as test data. */
+  livemode: boolean | null;
   createdAt: string;
 }
 

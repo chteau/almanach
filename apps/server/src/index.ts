@@ -3,6 +3,7 @@ import { loadConfig } from './config.ts';
 import { createDatabase, runMigrations } from './db/client.ts';
 import { SessionStore } from './features/auth/sessions.ts';
 import { DocumentService } from './features/documents/documents.service.ts';
+import { ExternalSources } from './features/external/external.ts';
 import { Federation } from './features/federation/federation.ts';
 import { DrizzleInstallRepository } from './features/install/install.repository.ts';
 import { InstallService } from './features/install/install.service.ts';
@@ -53,11 +54,18 @@ async function main(): Promise<void> {
   const packUpdates = new PackUpdates(db, packs, config.packPublicKeys, config.packUpdateUrl);
   await packUpdates.restore();
   const documents = new DocumentService(db, packs);
-  const planning = new PlanningService(db, packs);
+  const planning = new PlanningService(db, packs, config.federation);
   const reminders = new ReminderJob(db, planning, config);
   const releases = new ReleaseCheck(db, config.releaseCheckUrl);
   const stripe = new StripeSync(db, config.secretsKey, fetch, config.stripeSync);
-  const federation = new Federation(db, planning, config.secretsKey, fetch, config.federation);
+  const federation = new Federation(db, planning, config.secretsKey, fetch, config.federation, {
+    documents,
+    intervalMinutes: config.federationIntervalMinutes,
+  });
+  stripe.onChange = (companyId) => federation.touch(companyId);
+  const externalSources = new ExternalSources(db, config.secretsKey, fetch, config.externalSources);
+  externalSources.onChange = (companyId) => federation.touch(companyId);
+  await stripe.backfillLivemode();
   const app = createApp({
     config,
     install,
@@ -71,6 +79,7 @@ async function main(): Promise<void> {
     releases,
     stripe,
     federation,
+    externalSources,
   });
   if (config.maintenance) {
     console.log('MAINTENANCE=true: only the maintenance page is served, background jobs are off.');
@@ -81,6 +90,7 @@ async function main(): Promise<void> {
   releases.start();
   stripe.start();
   federation.start();
+  externalSources.start();
   server.reload({ fetch: app.fetch });
   console.log('Almanach is ready.');
 }

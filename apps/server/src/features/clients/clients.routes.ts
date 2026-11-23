@@ -148,6 +148,7 @@ export function clientRoutes(db: Database): Hono<AppEnv> {
         amountCents: externalRevenues.amountCents,
         currency: externalRevenues.currency,
         reference: externalRevenues.reference,
+        livemode: externalRevenues.livemode,
       })
       .from(externalRevenues)
       .where(eq(externalRevenues.clientId, row.id))

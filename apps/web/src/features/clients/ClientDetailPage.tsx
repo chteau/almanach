@@ -16,6 +16,7 @@ import { ApiError, api } from '../../lib/api.ts';
 import { countryName, formatDate } from '../../lib/format.ts';
 import { useResource } from '../../lib/useResource.ts';
 import { describeError } from '../install/errors.ts';
+import { DevBadge } from '../linked/TestData.tsx';
 import { useProfile } from '../profile/useProfile.ts';
 
 /**
@@ -31,7 +32,14 @@ export function ClientDetailPage() {
   const { data, error, reload } = useResource<{
     client: Client;
     missionCount: number;
-    receipts: { id: string; date: string; amountCents: number; currency: string; reference: string | null }[];
+    receipts: {
+      id: string;
+      date: string;
+      amountCents: number;
+      currency: string;
+      reference: string | null;
+      livemode: boolean | null;
+    }[];
   }>(`/api/clients/${id}`);
   const missions = useResource<{ missions: Mission[] }>('/api/missions');
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -156,7 +164,10 @@ export function ClientDetailPage() {
             <PageHeaderLite id="client-receipts" title={t('clients.receipts')} />
             <ul className={list.list}>
               {receipts.map((receipt) => (
-                <li key={receipt.id} className={list.item}>
+                <li
+                  key={receipt.id}
+                  className={receipt.livemode === false ? `${list.item} ${list.test}` : list.item}
+                >
                   <div className={list.row}>
                     <span className={list.primary}>
                       <strong>{formatMoney(receipt.amountCents, receipt.currency, locale)}</strong>
@@ -165,6 +176,7 @@ export function ClientDetailPage() {
                     <span>{receipt.reference ?? ''}</span>
                     <span className={list.badges}>
                       <Badge>Stripe</Badge>
+                      {receipt.livemode === false && <DevBadge />}
                     </span>
                   </div>
                 </li>

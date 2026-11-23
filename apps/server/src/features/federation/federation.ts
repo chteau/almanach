@@ -1,24 +1,33 @@
 import {
+  DETAIL_LIMITS,
   type FederationLink,
   federationCreateSchema,
   federationJoinSchema,
   federationLinkOptionsSchema,
   federationSettingsSchema,
+  type LinkedDetail,
+  linkedDetailSchema,
   type MonthlyTotals,
   monthlyTotalsSchema,
   type Receipt,
 } from '@almanach/shared';
-import { and, eq, gt, lt, or } from 'drizzle-orm';
+import { and, desc, eq, gt, gte, isNull, lt, or } from 'drizzle-orm';
 import { type Context, Hono, type MiddlewareHandler } from 'hono';
 import { z } from 'zod';
 import type { Database } from '../../db/client.ts';
 import {
   auditLog,
+  clients,
   companies,
+  documents,
+  externalDocuments,
+  externalRevenues,
+  externalSources,
   federationLinks,
   federationNonces,
   federationTotals,
   instance,
+  payments,
 } from '../../db/schema.ts';
 import { parseBody } from '../../http/errors.ts';
 import { type AppEnv, requestContext } from '../../http/request.ts';
@@ -26,6 +35,7 @@ import { RateLimiter, rateLimit } from '../../security/rate-limit.ts';
 import { decryptSecret, encryptSecret } from '../../security/secrets.ts';
 import { randomToken, sha256 } from '../../security/tokens.ts';
 import { ownerOf } from '../companies/companies.ts';
+import type { DocumentService } from '../documents/documents.service.ts';
 import { generateSigningKeys, keyIdOf } from '../packs/signing.ts';
 import { instanceToday } from '../planning/planning.routes.ts';
 import type { PlanningService } from '../planning/planning.service.ts';
@@ -44,11 +54,16 @@ import {
   signResponse,
   verifyResponse,
 } from './crypto.ts';
+import { storeDetail } from './linked.ts';
 
 /** Prefix of the routes other instances call. */
 export const FEDERATION_PATH = '/api/federation';
-const SIX_HOURS_MS = 6 * 60 * 60 * 1000;
-const MAX_RESPONSE_BYTES = 256 * 1024;
+/** Answers carry the detail snapshot when shared; requests are bounded alike in app.ts. */
+export const MAX_EXCHANGE_BYTES = 8 * 1024 * 1024;
+/** Above this size a detail snapshot drops its document lines. */
+const DETAIL_BUDGET_BYTES = 6 * 1024 * 1024;
+/** Opening the dashboard refreshes links whose last exchange is older than this. */
+const STALE_MS = 5 * 60 * 1000;
 /** Calendar months shared, the current one included: enough for every threshold window. */
 const SHARED_MONTHS = 36;
 
@@ -63,10 +78,22 @@ const pairRequestSchema = z
   })
   .strict();
 const pairAnswerSchema = z.object({ publicKey: publicKeySchema }).strict();
+// The detail fields are optional and only sent when used, so peers running an older version keep exchanging totals.
 const exchangeRequestSchema = z
-  .object({ receive: z.boolean(), totals: monthlyTotalsSchema.nullable() })
+  .object({
+    receive: z.boolean(),
+    totals: monthlyTotalsSchema.nullable(),
+    receiveDetail: z.literal(true).optional(),
+    detail: linkedDetailSchema.optional(),
+  })
   .strict();
-const exchangeAnswerSchema = z.object({ totals: monthlyTotalsSchema.nullable() }).strict();
+const exchangeAnswerSchema = z
+  .object({
+    totals: monthlyTotalsSchema.nullable(),
+    receiveDetail: z.literal(true).optional(),
+    detail: linkedDetailSchema.optional(),
+  })
+  .strict();
 
 /**
  * Parses JSON without throwing
@@ -104,12 +131,23 @@ export function monthlyTotals(
   });
 }
 
+/** Whether a link sends its detail: shared on this side and kept on the other one. */
+const sendsDetail = (link: LinkRow, peerReceives: boolean) => link.share && link.shareDetail && peerReceives;
+/** Whether a link keeps the detail the peer shares. */
+const keepsDetail = (link: LinkRow) => link.receive && link.receiveDetail;
+
 /**
  * Links between instances tracking activities of the same business: pairing, signed exchanges of monthly
- * totals, revocation, and the six-hourly sync of the links this side calls (docs/federation.md)
+ * totals and of the optional read-only detail, revocation, and the automatic sync of the links this side
+ * calls: on a schedule, shortly after a local change, and when the dashboard opens (docs/federation.md)
  */
 export class Federation {
   private timer: ReturnType<typeof setInterval> | undefined;
+  private readonly pending = new Map<string, ReturnType<typeof setTimeout>>();
+  private readonly running = new Set<string>();
+  private readonly queued = new Set<string>();
+  /** Delay gathering a burst of local changes into one exchange. */
+  debounceMs = 30_000;
 
   /**
    * Creates the service
@@ -119,6 +157,8 @@ export class Federation {
    * @param secretsKey {Buffer | undefined} - key encrypting the private keys of links
    * @param fetcher {typeof fetch} - HTTP client, replaced in tests
    * @param preset {boolean} - FEDERATION=true: the server administrator allowed links in the configuration
+   * @param options {{ documents?: DocumentService; intervalMinutes?: number }} - source of the shared detail, and
+   * minutes between scheduled syncs (FEDERATION_INTERVAL_MINUTES)
    */
   constructor(
     private readonly db: Database,
@@ -126,26 +166,104 @@ export class Federation {
     private readonly secretsKey: Buffer | undefined,
     private readonly fetcher: typeof fetch = fetch,
     private readonly preset = false,
+    private readonly options: { documents?: DocumentService; intervalMinutes?: number } = {},
   ) {}
 
+  /** Minutes between two scheduled syncs. */
+  get intervalMinutes(): number {
+    return this.options.intervalMinutes ?? 15;
+  }
+
   /**
-   * Syncs the links this side calls in a minute, then every six hours
+   * Syncs the links this side calls in a minute, then every FEDERATION_INTERVAL_MINUTES
    *
    * @returns {void}
    */
   start(): void {
     const run = () => void this.tick().catch((error) => console.warn('Federation sync failed:', error));
     setTimeout(run, 60_000);
-    this.timer = setInterval(run, SIX_HOURS_MS);
+    this.timer = setInterval(run, this.intervalMinutes * 60_000);
   }
 
   /**
-   * Stops the schedule
+   * Stops the schedule and the pending syncs
    *
    * @returns {void}
    */
   stop(): void {
     if (this.timer) clearInterval(this.timer);
+    for (const timer of this.pending.values()) clearTimeout(timer);
+    this.pending.clear();
+  }
+
+  /**
+   * Schedules a sync of a company's links after a local change (document, payment, Stripe receipt); a burst of
+   * changes within the debounce delay leads to a single exchange
+   *
+   * @param companyId {string} - company whose records changed
+   * @returns {void}
+   */
+  touch(companyId: string): void {
+    clearTimeout(this.pending.get(companyId));
+    const timer = setTimeout(() => {
+      this.pending.delete(companyId);
+      void this.syncCompany(companyId);
+    }, this.debounceMs);
+    timer.unref?.();
+    this.pending.set(companyId, timer);
+  }
+
+  /**
+   * Syncs, without waiting, the links of a company whose last exchange is more than five minutes old
+   *
+   * @param companyId {string} - company whose dashboard opens
+   * @returns {void}
+   */
+  refresh(companyId: string): void {
+    void this.syncCompany(companyId, new Date(Date.now() - STALE_MS));
+  }
+
+  /**
+   * Exchanges with the peers a company calls, skipping links synced since a date; nothing leaves the
+   * instance unless links are allowed, and a company is never synced twice at once (a change arriving
+   * meanwhile runs once more afterwards)
+   *
+   * @param companyId {string} - company
+   * @param staleBefore {Date} - only links last synced before this date, or never
+   * @returns {Promise<void>} - resolves once done; failures are stored on each link
+   */
+  async syncCompany(companyId: string, staleBefore?: Date): Promise<void> {
+    if (this.running.has(companyId)) {
+      if (!staleBefore) this.queued.add(companyId);
+      return;
+    }
+    this.running.add(companyId);
+    try {
+      if (!(await this.allowed())) return;
+      const rows = await this.db
+        .select({ id: federationLinks.id })
+        .from(federationLinks)
+        .innerJoin(
+          companies,
+          and(eq(companies.id, federationLinks.companyId), eq(companies.federation, true)),
+        )
+        .where(
+          and(
+            eq(federationLinks.companyId, companyId),
+            eq(federationLinks.state, 'active'),
+            eq(federationLinks.pulls, true),
+            staleBefore
+              ? or(isNull(federationLinks.syncedAt), lt(federationLinks.syncedAt, staleBefore))
+              : undefined,
+          ),
+        );
+      for (const row of rows) await this.exchange(row.id);
+    } catch (error) {
+      console.warn('Federation sync failed:', error);
+    } finally {
+      this.running.delete(companyId);
+    }
+    if (this.queued.delete(companyId)) await this.syncCompany(companyId);
   }
 
   /**
@@ -259,6 +377,8 @@ export class Federation {
       share: row.share,
       receive: row.receive,
       pulls: row.pulls,
+      shareDetail: row.shareDetail,
+      receiveDetail: row.receiveDetail,
       syncedAt: row.syncedAt?.toISOString() ?? null,
       receivedAt: row.receivedAt?.toISOString() ?? null,
       error: row.error,
@@ -424,15 +544,144 @@ export class Federation {
   }
 
   /**
-   * Replaces the totals received on a link; null forgets them (the peer stopped sharing, or this side
-   * stopped receiving)
+   * Read-only detail of a company for its links: active clients, issued documents and payments (invoice
+   * payments and Stripe receipts) of the current and previous calendar years, newest first and bounded by
+   * DETAIL_LIMITS; document lines are left out when the snapshot would be too large
+   *
+   * @param companyId {string} - company
+   * @returns {Promise<LinkedDetail | null>} - snapshot, or null when the document service is not wired
+   */
+  async ownDetail(companyId: string): Promise<LinkedDetail | null> {
+    if (!this.options.documents) return null;
+    const today = await instanceToday(this.db);
+    const since = `${Number(today.slice(0, 4)) - 1}-01-01`;
+    const docs = (await this.options.documents.views(companyId, today))
+      .filter((doc) => doc.state !== 'draft' && doc.issueDate >= since)
+      .slice(0, DETAIL_LIMITS.documents);
+    const people = await this.db
+      .select({
+        id: clients.id,
+        kind: clients.kind,
+        name: clients.name,
+        email: clients.email,
+        country: clients.country,
+        siret: clients.siret,
+        vatNumber: clients.vatNumber,
+        livemode: clients.livemode,
+      })
+      .from(clients)
+      .where(and(eq(clients.companyId, companyId), eq(clients.archived, false)))
+      .orderBy(clients.name)
+      .limit(DETAIL_LIMITS.clients);
+    const invoicePayments = await this.db
+      .select({
+        id: payments.id,
+        date: payments.date,
+        amountCents: payments.amountCents,
+        currency: documents.currency,
+        documentId: payments.documentId,
+        documentNumber: documents.number,
+        clientName: clients.name,
+        reference: payments.reference,
+      })
+      .from(payments)
+      .innerJoin(documents, eq(documents.id, payments.documentId))
+      .innerJoin(clients, eq(clients.id, documents.clientId))
+      .where(and(eq(payments.companyId, companyId), gte(payments.date, since)))
+      .orderBy(desc(payments.date))
+      .limit(DETAIL_LIMITS.payments);
+    const receipts = await this.db
+      .select({ revenue: externalRevenues, clientName: clients.name })
+      .from(externalRevenues)
+      .leftJoin(clients, eq(clients.id, externalRevenues.clientId))
+      .where(and(eq(externalRevenues.companyId, companyId), gte(externalRevenues.date, since)))
+      .orderBy(desc(externalRevenues.date))
+      .limit(DETAIL_LIMITS.payments);
+    // Records of the external sources travel too, marked with their source, after the local ones.
+    const relayed = await this.db
+      .select({ data: externalDocuments.data, origin: externalSources.name, test: externalSources.test })
+      .from(externalDocuments)
+      .innerJoin(externalSources, eq(externalSources.id, externalDocuments.linkId))
+      .where(eq(externalSources.companyId, companyId));
+    const detail: LinkedDetail = {
+      clients: people.map(({ livemode, ...client }) => ({
+        ...client,
+        ...(livemode === false && { test: true }),
+      })),
+      documents: docs.map((doc) => ({
+        id: doc.id,
+        type: doc.type,
+        status: doc.status,
+        number: doc.number,
+        clientId: doc.clientId,
+        clientName: doc.clientName,
+        issueDate: doc.issueDate,
+        dueDate: doc.dueDate,
+        validUntil: doc.validUntil,
+        currency: doc.currency,
+        netCents: doc.totals.netCents,
+        vatCents: doc.totals.vatCents,
+        totalCents: doc.totals.totalCents,
+        paidCents: doc.paidCents,
+        dueCents:
+          doc.type === 'invoice' || doc.type === 'deposit'
+            ? Math.max(0, doc.totals.totalCents - doc.creditedCents - doc.paidCents)
+            : 0,
+        lines:
+          doc.lines.length <= DETAIL_LIMITS.lines
+            ? doc.lines.map(({ description, quantity, unit, unitPriceCents }) => ({
+                description,
+                quantity,
+                unit,
+                unitPriceCents,
+              }))
+            : null,
+      })),
+      payments: [
+        ...invoicePayments.map((row) => ({ ...row, source: 'payment' as const })),
+        ...receipts.map(({ revenue, clientName }) => ({
+          id: revenue.id,
+          source: 'stripe' as const,
+          date: revenue.date,
+          amountCents: revenue.amountCents,
+          currency: revenue.currency,
+          documentId: null,
+          documentNumber: null,
+          clientName: clientName ?? revenue.client,
+          reference: revenue.reference,
+          ...(revenue.livemode === false && { test: true as const }),
+        })),
+      ]
+        .sort((a, b) => b.date.localeCompare(a.date))
+        .slice(0, DETAIL_LIMITS.payments),
+    };
+    detail.documents = [
+      ...detail.documents,
+      ...relayed
+        .filter((row) => row.data.issueDate >= since)
+        .sort((a, b) => b.data.issueDate.localeCompare(a.data.issueDate))
+        .map((row) => ({ ...row.data, origin: row.origin, ...(row.test && { test: true as const }) })),
+    ].slice(0, DETAIL_LIMITS.documents);
+    if (JSON.stringify(detail).length > DETAIL_BUDGET_BYTES)
+      detail.documents = detail.documents.map((doc) => ({ ...doc, lines: null }));
+    return detail;
+  }
+
+  /**
+   * Replaces the totals and the detail received on a link; null forgets them (the peer stopped sharing, or
+   * this side stopped receiving)
    *
    * @param link {LinkRow} - link
    * @param totals {MonthlyTotals | null} - totals received
+   * @param detail {LinkedDetail | null} - detail received, kept only when this side receives it
    * @returns {Promise<void>} - resolves once stored
    * @throws {FederationError} - currency_mismatch when the peer counts in another currency
    */
-  private async store(link: LinkRow, totals: MonthlyTotals | null): Promise<void> {
+  private async store(
+    link: LinkRow,
+    totals: MonthlyTotals | null,
+    detail: LinkedDetail | null = null,
+  ): Promise<void> {
     if (totals && totals.currency !== (await this.planning.profile(link.companyId))?.currency) {
       throw new FederationError('currency_mismatch');
     }
@@ -447,6 +696,7 @@ export class Federation {
         await tx
           .insert(federationTotals)
           .values([...sums.values()].map((item) => ({ linkId: link.id, ...item })));
+      await storeDetail(tx, link.id, keepsDetail(link) ? detail : null);
       await tx
         .update(federationLinks)
         .set(
@@ -525,7 +775,7 @@ export class Federation {
       });
       return {
         status: response.status,
-        text: await readLimited(response, MAX_RESPONSE_BYTES),
+        text: await readLimited(response, MAX_EXCHANGE_BYTES),
         nonce: headers['x-almanach-nonce'] ?? '',
         signature: response.headers.get('x-almanach-signature'),
       };
@@ -535,13 +785,15 @@ export class Federation {
   }
 
   /**
-   * Calls the peer of a link: sends this side's totals when shared, keeps the peer's when received. On
-   * failure the last totals stay, with their date, and the error is stored.
+   * Calls the peer of a link: sends this side's totals when shared, keeps the peer's when received, and
+   * likewise the detail when one side shares it and the other keeps it. On failure the last totals and detail
+   * stay, with their date, and the error is stored.
    *
    * @param linkId {string} - link
+   * @param again {boolean} - whether a second call may follow at once, when the peer just started keeping the detail
    * @returns {Promise<{ ok: true } | { error: string }>} - outcome
    */
-  async exchange(linkId: string): Promise<{ ok: true } | { error: string }> {
+  async exchange(linkId: string, again = true): Promise<{ ok: true } | { error: string }> {
     if (!(await this.allowed())) return { error: 'link_inactive' };
     const [row] = await this.db
       .select({ link: federationLinks })
@@ -553,10 +805,16 @@ export class Federation {
     if (!link?.peerUrl || !link.peerPublicKey) return { error: 'link_inactive' };
     try {
       const totals = link.share ? await this.ownTotals(link.companyId) : null;
+      const detail = sendsDetail(link, link.peerReceivesDetail) ? await this.ownDetail(link.companyId) : null;
       const sent = await this.post(
         link.peerUrl,
         'exchange',
-        { receive: link.receive, totals },
+        {
+          receive: link.receive,
+          totals,
+          ...(keepsDetail(link) && { receiveDetail: true }),
+          ...(detail && { detail }),
+        },
         this.keys(link),
       );
       if (sent.status === 401 || sent.status === 404) throw new FederationError('peer_refused');
@@ -565,11 +823,13 @@ export class Federation {
         throw new FederationError('peer_bad_signature');
       const answer = exchangeAnswerSchema.safeParse(parseJson(sent.text));
       if (!answer.success) throw new FederationError('peer_invalid');
-      await this.store(link, link.receive ? answer.data.totals : null);
+      await this.store(link, link.receive ? answer.data.totals : null, answer.data.detail ?? null);
+      const peerReceivesDetail = answer.data.receiveDetail === true;
       await this.db
         .update(federationLinks)
-        .set({ syncedAt: new Date(), error: null })
+        .set({ syncedAt: new Date(), error: null, peerReceivesDetail })
         .where(eq(federationLinks.id, link.id));
+      if (again && !detail && sendsDetail(link, peerReceivesDetail)) return this.exchange(link.id, false);
       return { ok: true };
     } catch (error) {
       const code = error instanceof FederationError ? error.message : 'peer_failed';
@@ -588,13 +848,17 @@ export class Federation {
    * @throws {FederationError} - currency_mismatch
    */
   async answer(link: LinkRow, request: z.infer<typeof exchangeRequestSchema>): Promise<string> {
-    await this.store(link, link.receive ? request.totals : null);
+    await this.store(link, link.receive ? request.totals : null, request.detail ?? null);
+    const peerReceivesDetail = request.receiveDetail === true;
     await this.db
       .update(federationLinks)
-      .set({ syncedAt: new Date(), error: null })
+      .set({ syncedAt: new Date(), error: null, peerReceivesDetail })
       .where(eq(federationLinks.id, link.id));
+    const detail = sendsDetail(link, peerReceivesDetail) ? await this.ownDetail(link.companyId) : null;
     return JSON.stringify({
       totals: link.share && request.receive ? await this.ownTotals(link.companyId) : null,
+      ...(keepsDetail(link) && { receiveDetail: true }),
+      ...(detail && { detail }),
     });
   }
 
@@ -780,6 +1044,7 @@ export function federationSettingsRoutes(
       enabled: company?.enabled ?? false,
       label: company?.label ?? company?.name ?? '',
       publicUrl: row?.url ?? '',
+      intervalMinutes: federation.intervalMinutes,
       links: await federation.list(c.var.company.id),
     });
   });
@@ -843,6 +1108,7 @@ export function federationSettingsRoutes(
     if (!id) return c.json({ error: 'not_found' }, 404);
     await db.update(federationLinks).set(data).where(eq(federationLinks.id, id));
     if (!data.receive) await db.delete(federationTotals).where(eq(federationTotals.linkId, id));
+    if (!(data.receive && data.receiveDetail)) await storeDetail(db, id, null);
     return c.body(null, 204);
   });
 

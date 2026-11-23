@@ -524,6 +524,20 @@ export const planDe: Record<keyof typeof planEn, string> = {
   'system.stripeSync': 'Abgleich der Unternehmen mit Stripe erlauben',
   'system.stripeSync.hint':
     'Standardmäßig aus. Danach schaltet jede Person den Abgleich pro Unternehmen mit ihrem eigenen Nur-Lese-Schlüssel ein.',
+  'dashboard.business': 'Gesamtes Unternehmen',
+  'dashboard.business.hint':
+    'Im Geschäftsjahr vereinnahmt, inklusive verknüpfter Tätigkeiten: Diese Summe zählt für die Grenzen.',
+  'dashboard.business.here': 'Diese Instanz',
+  'dashboard.business.linked': 'verknüpfte Instanz',
+  'dashboard.business.received': 'empfangen am {date}',
+  'dashboard.business.total': 'Summe des Unternehmens',
+  'federation.instance': 'Diese Instanz',
+  'federation.links': 'Verknüpfungen',
+  'federation.fingerprints.title': 'Sicherheits-Fingerabdrücke',
+  'federation.mode.issue': 'Hier einen Code erzeugen',
+  'federation.mode.issue.hint': 'Wenn die andere Instanz diese erreichen kann.',
+  'federation.mode.join': 'Ich habe einen Code',
+  'federation.mode.join.hint': 'Auf der anderen Instanz erzeugt, 15 Minuten gültig.',
   'federation.title': 'Verknüpfte Instanzen',
   'federation.body':
     'Ein Unternehmen, mehrere Tätigkeiten in getrennten Almanach-Instanzen: Verknüpfen Sie sie, damit Obergrenzen, Umsatzsteuerbefreiung und Hinweise den Umsatz des ganzen Unternehmens zählen. Übertragen werden nur Monatssummen je Steuerkategorie und der Name der Tätigkeit; Rechnungen, Kunden und Beiträge bleiben in jeder Instanz.',
@@ -548,7 +562,8 @@ export const planDe: Record<keyof typeof planEn, string> = {
   'federation.never': 'nie',
   'federation.share': 'Summen dieser Tätigkeit teilen',
   'federation.receive': 'Summen der anderen Tätigkeit empfangen',
-  'federation.pulls': 'Diese Instanz ruft die andere auf (alle 6 Stunden)',
+  'federation.pulls':
+    'Diese Instanz ruft die andere auf (automatisch alle {minutes} Min. und kurz nach jeder Änderung)',
   'federation.sync': 'Abgleichen',
   'federation.synced': 'Summen ausgetauscht.',
   'federation.revoke': 'Widerrufen',
@@ -595,4 +610,78 @@ export const planDe: Record<keyof typeof planEn, string> = {
   'outlook.linkedEstimates':
     'Andere Tätigkeit ({label}): {amount} vereinnahmt, Beiträge verwaltet die andere Instanz.',
   'outlook.linkedStale': 'Summen vom {date}: Die andere Instanz ist seitdem nicht erreichbar.',
+  'linked.activity': 'Tätigkeit',
+  'linked.activity.here': 'Diese Instanz',
+  'linked.readOnly':
+    'Nur lesen: Dieser Eintrag stammt aus der verknüpften Instanz „{label}“. Er wird bei jedem Abgleich aktualisiert und dort bearbeitet.',
+  'linked.open': 'In der Ursprungsinstanz öffnen',
+  'linked.gone': 'Eintrag nicht gefunden',
+  'linked.gone.body':
+    'Die verknüpfte Instanz teilt ihn nicht mehr, oder die detaillierte Freigabe wurde beendet.',
+  'linked.client': 'Kunde',
+  'linked.document': 'Dokument',
+  'linked.paid': 'Eingenommen',
+  'linked.due': 'Noch offen',
+  'linked.lines': 'Positionen',
+  'linked.lines.none': 'Positionen nicht übermittelt.',
+  'linked.source.stripe': 'Stripe',
+  'dashboard.linkedPart': '+ {amount} aus {label} (verknüpfte Instanz)',
+  'federation.shareDetail':
+    'Details (Kunden, Rechnungen, Angebote, Gutschriften, Zahlungen) schreibgeschützt teilen',
+  'federation.receiveDetail': 'Von der anderen Instanz geteilte Details empfangen',
+  'federation.detail.hint':
+    'Details werden nur übertragen, wenn eine Seite sie teilt und die andere sie empfängt: laufendes und vorheriges Geschäftsjahr, schreibgeschützt, gelöscht, sobald eine Seite das Häkchen entfernt.',
+  'linked.dev': 'DEV',
+  'linked.hideTest': 'Testdaten ausblenden',
+  'stripe.testKey':
+    'Dies ist ein Stripe-Testschlüssel: Importierte Einnahmen und Kunden werden als DEV markiert und zählen nie zu Umsatz, Schwellen oder Schätzungen.',
+  'system.externalSources': 'Externe Dokumentquellen erlauben',
+  'system.externalSources.hint':
+    'Unternehmen können dann alle 15 Minuten HTTPS-Feeds mit Angeboten und Rechnungen anderer Tools abrufen. Solange dies aus ist, wird nichts abgerufen.',
+  'system.mcp': 'MCP-Endpunkt erlauben (KI-Assistenten)',
+  'system.mcp.hint':
+    '/mcp beantwortet dann persönliche Zugriffstoken aus den Einstellungen. Es stellt nie etwas aus, versendet oder löscht nichts.',
+  'external.title': 'Externe Quellen',
+  'external.body':
+    'Angebote, Rechnungen und Gutschriften eines anderen Tools, schreibgeschützt, über einen HTTPS-Feed im Format almanach-feed/1. Sie erscheinen mit dem Quellennamen, zählen nie zu Nummerierung, Erklärungen oder Export, externe Angebote nie zum Umsatz.',
+  'external.notAllowed':
+    'Ein Administrator muss externe Quellen zuerst unter Einstellungen → Instanz erlauben.',
+  'external.status': '{count} Dokument(e). Letzte Synchronisierung: {date}.',
+  'external.synced': '{count} Dokument(e) empfangen.',
+  'external.sync': 'Synchronisieren',
+  'external.remove': 'Entfernen',
+  'external.add': 'Quelle hinzufügen',
+  'external.name': 'Name',
+  'external.url': 'Feed-Adresse',
+  'external.url.hint': 'Nur HTTPS, z. B. https://api.example.com/platform/integrations/almanach/feed',
+  'external.token': 'Bearer-Token',
+  'external.token.hint': 'Verschlüsselt gespeichert, nie wieder angezeigt.',
+  'external.token.saved':
+    'Ein Token ist gespeichert. Nur zum Ersetzen eingeben (Pflicht bei geänderter Adresse).',
+  'external.test': 'Testumgebung',
+  'external.test.hint':
+    'Ihre Dokumente erscheinen ausgegraut mit DEV-Kennzeichen und bleiben aus allen Summen, Schwellen, Schätzungen und dem Dashboard heraus.',
+  'external.remove.title': '{name} entfernen?',
+  'external.remove.body': 'Die Quelle, ihr Token und alle Kopien ihrer Dokumente werden gelöscht.',
+  'external.error.external_not_allowed': 'Externe Quellen sind auf dieser Instanz nicht erlaubt.',
+  'external.error.token_required': 'Token eingeben.',
+  'external.error.feed_unreachable': 'Der Feed ist nicht erreichbar.',
+  'external.error.feed_unauthorized': 'Der Feed hat das Token abgelehnt.',
+  'external.error.feed_http': 'Der Feed antwortete mit einem Fehler.',
+  'external.error.feed_too_large': 'Der Feed ist zu groß (über 5 MiB).',
+  'external.error.feed_invalid': 'Der Feed entspricht nicht dem Format almanach-feed/1.',
+  'external.error.feed_failed': 'Die Synchronisierung ist fehlgeschlagen.',
+  'tokens.title': 'Persönliche Zugriffstoken (MCP)',
+  'tokens.body':
+    'Erlauben einem KI-Assistenten, Ihre Daten über /mcp zu lesen (docs/mcp.md). „Lesen + Entwürfe“ darf zudem Kunden und Entwürfe von Angeboten oder Rechnungen anlegen, nie ausstellen, versenden oder löschen.',
+  'tokens.notAllowed':
+    'Ein Administrator muss den MCP-Endpunkt zuerst unter Einstellungen → Instanz erlauben.',
+  'tokens.created': 'Kopieren Sie dieses Token jetzt, es wird nicht wieder angezeigt:',
+  'tokens.used': 'Erstellt am {created} · zuletzt genutzt: {used}',
+  'tokens.scope': 'Umfang',
+  'tokens.scope.read': 'Lesen',
+  'tokens.scope.read_drafts': 'Lesen + Entwürfe',
+  'tokens.revoke': 'Widerrufen',
+  'tokens.name': 'Name',
+  'tokens.create': 'Token erstellen',
 };

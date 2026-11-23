@@ -2,6 +2,9 @@ import type {
   Bank,
   DeclarationPeriod,
   Line,
+  LinkedClient,
+  LinkedDocument,
+  LinkedPayment,
   Locale,
   NumberFormatPeriod,
   PDF_FONTS,
@@ -45,6 +48,10 @@ export const instance = pgTable(
     stripeSync: boolean('stripe_sync').notNull().default(false),
     /** Whether people may link their companies with other instances (docs/federation.md); off by default. */
     federation: boolean('federation').notNull().default(false),
+    /** Whether people may add external document sources (docs/external-sources.md); off by default. */
+    externalSources: boolean('external_sources').notNull().default(false),
+    /** Whether the /mcp endpoint answers personal access tokens (docs/mcp.md); off by default. */
+    mcp: boolean('mcp').notNull().default(false),
     installedAt: timestamp('installed_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [check('instance_singleton', sql`${table.id} = 1`)],
@@ -89,6 +96,23 @@ export const companies = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [index('companies_user_idx').on(table.userId)],
+);
+
+/** Personal access tokens for /mcp (docs/mcp.md); only the SHA-256 of the token is stored. */
+export const apiTokens = pgTable(
+  'api_tokens',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    scope: text('scope', { enum: ['read', 'read_drafts'] }).notNull(),
+    tokenHash: text('token_hash').notNull().unique(),
+    lastUsedAt: timestamp('last_used_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index('api_tokens_user_idx').on(table.userId)],
 );
 
 /** Server-side sessions; only the SHA-256 of the cookie token is stored. */
@@ -175,6 +199,8 @@ export const clients = pgTable(
     stripeEdited: boolean('stripe_edited').notNull().default(false),
     /** When the Stripe customer disappeared; the client and its history are kept. */
     stripeDeletedAt: timestamp('stripe_deleted_at', { withTimezone: true }),
+    /** Stripe `livemode` of the customer; false marks test data. Null only before the first backfill. */
+    livemode: boolean('livemode'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
@@ -482,6 +508,8 @@ export const externalRevenues = pgTable(
     /** Almanach client of the paying Stripe customer, when known. */
     clientId: uuid('client_id').references(() => clients.id, { onDelete: 'set null' }),
     reference: text('reference'),
+    /** Stripe `livemode` of the object; false marks test data, left out of every total. */
+    livemode: boolean('livemode'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
@@ -517,6 +545,12 @@ export const federationLinks = pgTable(
     receive: boolean('receive').notNull().default(true),
     /** Whether this side calls the other one; the side behind a VPN may be the only one able to. */
     pulls: boolean('pulls').notNull().default(false),
+    /** Whether this side shares its clients, documents and payments read-only; off by default. */
+    shareDetail: boolean('share_detail').notNull().default(false),
+    /** Whether this side keeps the detail the other one shares; off by default. */
+    receiveDetail: boolean('receive_detail').notNull().default(false),
+    /** Whether the peer said it keeps this side's detail; learnt from its answers, nothing is sent before. */
+    peerReceivesDetail: boolean('peer_receives_detail').notNull().default(false),
     peerLabel: text('peer_label'),
     peerCurrency: text('peer_currency'),
     /** Last exchange, whichever side called. */
@@ -557,3 +591,63 @@ export const federationNonces = pgTable(
   },
   (table) => [primaryKey({ columns: [table.keyId, table.nonce] })],
 );
+
+/**
+ * Read-only copies of the records a linked instance shares, one table per kind, keyed by link and remote id.
+ * Never mixed with local records: they take no part in numbering, declarations, estimates or exports, and go
+ * with the link or as soon as either side stops sharing.
+ */
+const linkedTable = <T>(name: string) =>
+  pgTable(
+    name,
+    {
+      linkId: uuid('link_id')
+        .notNull()
+        .references(() => federationLinks.id, { onDelete: 'cascade' }),
+      remoteId: uuid('remote_id').notNull(),
+      data: jsonb('data').$type<T>().notNull(),
+    },
+    (table) => [primaryKey({ columns: [table.linkId, table.remoteId] })],
+  );
+
+export const federationClients = linkedTable<LinkedClient>('federation_clients');
+export const federationDocuments = linkedTable<LinkedDocument>('federation_documents');
+export const federationPayments = linkedTable<LinkedPayment>('federation_payments');
+
+/** HTTPS feed of documents from another tool, polled like a link (docs/external-sources.md). */
+export const externalSources = pgTable(
+  'external_sources',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    companyId: uuid('company_id')
+      .notNull()
+      .references(() => companies.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    url: text('url').notNull(),
+    /** Bearer token, AES-256-GCM encrypted with SECRETS_KEY; never sent back to the interface. */
+    token: text('token').notNull(),
+    /** Test environment: its records show as test data and stay out of every total. */
+    test: boolean('test').notNull().default(false),
+    syncedAt: timestamp('synced_at', { withTimezone: true }),
+    error: text('error'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index('external_sources_company_idx').on(table.companyId)],
+);
+
+/** Read-only copies of a source's records, replaced at each poll and gone with the source. */
+const sourceTable = <T>(name: string) =>
+  pgTable(
+    name,
+    {
+      linkId: uuid('source_id')
+        .notNull()
+        .references(() => externalSources.id, { onDelete: 'cascade' }),
+      remoteId: uuid('remote_id').notNull(),
+      data: jsonb('data').$type<T>().notNull(),
+    },
+    (table) => [primaryKey({ columns: [table.linkId, table.remoteId] })],
+  );
+
+export const externalClients = sourceTable<LinkedClient>('external_clients');
+export const externalDocuments = sourceTable<LinkedDocument>('external_documents');

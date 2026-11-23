@@ -50,7 +50,7 @@ export function CompaniesSettings() {
       {failure && <Notice tone="error">{failure}</Notice>}
       <ul className={list.list}>
         {data.companies.map((company) => (
-          <li key={company.id} className={list.item}>
+          <li key={company.id} className={`${list.item} ${list.panel}`}>
             <form
               className={local.row}
               onSubmit={(event) => {

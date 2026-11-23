@@ -520,6 +520,20 @@ export const planFr: Record<keyof typeof planEn, string> = {
   'system.stripeSync': 'Autoriser la synchronisation des entreprises avec Stripe',
   'system.stripeSync.hint':
     'Désactivé par défaut. Une fois autorisé, chacun active la synchronisation d’une entreprise avec sa propre clé en lecture seule.',
+  'dashboard.business': 'Toute l’entreprise',
+  'dashboard.business.hint':
+    'Encaissé sur l’exercice, toutes activités liées comprises : c’est ce total qui compte pour les plafonds.',
+  'dashboard.business.here': 'Cette instance',
+  'dashboard.business.linked': 'instance liée',
+  'dashboard.business.received': 'reçu le {date}',
+  'dashboard.business.total': 'Total de l’entreprise',
+  'federation.instance': 'Cette instance',
+  'federation.links': 'Liaisons',
+  'federation.fingerprints.title': 'Empreintes de sécurité',
+  'federation.mode.issue': 'Générer un code ici',
+  'federation.mode.issue.hint': 'Si l’autre instance peut joindre celle-ci.',
+  'federation.mode.join': 'J’ai reçu un code',
+  'federation.mode.join.hint': 'Code généré sur l’autre instance, valable 15 minutes.',
   'federation.title': 'Instances liées',
   'federation.body':
     'Une entreprise, plusieurs activités suivies dans des instances Almanach séparées : liez-les pour que plafonds, franchise de TVA et alertes comptent le chiffre d’affaires de toute l’entreprise. Seuls les totaux mensuels par catégorie fiscale et le nom de l’activité transitent ; factures, clients et cotisations restent dans chaque instance.',
@@ -545,7 +559,8 @@ export const planFr: Record<keyof typeof planEn, string> = {
   'federation.never': 'jamais',
   'federation.share': 'Partager les totaux de cette activité',
   'federation.receive': 'Recevoir les totaux de l’autre activité',
-  'federation.pulls': 'Cette instance appelle l’autre (toutes les 6 heures)',
+  'federation.pulls':
+    'Cette instance appelle l’autre (automatiquement toutes les {minutes} min et peu après chaque modification)',
   'federation.sync': 'Synchroniser',
   'federation.synced': 'Totaux échangés.',
   'federation.revoke': 'Révoquer',
@@ -593,4 +608,78 @@ export const planFr: Record<keyof typeof planEn, string> = {
   'outlook.linkedEstimates':
     'Autre activité ({label}) : {amount} encaissés, cotisations gérées par l’autre instance.',
   'outlook.linkedStale': 'Totaux du {date} : l’autre instance est injoignable depuis.',
+  'linked.activity': 'Activité',
+  'linked.activity.here': 'Cette instance',
+  'linked.readOnly':
+    'Lecture seule : cet élément vient de l’instance liée « {label} ». Il se met à jour à chaque échange et se modifie là-bas.',
+  'linked.open': 'Ouvrir dans l’instance d’origine',
+  'linked.gone': 'Élément introuvable',
+  'linked.gone.body': 'L’instance liée ne le partage plus, ou le partage détaillé a été retiré.',
+  'linked.client': 'Client',
+  'linked.document': 'Document',
+  'linked.paid': 'Encaissé',
+  'linked.due': 'Reste dû',
+  'linked.lines': 'Lignes',
+  'linked.lines.none': 'Lignes non transmises.',
+  'linked.source.stripe': 'Stripe',
+  'dashboard.linkedPart': '+ {amount} pour {label} (instance liée)',
+  'federation.shareDetail':
+    'Partager le détail (clients, factures, devis, avoirs, paiements) en lecture seule',
+  'federation.receiveDetail': 'Recevoir le détail partagé par l’autre instance',
+  'federation.detail.hint':
+    'Le détail ne transite que si un côté le partage et l’autre le reçoit : exercice en cours et précédent, en lecture seule, supprimé dès que l’un des deux décoche.',
+  'linked.dev': 'DEV',
+  'linked.hideTest': 'Masquer les données de test',
+  'stripe.testKey':
+    'Cette clé Stripe est une clé de test : les recettes et clients importés sont marqués DEV et ne comptent jamais dans le chiffre d’affaires, les seuils ni les estimations.',
+  'system.externalSources': 'Autoriser les sources de documents externes',
+  'system.externalSources.hint':
+    'Les entreprises peuvent alors interroger toutes les 15 minutes des flux HTTPS de devis et factures d’autres outils. Rien n’est récupéré tant que c’est décoché.',
+  'system.mcp': 'Autoriser le point d’accès MCP (assistants IA)',
+  'system.mcp.hint':
+    '/mcp répond alors aux jetons personnels créés dans les réglages. Il n’émet, n’envoie et ne supprime jamais rien.',
+  'external.title': 'Sources externes',
+  'external.body':
+    'Devis, factures et avoirs d’un autre outil, en lecture seule, via un flux HTTPS au format almanach-feed/1. Ils s’affichent au nom de la source, hors numérotation, déclarations et export ; les devis externes ne comptent jamais dans le chiffre d’affaires.',
+  'external.notAllowed':
+    'Un administrateur doit d’abord autoriser les sources externes dans Réglages → Instance.',
+  'external.status': '{count} document(s). Dernière synchronisation : {date}.',
+  'external.synced': '{count} document(s) reçu(s).',
+  'external.sync': 'Synchroniser',
+  'external.remove': 'Supprimer',
+  'external.add': 'Ajouter une source',
+  'external.name': 'Nom',
+  'external.url': 'Adresse du flux',
+  'external.url.hint':
+    'HTTPS uniquement, par exemple https://api.example.com/platform/integrations/almanach/feed',
+  'external.token': 'Jeton Bearer',
+  'external.token.hint': 'Stocké chiffré, jamais réaffiché.',
+  'external.token.saved':
+    'Un jeton est enregistré. N’en saisissez un que pour le remplacer (obligatoire si l’adresse change).',
+  'external.test': 'Environnement de test',
+  'external.test.hint':
+    'Ses documents s’affichent grisés avec une pastille DEV et restent hors de tous les totaux, seuils, estimations et du tableau de bord.',
+  'external.remove.title': 'Supprimer {name} ?',
+  'external.remove.body': 'La source, son jeton et toutes les copies de ses documents sont supprimés.',
+  'external.error.external_not_allowed': 'Les sources externes ne sont pas autorisées sur cette instance.',
+  'external.error.token_required': 'Saisissez le jeton.',
+  'external.error.feed_unreachable': 'Le flux est injoignable.',
+  'external.error.feed_unauthorized': 'Le flux a refusé le jeton.',
+  'external.error.feed_http': 'Le flux a répondu par une erreur.',
+  'external.error.feed_too_large': 'Le flux est trop volumineux (plus de 5 Mio).',
+  'external.error.feed_invalid': 'Le flux n’est pas au format almanach-feed/1.',
+  'external.error.feed_failed': 'La synchronisation a échoué.',
+  'tokens.title': 'Jetons personnels (MCP)',
+  'tokens.body':
+    'Permettent à un assistant IA de lire vos données via /mcp (docs/mcp.md). « Lecture + brouillons » peut aussi créer des clients et des brouillons de devis ou factures, jamais émettre, envoyer ni supprimer.',
+  'tokens.notAllowed':
+    'Un administrateur doit d’abord autoriser le point d’accès MCP dans Réglages → Instance.',
+  'tokens.created': 'Copiez ce jeton maintenant, il ne sera plus affiché :',
+  'tokens.used': 'Créé le {created} · dernière utilisation : {used}',
+  'tokens.scope': 'Portée',
+  'tokens.scope.read': 'Lecture',
+  'tokens.scope.read_drafts': 'Lecture + brouillons',
+  'tokens.revoke': 'Révoquer',
+  'tokens.name': 'Nom',
+  'tokens.create': 'Créer un jeton',
 };

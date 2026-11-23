@@ -1,4 +1,4 @@
-import { type DocumentView, daysBetween } from '@almanach/shared';
+import { type DocumentView, daysBetween, type LinkedRecords } from '@almanach/shared';
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router';
 import { Badge } from '../../components/Badge/Badge.tsx';
@@ -14,9 +14,41 @@ import { Skeleton } from '../../components/Skeleton/Skeleton.tsx';
 import { useI18n } from '../../i18n/I18nProvider.tsx';
 import { formatDate, formatMoney, today } from '../../lib/format.ts';
 import { useResource } from '../../lib/useResource.ts';
+import { ActivityFilter } from '../linked/ActivityFilter.tsx';
+import { labelsOf, linkedPath, showsLink, showsLocal } from '../linked/activity.ts';
+import { DevBadge, HideTestToggle, useHideTest } from '../linked/TestData.tsx';
 import { STATUS_TONE, toCsv } from './labels.ts';
 
 type Kind = 'invoice' | 'quote' | 'credit_note';
+
+/** Document types each list shows. */
+const TYPES: Record<Kind, string[]> = {
+  invoice: ['invoice', 'deposit'],
+  quote: ['quote'],
+  credit_note: ['credit_note'],
+};
+
+/** A document of this instance, or one received read-only from a linked instance (with its activity label). */
+type Row = Pick<
+  DocumentView,
+  'id' | 'type' | 'number' | 'clientId' | 'clientName' | 'issueDate' | 'dueDate' | 'currency'
+> & {
+  status: string;
+  key: string;
+  to: string;
+  draft: boolean;
+  netCents: number;
+  vatCents: number;
+  totalCents: number;
+  paidCents: number;
+  dueCents: number;
+  linkId?: string;
+  source?: string;
+  /** Name of the external source of a record relayed by a linked instance. */
+  origin?: string;
+  /** Test data: shown greyed with a DEV pill, never counted. */
+  test?: boolean;
+};
 
 const STATUSES: Record<Kind, string[]> = {
   invoice: ['draft', 'issued', 'partially_paid', 'paid', 'overdue', 'cancelled'],
@@ -26,7 +58,7 @@ const STATUSES: Record<Kind, string[]> = {
 
 /**
  * Lists invoices, quotes or credit notes with filters, per-currency totals and CSV export
- * (P12, P13: S-150 to S-154)
+ * (P12, P13: S-150 to S-154); documents of linked instances show read-only with their activity badge
  *
  * @param props {{ kind: Kind }} - which documents to list
  * @returns {JSX.Element} - the page
@@ -41,7 +73,33 @@ export function DocumentsPage({ kind }: { kind: Kind }) {
   const [client, setClient] = useState('');
   const [currency, setCurrency] = useState('');
   const [year, setYear] = useState('');
-  const docs = data?.documents ?? [];
+  const linked = useResource<LinkedRecords>('/api/linked').data;
+  const [activity, setActivity] = useState('');
+  const [hideTest, setHideTest] = useHideTest();
+  const docs = useMemo<Row[]>(() => {
+    const labels = labelsOf(linked);
+    return [
+      ...(data?.documents ?? []).map((doc) => ({
+        ...doc,
+        key: doc.id,
+        to: `/documents/${doc.id}`,
+        draft: doc.state === 'draft',
+        netCents: doc.totals.netCents,
+        vatCents: doc.totals.vatCents,
+        totalCents: doc.totals.totalCents,
+        dueCents: Math.max(0, doc.totals.totalCents - doc.creditedCents - doc.paidCents),
+      })),
+      ...(linked?.documents ?? [])
+        .filter((doc) => TYPES[kind].includes(doc.type))
+        .map((doc) => ({
+          ...doc,
+          key: `${doc.linkId}:${doc.id}`,
+          to: linkedPath('document', doc.linkId, doc.id),
+          draft: false,
+          source: labels.get(doc.linkId) ?? '',
+        })),
+    ];
+  }, [data, linked, kind]);
 
   const clients = useMemo(
     () => [...new Map(docs.map((doc) => [doc.clientId, doc.clientName])).entries()],
@@ -51,6 +109,8 @@ export function DocumentsPage({ kind }: { kind: Kind }) {
   const years = [...new Set(docs.map((doc) => doc.issueDate.slice(0, 4)))];
   const visible = docs.filter(
     (doc) =>
+      (doc.linkId ? showsLink(activity, doc.linkId) : showsLocal(activity)) &&
+      (!hideTest || !doc.test) &&
       (!status || doc.status === status) &&
       (!client || doc.clientId === client) &&
       (!currency || doc.currency === currency) &&
@@ -59,11 +119,11 @@ export function DocumentsPage({ kind }: { kind: Kind }) {
 
   const totals = new Map<string, { billed: number; paid: number; due: number }>();
   for (const doc of visible) {
-    if (doc.state === 'draft') continue;
+    if (doc.draft || doc.test) continue;
     const entry = totals.get(doc.currency) ?? { billed: 0, paid: 0, due: 0 };
-    entry.billed += doc.totals.totalCents;
+    entry.billed += doc.totalCents;
     entry.paid += doc.paidCents;
-    entry.due += Math.max(0, doc.totals.totalCents - doc.creditedCents - doc.paidCents);
+    entry.due += doc.dueCents;
     totals.set(doc.currency, entry);
   }
 
@@ -74,7 +134,19 @@ export function DocumentsPage({ kind }: { kind: Kind }) {
    */
   function exportCsv(): void {
     const rows: (string | number)[][] = [
-      ['number', 'status', 'client', 'issue_date', 'due_date', 'currency', 'net', 'vat', 'total', 'paid'],
+      [
+        'number',
+        'status',
+        'client',
+        'issue_date',
+        'due_date',
+        'currency',
+        'net',
+        'vat',
+        'total',
+        'paid',
+        'activity',
+      ],
       ...visible.map((doc) => [
         doc.number ?? '',
         doc.status,
@@ -82,10 +154,11 @@ export function DocumentsPage({ kind }: { kind: Kind }) {
         doc.issueDate,
         doc.dueDate ?? '',
         doc.currency,
-        (doc.totals.netCents / 100).toFixed(2),
-        (doc.totals.vatCents / 100).toFixed(2),
-        (doc.totals.totalCents / 100).toFixed(2),
+        (doc.netCents / 100).toFixed(2),
+        (doc.vatCents / 100).toFixed(2),
+        (doc.totalCents / 100).toFixed(2),
         (doc.paidCents / 100).toFixed(2),
+        doc.source ?? '',
       ]),
     ];
     const url = URL.createObjectURL(new Blob([toCsv(rows)], { type: 'text/csv;charset=utf-8' }));
@@ -157,6 +230,8 @@ export function DocumentsPage({ kind }: { kind: Kind }) {
                 <option key={value}>{value}</option>
               ))}
             </SelectField>
+            <ActivityFilter linked={linked} value={activity} onChange={setActivity} />
+            <HideTestToggle shown={docs.some((doc) => doc.test)} value={hideTest} onChange={setHideTest} />
             {currencies.length > 1 && (
               <SelectField
                 label={t('clients.currency')}
@@ -176,17 +251,20 @@ export function DocumentsPage({ kind }: { kind: Kind }) {
           {visible.length > 0 && (
             <ul className={list.list}>
               {visible.map((doc) => (
-                <li key={doc.id} className={list.item}>
-                  <Link to={`/documents/${doc.id}`} className={list.row}>
+                <li key={doc.key} className={doc.test ? `${list.item} ${list.test}` : list.item}>
+                  <Link to={doc.to} className={list.row}>
                     <span className={list.primary}>
                       <strong>{doc.number ?? t('documents.status.draft')}</strong>
                       <span className={list.secondary}>{doc.clientName}</span>
                     </span>
                     <span className={list.secondary}>{formatDate(doc.issueDate, locale)}</span>
                     <span className={list.secondary}>
-                      {formatMoney(doc.totals.totalCents, doc.currency, locale)}
+                      {formatMoney(doc.totalCents, doc.currency, locale)}
                     </span>
                     <span className={list.badges}>
+                      {doc.source !== undefined && <Badge tone="accent">{doc.source}</Badge>}
+                      {doc.origin && <Badge>{doc.origin}</Badge>}
+                      {doc.test && <DevBadge />}
                       {doc.type === 'deposit' && <Badge>{t('documents.type.deposit')}</Badge>}
                       <Badge tone={STATUS_TONE[doc.status]}>
                         {t(`documents.status.${doc.status}` as 'documents.status.draft')}

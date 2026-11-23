@@ -146,6 +146,8 @@ test('paid invoices, standalone charges and refunds become receipts, once each',
       client: 'Acme',
       reference: 'SEK-0001',
       customer: 'cus_1',
+      // A test key: objects without `livemode` take its mode.
+      livemode: false,
     },
     {
       source: 'stripe',
@@ -157,6 +159,7 @@ test('paid invoices, standalone charges and refunds become receipts, once each',
       client: 'us@example.test',
       reference: 'SEK-0002',
       customer: null,
+      livemode: false,
     },
     {
       source: 'stripe',
@@ -168,6 +171,7 @@ test('paid invoices, standalone charges and refunds become receipts, once each',
       client: 'Walk-in',
       reference: null,
       customer: null,
+      livemode: false,
     },
     {
       source: 'stripe',
@@ -179,6 +183,7 @@ test('paid invoices, standalone charges and refunds become receipts, once each',
       client: 'Acme',
       reference: 'SEK-0001',
       customer: 'cus_1',
+      livemode: false,
     },
   ]);
   expect(JSON.stringify(rows)).not.toContain('4242');

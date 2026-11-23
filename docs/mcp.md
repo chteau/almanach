@@ -1,0 +1,57 @@
+# Serveur MCP
+
+Almanach expose un serveur [MCP](https://modelcontextprotocol.io) sur `/mcp` pour qu'un assistant IA
+(Claude Code, Claude Desktop…) lise tes données et, si tu l'autorises, prépare des brouillons.
+
+## Activer
+
+1. Un administrateur coche **Réglages → Instance → Autoriser le point d'accès MCP**, ou l'administrateur
+   du serveur pose `MCP=true`. Sinon `/mcp` répond 404.
+2. Dans **Réglages → Jetons personnels (MCP)**, crée un jeton avec un nom et une portée :
+   - **Lecture** (`read`) : uniquement les outils de lecture ;
+   - **Lecture + brouillons** (`read_drafts`) : en plus, créer ou modifier un client et créer un
+     brouillon de devis ou de facture.
+
+   Le jeton (`alm_…`) n'est affiché qu'une fois ; seule son empreinte SHA-256 est stockée. La liste
+   montre sa date de dernière utilisation ; « Révoquer » le supprime aussitôt.
+3. Ajoute le serveur à Claude Code :
+
+```sh
+claude mcp add --transport http almanach http://localhost:8090/mcp --header "Authorization: Bearer <jeton>"
+```
+
+(adapte l'adresse à ton instance ; en dehors de ta machine, passe par HTTPS).
+
+## Outils
+
+Chaque outil agit dans une entreprise du compte du jeton : paramètre `company` (identifiant ou nom),
+par défaut la première. Montants en centimes.
+
+| Outil | Portée | Rôle |
+|---|---|---|
+| `list_companies` | read | entreprises du compte |
+| `search_clients` | read | recherche de clients, y compris ceux des instances liées et sources externes |
+| `list_documents` | read | devis, factures, avoirs : filtres type, statut, période, activité ; documents liés et externes avec leur `source` et `test` |
+| `get_document` | read | document détaillé (local ou en lecture seule) |
+| `list_payments` | read | paiements et recettes des instances liées |
+| `list_deadlines` | read | échéances à venir ou en retard |
+| `get_thresholds` | read | seuils, estimations de cotisations et d'impôt, simulation |
+| `get_dashboard` | read | résumé du tableau de bord |
+| `list_linked_activities` | read | instances liées et sources externes |
+| `create_client`, `update_client` | read_drafts | créer ou modifier un client |
+| `create_draft_document` | read_drafts | créer un **brouillon** de devis ou de facture |
+
+Aucun outil n'émet, n'envoie, ne numérote, ne supprime ni ne touche aux réglages, liaisons, sources ou
+jetons : l'émission se fait toujours dans Almanach. Les données de test sont exclues par défaut
+(`includeTest`) et toujours marquées `test: true`.
+
+## Sécurité et limites
+
+- Transport « Streamable HTTP » sans état, réponses JSON (pas de flux SSE) : `POST /mcp` ; `GET` et
+  `DELETE` répondent 405. Implémentation minimale du protocole (révisions 2025-06-18, 2025-03-26,
+  2024-11-05) plutôt que le SDK officiel, qui tirerait Express et une dizaine de dépendances.
+- 120 requêtes par minute et par adresse, et autant par jeton ; corps limité à 256 Kio ; une page web
+  d'un autre site est refusée (en-tête `Origin`).
+- Les outils réutilisent les routes de l'API : mêmes validations, mêmes calculs, même blocage après
+  cessation d'activité. Un jeton ne voit que les entreprises de son propriétaire. Chaque écriture est
+  journalisée (`mcp.write`).

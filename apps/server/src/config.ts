@@ -54,6 +54,12 @@ const envSchema = z.object({
   STRIPE_SYNC: booleanFromEnv.default(false),
   /** The server administrator allows links between instances here instead of in Settings → Instance. */
   FEDERATION: booleanFromEnv.default(false),
+  /** The server administrator allows external document sources here instead of in Settings → Instance. */
+  EXTERNAL_SOURCES: booleanFromEnv.default(false),
+  /** The server administrator allows the MCP endpoint here instead of in Settings → Instance. */
+  MCP: booleanFromEnv.default(false),
+  /** Minutes between two scheduled exchanges with linked instances. */
+  FEDERATION_INTERVAL_MINUTES: z.coerce.number().int().min(1).max(1440).default(15),
   RELEASE_CHECK_URL: z
     .url({ protocol: /^https$/ })
     .default('https://api.github.com/repos/chteau/almanach/releases/latest'),
@@ -87,6 +93,12 @@ export interface Config {
   stripeSync: boolean;
   /** FEDERATION=true: links between instances allowed by the server configuration, locked on in the interface. */
   federation: boolean;
+  /** EXTERNAL_SOURCES=true: external document sources allowed by the server configuration, locked on. */
+  externalSources: boolean;
+  /** MCP=true: the /mcp endpoint allowed by the server configuration, locked on. */
+  mcp: boolean;
+  /** Minutes between two scheduled exchanges with the linked instances this side calls. */
+  federationIntervalMinutes: number;
 }
 
 /**
@@ -120,5 +132,8 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     secretsKey: value.SECRETS_KEY,
     stripeSync: value.STRIPE_SYNC,
     federation: value.FEDERATION,
+    externalSources: value.EXTERNAL_SOURCES,
+    mcp: value.MCP,
+    federationIntervalMinutes: value.FEDERATION_INTERVAL_MINUTES,
   };
 }

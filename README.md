@@ -82,6 +82,11 @@ l'application le dit à l'inscription. Le détail est dans le
   derrière un VPN, l'autre perso) : plafonds, franchise de TVA et alertes comptent le cumul. Seuls
   des totaux mensuels par catégorie fiscale transitent, par requêtes signées Ed25519
   ([détails](docs/federation.md)).
+- **Ajoute des sources externes.** Devis et factures d'un autre outil, lus depuis un flux HTTPS
+  `almanach-feed/1`, en lecture seule et marqués de leur source ; les sources de test et le mode test
+  de Stripe restent hors de tous les totaux ([détails](docs/external-sources.md)).
+- **Interroge-le depuis un assistant IA.** Serveur MCP sur `/mcp`, avec des jetons personnels en
+  lecture ou en lecture + brouillons ([détails](docs/mcp.md)).
 - **Garde tes données.** Export JSON complet, réimport dans une instance neuve. Double
   authentification (TOTP), sessions révocables, verrouillage après plusieurs échecs.
 
@@ -90,9 +95,9 @@ l'application le dit à l'inscription. Le détail est dans le
 - Gratuit et libre, pour toujours, sous licence [AGPL-3.0](LICENSE).
 - Pas de version hébergée, pas d'offre payante, pas de télémétrie.
 - Aucune requête vers l'extérieur tant qu'un administrateur ne l'a pas activée (mises à jour de
-  packs, annonce de nouvelle version, synchronisation Stripe, liaisons entre instances). L'autorisation
-  se donne dans les réglages ou, pour Stripe et les liaisons, dans la configuration du serveur
-  (`STRIPE_SYNC`, `FEDERATION`).
+  packs, annonce de nouvelle version, synchronisation Stripe, liaisons entre instances, sources externes, MCP). L'autorisation
+  se donne dans les réglages ou dans la configuration du serveur
+  (`STRIPE_SYNC`, `FEDERATION`, `EXTERNAL_SOURCES`, `MCP`).
 
 ## Installation
 
@@ -127,6 +132,9 @@ Tout est facultatif.
 | `RELEASE_CHECK_URL` | Adresse interrogée une fois par jour pour annoncer une nouvelle version, seulement si un administrateur l'active. |
 | `STRIPE_SYNC` | `true` autorise la synchronisation Stripe sur l'instance, comme la case de **Réglages → Instance** (alors cochée et verrouillée). Absente : la case décide. Chaque entreprise l'active ensuite avec sa propre clé. |
 | `FEDERATION` | `true` autorise les liaisons entre instances, de la même façon. |
+| `EXTERNAL_SOURCES` | `true` autorise les sources de documents externes, de la même façon. |
+| `MCP` | `true` ouvre le point d'accès `/mcp` aux jetons personnels, de la même façon. |
+| `FEDERATION_INTERVAL_MINUTES` | Minutes entre deux échanges automatiques avec les instances liées (15 par défaut). Une modification locale déclenche aussi un échange une trentaine de secondes plus tard. |
 
 ### Publier une mise à jour de pack
 

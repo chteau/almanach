@@ -195,7 +195,7 @@ describe.skipIf(!url)('companies (database)', () => {
     const saved = await call('a', '/api/settings/stripe', {
       method: 'PUT',
       company: ids.a,
-      body: { key: 'rk_test_abcdefghijklmnop', enabled: true },
+      body: { key: 'rk_live_abcdefghijklmnop', enabled: true },
     });
     expect(saved.status).toBe(204);
     const sync = () => call('a', '/api/settings/stripe/sync', { method: 'POST', company: ids.a });
@@ -203,7 +203,7 @@ describe.skipIf(!url)('companies (database)', () => {
     expect(await (await sync()).json()).toEqual({ imported: 0 } as never);
     const status = await json(call('a', '/api/settings/stripe', { company: ids.a }));
     expect(status).toMatchObject({ keySet: true, enabled: true, imported: 1, error: null });
-    expect(JSON.stringify(status)).not.toContain('rk_test');
+    expect(JSON.stringify(status)).not.toContain('rk_live');
 
     const planning = new PlanningService(db, await PackRegistry.load());
     const own = await planning.receipts(ids.a, 'EUR', '2026-01-01', '2026-12-31');

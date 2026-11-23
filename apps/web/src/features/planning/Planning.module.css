@@ -450,3 +450,25 @@
 .muted {
   color: var(--muted);
 }
+
+.spaced {
+  margin-bottom: 16px;
+}
+
+.split {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 16px;
+}
+
+.split strong {
+  font-variant-numeric: tabular-nums;
+}
+
+.total {
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+  font-weight: 600;
+}

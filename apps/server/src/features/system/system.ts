@@ -9,6 +9,9 @@ export const APP_VERSION: string = serverPackage.version;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
+/** Instance-wide permissions an administrator grants in Settings → Instance or the server configuration. */
+export type Preset = { stripeSync: boolean; federation: boolean; externalSources: boolean; mcp: boolean };
+
 /**
  * Compares two "x.y.z" versions
  *
@@ -133,19 +136,24 @@ export class ReleaseCheck {
  *
  * @param db {Database} - database
  * @param releases {ReleaseCheck} - release checker
- * @param preset {{ stripeSync: boolean; federation: boolean }} - permissions the server configuration grants
+ * @param preset {Preset} - permissions the server configuration grants
  * @returns {Hono<AppEnv>} - router
  */
 export function systemRoutes(
   db: Database,
   releases: ReleaseCheck,
-  preset: { stripeSync: boolean; federation: boolean } = { stripeSync: false, federation: false },
+  preset: Preset = { stripeSync: false, federation: false, externalSources: false, mcp: false },
 ): Hono<AppEnv> {
   const router = new Hono<AppEnv>();
 
   router.get('/', async (c) => {
     const [row] = await db
-      .select({ stripeSync: instance.stripeSync, federation: instance.federation })
+      .select({
+        stripeSync: instance.stripeSync,
+        federation: instance.federation,
+        externalSources: instance.externalSources,
+        mcp: instance.mcp,
+      })
       .from(instance)
       .limit(1);
     return c.json({
@@ -154,15 +162,20 @@ export function systemRoutes(
       versionCheck: await releases.enabled(),
       stripeSync: preset.stripeSync || (row?.stripeSync ?? false),
       federation: preset.federation || (row?.federation ?? false),
+      externalSources: preset.externalSources || (row?.externalSources ?? false),
+      mcp: preset.mcp || (row?.mcp ?? false),
       preset,
     });
   });
 
   // Instance-wide permissions, off by default: nothing leaves the instance until an administrator allows it,
-  // here or in the server configuration (STRIPE_SYNC, FEDERATION), which then cannot be undone from here.
+  // here or in the server configuration (STRIPE_SYNC, FEDERATION, EXTERNAL_SOURCES, MCP), which then cannot be
+  // undone from here.
   for (const [path, column, action] of [
     ['stripe-sync', 'stripeSync', 'system.stripe_sync'],
     ['federation', 'federation', 'system.federation'],
+    ['external-sources', 'externalSources', 'system.external_sources'],
+    ['mcp', 'mcp', 'system.mcp'],
   ] as const) {
     router.put(`/${path}`, async (c) => {
       if (c.var.user.role !== 'admin') return c.json({ error: 'forbidden' }, 403);

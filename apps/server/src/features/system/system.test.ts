@@ -59,7 +59,10 @@ describe('permissions set by the server configuration', () => {
       c.set('user', { id: 'admin', role: 'admin' } as never);
       await next();
     });
-    app.route('/', systemRoutes(db, releases, { stripeSync: true, federation: false }));
+    app.route(
+      '/',
+      systemRoutes(db, releases, { stripeSync: true, federation: false, externalSources: false, mcp: true }),
+    );
     expect(await (await app.request('/')).json()).toMatchObject({
       stripeSync: true,
       federation: false,

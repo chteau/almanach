@@ -14,7 +14,7 @@ import {
   type Situation,
   type ThresholdProgress,
 } from '@almanach/shared';
-import { and, asc, eq, gte, inArray, lte, ne } from 'drizzle-orm';
+import { and, asc, eq, gte, inArray, lte, ne, sql } from 'drizzle-orm';
 import type { Database } from '../../db/client.ts';
 import {
   clients,
@@ -106,10 +106,12 @@ export class PlanningService {
    *
    * @param db {Database} - Drizzle database
    * @param packs {PackRegistry} - country packs and their yearly rules
+   * @param federationPreset {boolean} - links allowed by the server configuration (FEDERATION=true)
    */
   constructor(
     private readonly db: Database,
     private readonly packs: PackRegistry,
+    private readonly federationPreset = false,
   ) {}
 
   /**
@@ -156,6 +158,8 @@ export class PlanningService {
           eq(externalRevenues.companyId, companyId),
           gte(externalRevenues.date, from),
           lte(externalRevenues.date, to),
+          // Stripe test mode is never revenue.
+          sql`${externalRevenues.livemode} is not false`,
         ),
       );
     const receipts: Receipt[] = [];
@@ -178,6 +182,10 @@ export class PlanningService {
    * @returns {Promise<{ label: string; receivedAt: string | null; error: string | null; receipts: Receipt[] }[]>} - one entry per link
    */
   async linkedRevenue(companyId: string, mainCurrency: string, from: string) {
+    if (!this.federationPreset) {
+      const [row] = await this.db.select({ on: instance.federation }).from(instance).limit(1);
+      if (!row?.on) return [];
+    }
     const rows = await this.db
       .select({
         id: federationLinks.id,
@@ -190,7 +198,6 @@ export class PlanningService {
       })
       .from(federationLinks)
       .innerJoin(companies, and(eq(companies.id, federationLinks.companyId), eq(companies.federation, true)))
-      .innerJoin(instance, and(eq(instance.id, 1), eq(instance.federation, true)))
       .innerJoin(federationTotals, eq(federationTotals.linkId, federationLinks.id))
       .where(
         and(

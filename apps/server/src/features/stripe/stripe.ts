@@ -48,6 +48,7 @@ interface StripeInvoice {
   customer_email: string | null;
   customer?: string | { id: string } | null;
   created: number;
+  livemode?: boolean;
   status_transitions?: { paid_at: number | null };
   charge: string | StripeCharge | null;
 }
@@ -58,6 +59,7 @@ interface StripeCharge {
   paid: boolean;
   status: string;
   created: number;
+  livemode?: boolean;
   invoice: string | StripeInvoice | null;
   customer?: string | { id: string } | null;
   billing_details?: { name: string | null; email: string | null };
@@ -69,12 +71,14 @@ interface StripeRefund {
   currency: string;
   status: string;
   created: number;
+  livemode?: boolean;
   charge: string | StripeCharge | null;
   balance_transaction: string | StripeBalance | null;
 }
 
 export interface StripeCustomer {
   id: string;
+  livemode?: boolean;
   name: string | null;
   email: string | null;
   currency?: string | null;
@@ -93,6 +97,16 @@ export interface StripeCustomer {
 
 /** A Stripe failure, with a code the interface translates. */
 export class StripeError extends Error {}
+
+/**
+ * Tells whether a Stripe key works in test mode
+ *
+ * @param key {string} - secret or restricted key
+ * @returns {boolean} - true for sk_test_… and rk_test_…
+ */
+export function isTestKey(key: string): boolean {
+  return /^(sk|rk)_test_/.test(key);
+}
 
 /**
  * Keeps an expanded Stripe object, dropping bare ids
@@ -229,6 +243,7 @@ function toRevenue(
     client: string | null;
     reference: string | null;
     customer: string | null;
+    livemode: boolean;
   },
   main: string,
   timezone: string,
@@ -246,6 +261,7 @@ function toRevenue(
     client: input.client?.slice(0, 200) ?? null,
     reference: input.reference?.slice(0, 100) ?? null,
     customer: input.customer,
+    livemode: input.livemode,
   };
 }
 
@@ -280,6 +296,8 @@ export async function fetchStripeRevenues(
   timezone: string,
   fetcher: typeof fetch = fetch,
 ): Promise<Revenue[]> {
+  // Objects carry `livemode`; the key mode stands in for the ones that do not (refunds).
+  const live = !isTestKey(key);
   const list = async <T extends { id: string }>(path: string, params: [string, string][]) =>
     (await stripeList<T>(key, path, [...params, ['created[gte]', String(since)]], fetcher)).items;
 
@@ -303,6 +321,7 @@ export async function fetchStripeRevenues(
           client: invoice.customer_name ?? invoice.customer_email,
           reference: invoice.number,
           customer: idOf(invoice.customer),
+          livemode: invoice.livemode ?? live,
         },
         main,
         timezone,
@@ -325,6 +344,7 @@ export async function fetchStripeRevenues(
           client: charge.billing_details?.name ?? charge.billing_details?.email ?? null,
           reference: null,
           customer: idOf(charge.customer),
+          livemode: charge.livemode ?? live,
         },
         main,
         timezone,
@@ -351,6 +371,7 @@ export async function fetchStripeRevenues(
           client: invoice?.customer_name ?? charge?.billing_details?.name ?? null,
           reference: invoice?.number ?? null,
           customer: idOf(charge?.customer ?? invoice?.customer),
+          livemode: refund.livemode ?? charge?.livemode ?? live,
         },
         main,
         timezone,
@@ -363,6 +384,8 @@ export async function fetchStripeRevenues(
 /** Scheduled and on-demand Stripe sync; runs only for companies whose owner turned it on, once allowed. */
 export class StripeSync {
   private timer: ReturnType<typeof setInterval> | undefined;
+  /** Called after a sync imported new receipts, so linked instances hear about them. */
+  onChange: ((companyId: string) => void) | undefined;
 
   /**
    * Creates the job
@@ -400,6 +423,39 @@ export class StripeSync {
   }
 
   /**
+   * Fills the Stripe mode of rows imported before it was recorded: test mode when the company key is a test key,
+   * live otherwise (no key, or SECRETS_KEY missing)
+   *
+   * @returns {Promise<void>} - resolves once every row has a mode
+   */
+  async backfillLivemode(): Promise<void> {
+    const rows = await this.db
+      .select({ id: companies.id, key: companies.stripeKey })
+      .from(companies)
+      .where(isNotNull(companies.stripeKey));
+    const live = (stored: string | null) => {
+      try {
+        return !(stored && this.secretsKey && isTestKey(decryptSecret(stored, this.secretsKey)));
+      } catch {
+        return true;
+      }
+    };
+    for (const row of [...rows, { id: null, key: null }]) {
+      const livemode = live(row.key);
+      const company = (table: typeof clients | typeof externalRevenues) =>
+        row.id ? eq(table.companyId, row.id) : undefined;
+      await this.db
+        .update(externalRevenues)
+        .set({ livemode })
+        .where(and(company(externalRevenues), isNull(externalRevenues.livemode)));
+      await this.db
+        .update(clients)
+        .set({ livemode })
+        .where(and(company(clients), isNotNull(clients.stripeId), isNull(clients.livemode)));
+    }
+  }
+
+  /**
    * Tells whether an administrator allowed Stripe syncs on this instance
    *
    * @returns {Promise<boolean>} - true once allowed
@@ -430,13 +486,14 @@ export class StripeSync {
    *
    * @param companyId {string} - company
    * @param customers {{ items: StripeCustomer[]; complete: boolean }} - every customer of the Stripe account
-   * @param defaults {{ country: string; currency: string; language: Locale }} - company country and currency, instance language
+   * @param defaults {{ country: string; currency: string; language: Locale; live: boolean }} - company country and
+   * currency, instance language, and the key mode for customers without `livemode`
    * @returns {Promise<Map<string, string>>} - Almanach client id by Stripe customer id
    */
   private async syncCustomers(
     companyId: string,
     customers: { items: StripeCustomer[]; complete: boolean },
-    defaults: { country: string; currency: string; language: Locale },
+    defaults: { country: string; currency: string; language: Locale; live: boolean },
   ): Promise<Map<string, string>> {
     const rows = await this.db
       .select({
@@ -454,11 +511,12 @@ export class StripeSync {
     const ids = new Map<string, string>();
     for (const customer of customers.items) {
       const fields = toClientFields(customer, defaults.country);
+      const livemode = customer.livemode ?? defaults.live;
       const row = linked.get(customer.id);
       if (row) {
         await this.db
           .update(clients)
-          .set({ ...(row.edited ? {} : fields), stripeDeletedAt: null })
+          .set({ ...(row.edited ? {} : { ...fields, livemode }), stripeDeletedAt: null })
           .where(eq(clients.id, row.id));
         ids.set(customer.id, row.id);
         continue;
@@ -484,6 +542,7 @@ export class StripeSync {
         .insert(clients)
         .values({
           ...fields,
+          livemode,
           companyId,
           stripeId: customer.id,
           currency: currency && currencySchema.safeParse(currency).success ? currency : defaults.currency,
@@ -552,6 +611,7 @@ export class StripeSync {
         country: row.profile.country,
         currency: row.profile.currency,
         language: row.language as Locale,
+        live: !isTestKey(key),
       });
       let imported = 0;
       for (let start = 0; start < revenues.length; start += 500) {
@@ -564,11 +624,14 @@ export class StripeSync {
               clientId: (customer && clientIds.get(customer)) || null,
             })),
           )
-          // Receipts imported before their client existed get it now; `xmax = 0` tells a new row from an update.
+          // Receipts imported before their client existed get it now, and every receipt its Stripe mode;
+          // `xmax = 0` tells a new row from an update.
           .onConflictDoUpdate({
             target: [externalRevenues.companyId, externalRevenues.source, externalRevenues.externalId],
-            set: { clientId: sql`excluded.client_id` },
-            setWhere: sql`${externalRevenues.clientId} is null and excluded.client_id is not null`,
+            set: {
+              clientId: sql`coalesce(${externalRevenues.clientId}, excluded.client_id)`,
+              livemode: sql`excluded.livemode`,
+            },
           })
           .returning({ inserted: sql<boolean>`xmax = 0` });
         imported += rows.filter((inserted) => inserted.inserted).length;
@@ -577,6 +640,7 @@ export class StripeSync {
         .update(companies)
         .set({ stripeSyncedAt: started, stripeError: null })
         .where(eq(companies.id, companyId));
+      if (imported > 0) this.onChange?.(companyId);
       return { imported };
     } catch (error) {
       const code = error instanceof StripeError ? error.message : 'stripe_failed';
@@ -606,10 +670,19 @@ export function stripeRoutes(db: Database, sync: StripeSync, secretsKey: Buffer 
       .select({ count: count() })
       .from(externalRevenues)
       .where(and(eq(externalRevenues.companyId, id), eq(externalRevenues.source, 'stripe')));
+    let testKey = false;
+    try {
+      testKey = Boolean(
+        company?.stripeKey && secretsKey && isTestKey(decryptSecret(company.stripeKey, secretsKey)),
+      );
+    } catch {
+      testKey = false;
+    }
     return c.json({
       allowed: await sync.allowed(),
       secretsKey: Boolean(secretsKey),
       keySet: Boolean(company?.stripeKey),
+      testKey,
       enabled: company?.stripeSync ?? false,
       syncedAt: company?.stripeSyncedAt?.toISOString() ?? null,
       error: company?.stripeError ?? null,

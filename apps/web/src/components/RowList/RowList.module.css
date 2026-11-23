@@ -30,6 +30,13 @@
   overflow: hidden;
 }
 
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 20px;
+}
+
 .item + .item {
   border-top: 1px solid var(--line);
 }
@@ -126,4 +133,9 @@
   grid-column: auto;
   grid-row: auto;
   justify-content: flex-start;
+}
+
+/* Test data (Stripe test mode, test source): greyed out, never counted. */
+.test {
+  opacity: 0.55;
 }

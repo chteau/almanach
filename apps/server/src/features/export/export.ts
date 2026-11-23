@@ -59,8 +59,8 @@ type Row = Record<string, unknown>;
 type CompanyData = Record<TableName, Row[]> & { federationLinks?: Row[] };
 
 /**
- * Configuration of a link kept by exports: never a key, secret or received total. Imported links stay
- * inactive and must be paired again.
+ * Configuration of a link kept by exports: never a key, secret, received total or copy of the linked detail.
+ * Imported links stay inactive and must be paired again.
  */
 const linkExportSchema = z
   .object({
@@ -69,6 +69,8 @@ const linkExportSchema = z
     share: z.boolean(),
     receive: z.boolean(),
     pulls: z.boolean(),
+    shareDetail: z.boolean().default(false),
+    receiveDetail: z.boolean().default(false),
   })
   .strict();
 
@@ -107,6 +109,8 @@ export async function exportData(db: Database, userId: string): Promise<ExportFi
         share: federationLinks.share,
         receive: federationLinks.receive,
         pulls: federationLinks.pulls,
+        shareDetail: federationLinks.shareDetail,
+        receiveDetail: federationLinks.receiveDetail,
       })
       .from(federationLinks)
       .where(and(eq(federationLinks.companyId, company.id), eq(federationLinks.state, 'active')));

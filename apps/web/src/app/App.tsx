@@ -13,6 +13,7 @@ import { DocumentsPage } from '../features/documents/DocumentsPage.tsx';
 import { PaymentsPage } from '../features/documents/PaymentsPage.tsx';
 import { InstallPage } from '../features/install/InstallPage.tsx';
 import { useInstallStatus } from '../features/install/useInstallStatus.ts';
+import { LinkedRecordPage } from '../features/linked/LinkedRecordPage.tsx';
 import { MissionDetailPage } from '../features/missions/MissionDetailPage.tsx';
 import { MissionFormPage } from '../features/missions/MissionFormPage.tsx';
 import { MissionsPage } from '../features/missions/MissionsPage.tsx';
@@ -99,6 +100,7 @@ const router = createBrowserRouter([
           { path: '/documents/new', element: <DocumentPage /> },
           { path: '/documents/:id', element: <DocumentPage /> },
           { path: '/payments', element: <PaymentsPage /> },
+          { path: '/linked/:kind/:linkId/:id', element: <LinkedRecordPage /> },
         ],
       },
       { path: '*', element: <NotFoundPage /> },
