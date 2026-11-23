@@ -14,6 +14,10 @@ export interface RuleProfile {
 export interface Receipt {
   date: string;
   cents: number;
+  /** Status of the activity that collected it; the profile status when absent. */
+  category?: string;
+  /** Collected by another activity of the same business, tracked in a linked instance. */
+  linked?: boolean;
 }
 
 /**
@@ -433,6 +437,8 @@ export interface ThresholdProgress {
   limitCents: number;
   toleranceCents: number | null;
   reachedCents: number;
+  /** Part of reachedCents collected by linked instances. */
+  linkedCents: number;
   /** Percentage reached, in basis points of the limit. */
   reachedBp: number;
   remainingCents: number;
@@ -447,7 +453,9 @@ export interface ThresholdProgress {
 }
 
 /**
- * Measures each threshold that concerns a profile
+ * Measures each threshold that concerns a profile. When receipts of other activities of the same business
+ * are given (linked instances), a threshold applies if any activity matches it, and only counts the
+ * revenue of the statuses it lists (mixed activity: global ceiling on everything, sub-ceiling on services).
  *
  * @param rules {YearRules} - rules of the current fiscal year
  * @param profile {RuleProfile} - the person's situation
@@ -465,8 +473,11 @@ export function measureThresholds(
   today: string,
   priorYearCents: number | null,
 ): ThresholdProgress[] {
+  const statusOf = (receipt: Receipt) => receipt.category ?? profile.status ?? '';
+  const statuses = new Set([profile.status ?? '', ...receipts.map(statusOf)]);
+  const sum = (list: Receipt[]) => list.reduce((total, receipt) => total + receipt.cents, 0);
   return rules.thresholds
-    .filter((rule) => applies(rule.appliesTo, profile))
+    .filter((rule) => [...statuses].some((status) => applies(rule.appliesTo, { ...profile, status })))
     .map((rule) => {
       let start = fiscalYear.start;
       let end = fiscalYear.end;
@@ -477,10 +488,20 @@ export function measureThresholds(
         start = addDays(`${Number(today.slice(0, 4)) - 1}${today.slice(4)}`, 1);
         end = today;
       }
-      const inWindow = receipts.filter((receipt) => receipt.date >= start && receipt.date <= end);
-      let reached = inWindow.reduce((sum, receipt) => sum + receipt.cents, 0);
-      if (rule.window === 'previous_fiscal_year' && inWindow.length === 0 && priorYearCents !== null) {
-        reached = priorYearCents;
+      const inWindow = receipts.filter(
+        (receipt) =>
+          receipt.date >= start &&
+          receipt.date <= end &&
+          (!rule.counts || rule.counts.includes(statusOf(receipt))),
+      );
+      const linked = sum(inWindow.filter((receipt) => receipt.linked));
+      let reached = sum(inWindow);
+      if (
+        rule.window === 'previous_fiscal_year' &&
+        !inWindow.some((receipt) => !receipt.linked) &&
+        priorYearCents !== null
+      ) {
+        reached = priorYearCents + linked;
       }
       let projected: string | null = null;
       if (rule.window === 'fiscal_year' && reached > 0 && reached < rule.limitCents) {
@@ -498,6 +519,7 @@ export function measureThresholds(
         limitCents: rule.limitCents,
         toleranceCents: rule.toleranceCents ?? null,
         reachedCents: reached,
+        linkedCents: linked,
         reachedBp: rule.limitCents === 0 ? 0 : Math.round((reached * 10_000) / rule.limitCents),
         remainingCents: Math.max(0, rule.limitCents - reached),
         projectedDate: projected,

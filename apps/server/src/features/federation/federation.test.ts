@@ -1,0 +1,366 @@
+import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
+import { SQL } from 'bun';
+import { eq } from 'drizzle-orm';
+import { createApp } from '../../app.ts';
+import { loadConfig } from '../../config.ts';
+import { createDatabase, type Database, runMigrations } from '../../db/client.ts';
+import {
+  companies,
+  externalRevenues,
+  federationLinks,
+  federationTotals,
+  instance,
+  profiles,
+  users,
+} from '../../db/schema.ts';
+import { SessionStore } from '../auth/sessions.ts';
+import { DocumentService } from '../documents/documents.service.ts';
+import { DrizzleInstallRepository } from '../install/install.repository.ts';
+import { InstallService } from '../install/install.service.ts';
+import { InstallTokenStore } from '../install/install-token.ts';
+import { PackRegistry } from '../packs/packs.ts';
+import { PackUpdates } from '../packs/updates.ts';
+import { PlanningService } from '../planning/planning.service.ts';
+import { ReminderJob } from '../planning/reminders.ts';
+import { StripeSync } from '../stripe/stripe.ts';
+import { ReleaseCheck } from '../system/system.ts';
+import { Federation } from './federation.ts';
+
+// Two instances, each on its own database created next to TEST_DATABASE_URL and dropped afterwards:
+// TEST_DATABASE_URL=postgres://… bun test federation
+const url = process.env.TEST_DATABASE_URL;
+const SIDES = ['a', 'b'] as const;
+type Who = (typeof SIDES)[number];
+
+interface Side {
+  db: Database;
+  app: ReturnType<typeof createApp>;
+  cookie: string;
+  company: string;
+}
+
+/** The parts of API answers the assertions read. */
+// biome-ignore lint/suspicious/noExplicitAny: test answers are checked field by field.
+type Body = any;
+
+describe.skipIf(!url)('linked instances (two databases)', () => {
+  const sides = {} as Record<Who, Side>;
+  const down: Record<Who, boolean> = { a: false, b: false };
+  const databases = SIDES.map((who) => `almanach_federation_${who}_${process.pid}`);
+  let admin: SQL;
+  let last: { side: Who; path: string; init: RequestInit; answer: string } | undefined;
+  const month = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(new Date()).slice(0, 7);
+
+  /** Network between the two instances: http://a.localhost and http://b.localhost, recorded for replays. */
+  const network = (async (input: string | URL | Request, init?: RequestInit) => {
+    const target = new URL(String(input));
+    const who = target.hostname.split('.')[0] as Who;
+    if (!sides[who] || down[who]) throw new TypeError('unreachable');
+    const response = await sides[who].app.request(target.pathname, init);
+    last = { side: who, path: target.pathname, init: init ?? {}, answer: await response.clone().text() };
+    return response;
+  }) as typeof fetch;
+
+  /**
+   * Calls the API of one instance as its owner
+   *
+   * @param who {Who} - instance
+   * @param path {string} - API path
+   * @param init {{ method?: string; body?: unknown; cookie?: string }} - method, JSON body, other session
+   * @returns {Promise<Response>} - the response
+   */
+  const call = (who: Who, path: string, init: { method?: string; body?: unknown; cookie?: string } = {}) =>
+    sides[who].app.request(path, {
+      method: init.method ?? 'GET',
+      headers: {
+        cookie: `almanach_session=${init.cookie ?? sides[who].cookie}`,
+        'content-type': 'application/json',
+      },
+      body: init.body === undefined ? undefined : JSON.stringify(init.body),
+    });
+
+  /**
+   * Reads a JSON answer
+   *
+   * @param who {Who} - instance
+   * @param path {string} - API path
+   * @returns {Promise<Body>} - parsed body
+   */
+  const get = async (who: Who, path: string): Promise<Body> => (await call(who, path)).json();
+
+  /**
+   * Creates a signed-in person with a French micro-entreprise on an instance
+   *
+   * @param who {Who} - instance
+   * @param email {string} - login
+   * @param status {string} - micro status of the activity
+   * @returns {Promise<{ cookie: string; company: string }>} - session and company
+   */
+  const person = async (who: Who, email: string, status: string) => {
+    const db = sides[who].db;
+    const [user] = await db
+      .insert(users)
+      .values({ email, passwordHash: 'x', role: 'admin', locale: 'fr' })
+      .returning({ id: users.id });
+    const id = user?.id ?? '';
+    await db.insert(companies).values({ id, userId: id, name: email.split('@')[0] ?? email });
+    await db.insert(profiles).values({
+      companyId: id,
+      country: 'FR',
+      status,
+      activityStart: '2025-01-01',
+      declarationPeriod: 'monthly',
+      options: [],
+      identifiers: {},
+      currency: 'EUR',
+      bank: { iban: null, bic: null } as never,
+      company: { name: email, address: 'Paris', email, phone: null, website: null },
+    });
+    return { cookie: await new SessionStore(db).create(id, { ip: null, userAgent: null }), company: id };
+  };
+
+  beforeAll(async () => {
+    admin = new SQL(url as string);
+    for (const [index, who] of SIDES.entries()) {
+      const name = databases[index] as string;
+      await admin.unsafe(`DROP DATABASE IF EXISTS ${name}`);
+      await admin.unsafe(`CREATE DATABASE ${name}`);
+      const target = new URL(url as string);
+      target.pathname = `/${name}`;
+      const db = createDatabase(target.toString());
+      await runMigrations(db);
+      await db.insert(instance).values({
+        id: 1,
+        name: who,
+        publicUrl: `http://${who}.localhost`,
+        timezone: 'Europe/Paris',
+        defaultLocale: 'fr',
+        federation: true,
+      });
+      const config = {
+        ...loadConfig({ DATABASE_URL: target.toString() }),
+        cookieSecure: false,
+        secretsKey: Buffer.alloc(32, index + 1),
+      };
+      const packs = await PackRegistry.load();
+      const planning = new PlanningService(db, packs);
+      const sessions = new SessionStore(db);
+      const app = createApp({
+        config,
+        install: new InstallService(new DrizzleInstallRepository(db), new InstallTokenStore(), false),
+        db,
+        sessions,
+        packs,
+        documents: new DocumentService(db, packs),
+        planning,
+        reminders: new ReminderJob(db, planning, config),
+        packUpdates: new PackUpdates(db, packs, [], undefined),
+        releases: new ReleaseCheck(db, config.releaseCheckUrl),
+        stripe: new StripeSync(db, config.secretsKey),
+        federation: new Federation(db, planning, config.secretsKey, network),
+      });
+      sides[who] = { db, app, cookie: '', company: '' };
+      const owner = await person(
+        who,
+        `${who}@example.test`,
+        who === 'a' ? 'micro_bnc' : 'micro_bic_services',
+      );
+      sides[who] = { db, app, ...owner };
+      await db.insert(externalRevenues).values({
+        companyId: owner.company,
+        source: 'stripe',
+        externalId: `in_${who}`,
+        date: `${month}-01`,
+        amountCents: who === 'a' ? 3_000_000 : 2_000_000,
+        currency: 'EUR',
+        client: 'Secret Client Corp',
+        reference: 'INV-PRIVATE-42',
+      });
+    }
+  });
+
+  afterAll(async () => {
+    for (const who of SIDES) await sides[who]?.db.$client.close();
+    for (const name of databases) await admin?.unsafe(`DROP DATABASE IF EXISTS ${name}`);
+    await admin?.close();
+  });
+
+  test('the federation routes answer 404 while no link exists', async () => {
+    expect(
+      (await sides.a.app.request('/api/federation/exchange', { method: 'POST', body: '{}' })).status,
+    ).toBe(404);
+    expect(
+      (
+        await call('a', '/api/settings/federation/links', {
+          method: 'POST',
+          body: { url: 'http://a.localhost', share: true, receive: true },
+        })
+      ).status,
+    ).toBe(409);
+  });
+
+  test('pairing: one-time code, fingerprints shown on both sides', async () => {
+    for (const [who, label] of [
+      ['a', 'Freelance'],
+      ['b', 'SEKLYR'],
+    ] as const) {
+      const saved = await call(who, '/api/settings/federation', {
+        method: 'PUT',
+        body: { enabled: true, label },
+      });
+      expect(saved.status).toBe(204);
+    }
+    const issued = await call('a', '/api/settings/federation/links', {
+      method: 'POST',
+      body: { url: 'http://a.localhost', share: true, receive: true },
+    });
+    expect(issued.status).toBe(201);
+    const { code, fingerprint } = (await issued.json()) as Body;
+    const join = () =>
+      call('b', '/api/settings/federation/links/join', {
+        method: 'POST',
+        body: { code, url: 'http://b.localhost', share: true, receive: true },
+      });
+    expect((await join()).status).toBe(201);
+    const [onA] = (await get('a', '/api/settings/federation')).links;
+    const [onB] = (await get('b', '/api/settings/federation')).links;
+    expect(onA).toMatchObject({ state: 'active', fingerprint, peerUrl: 'http://b.localhost', pulls: false });
+    expect(onB).toMatchObject({
+      state: 'active',
+      peerFingerprint: fingerprint,
+      peerUrl: 'http://a.localhost',
+      pulls: true,
+    });
+    expect(onA.peerFingerprint).toBe(onB.fingerprint);
+    expect(JSON.stringify(onA)).not.toMatch(/privateKey|PRIVATE/);
+
+    const reused = await join();
+    expect(reused.status).toBe(409);
+    expect(await reused.json()).toEqual({ error: 'code_unknown' });
+  });
+
+  test('an expired pairing code is refused', async () => {
+    const issued = (await (
+      await call('a', '/api/settings/federation/links', {
+        method: 'POST',
+        body: { url: 'http://a.localhost', share: true, receive: true },
+      })
+    ).json()) as Body;
+    await sides.a.db
+      .update(federationLinks)
+      .set({ codeExpiresAt: new Date(Date.now() - 1000) })
+      .where(eq(federationLinks.state, 'pending'));
+    const late = await call('b', '/api/settings/federation/links/join', {
+      method: 'POST',
+      body: { code: issued.code, url: 'http://b.localhost', share: true, receive: true },
+    });
+    expect(await late.json()).toEqual({ error: 'code_expired' });
+    await sides.a.db.delete(federationLinks).where(eq(federationLinks.state, 'pending'));
+  });
+
+  test('thresholds count both activities; estimates stay local', async () => {
+    for (const [who, own, other, label] of [
+      ['a', 3_000_000, 2_000_000, 'SEKLYR'],
+      ['b', 2_000_000, 3_000_000, 'Freelance'],
+    ] as const) {
+      const { outlook } = await get(who, '/api/outlook');
+      const ceiling = outlook.thresholds.find((item: Body) => item.id === 'micro_ceiling_services');
+      expect(ceiling).toMatchObject({ reachedCents: 5_000_000, linkedCents: other });
+      // 50,000 € together: VAT is due at once although each activity alone stays in the franchise.
+      expect(outlook.thresholds.find((item: Body) => item.id === 'vat_franchise_services')).toMatchObject({
+        toleranceExceeded: true,
+      });
+      expect(outlook.linked).toEqual([{ label, cents: other, receivedAt: expect.any(String), error: null }]);
+      expect(outlook.collectedCents).toBe(own);
+      for (const estimate of outlook.estimates) expect(estimate.steps[0].baseCents).toBe(own);
+    }
+    const simulated = (await get('a', '/api/outlook?simulate=1000000')).outlook;
+    expect(simulated.thresholds[0]).toMatchObject({ reachedCents: 6_000_000, linkedCents: 2_000_000 });
+    const stored = await sides.b.db.select().from(federationTotals);
+    expect(stored.map(({ month: m, category, cents }) => ({ m, category, cents }))).toEqual([
+      { m: month, category: 'micro_bnc', cents: 3_000_000 },
+    ]);
+  });
+
+  test('only monthly totals travel; unsigned, altered and replayed requests are refused', async () => {
+    const [link] = (await get('b', '/api/settings/federation')).links;
+    expect(
+      (await call('b', `/api/settings/federation/links/${link.id}/sync`, { method: 'POST' })).status,
+    ).toBe(200);
+    const sent = last;
+    if (!sent) throw new Error('no request recorded');
+    expect(sent.path).toBe('/api/federation/exchange');
+    const answer = JSON.parse(sent.answer);
+    expect(Object.keys(answer)).toEqual(['totals']);
+    expect(Object.keys(answer.totals).sort()).toEqual(['currency', 'label', 'months']);
+    expect(answer.totals.months).toEqual([{ month, category: 'micro_bnc', cents: 3_000_000 }]);
+    expect(JSON.stringify(sent.init.body) + sent.answer).not.toMatch(/Secret Client|INV-PRIVATE|in_a|in_b/);
+
+    const replay = (init: RequestInit) =>
+      sides.a.app.request('/api/federation/exchange', { method: 'POST', ...init });
+    const headers = sent.init.headers as Record<string, string>;
+    const replayed = await replay({ headers, body: sent.init.body });
+    expect(replayed.status).toBe(401);
+    expect(await replayed.json()).toEqual({ error: 'replayed' });
+    const altered = await replay({
+      headers,
+      body: String(sent.init.body).replace('"cents":2000000', '"cents":1'),
+    });
+    expect(await altered.json()).toEqual({ error: 'bad_signature' });
+    const unsigned = await replay({ headers: { 'content-type': 'application/json' }, body: sent.init.body });
+    expect(await unsigned.json()).toEqual({ error: 'bad_signature' });
+  });
+
+  test('an unreachable peer leaves the last totals, with their date', async () => {
+    const [link] = (await get('b', '/api/settings/federation')).links;
+    down.a = true;
+    const failed = await call('b', `/api/settings/federation/links/${link.id}/sync`, { method: 'POST' });
+    down.a = false;
+    expect(await failed.json()).toEqual({ error: 'peer_unreachable' });
+    const { outlook } = await get('b', '/api/outlook');
+    expect(outlook.linked).toEqual([
+      { label: 'Freelance', cents: 3_000_000, receivedAt: link.receivedAt, error: 'peer_unreachable' },
+    ]);
+  });
+
+  test('the export keeps the link settings without keys; an import leaves them to pair again', async () => {
+    const file = await get('a', '/api/account/export');
+    expect(file.companies[0].data.federationLinks).toEqual([
+      { peerUrl: 'http://b.localhost', peerLabel: 'SEKLYR', share: true, receive: true, pulls: false },
+    ]);
+    expect(JSON.stringify(file)).not.toMatch(/BEGIN PRIVATE|privateKey|publicKey|codeHash|federationTotals/);
+    const other = await person('b', 'c@example.test', 'micro_bnc');
+    await sides.b.db.delete(profiles).where(eq(profiles.companyId, other.company));
+    const imported = await call('b', '/api/account/import', {
+      method: 'POST',
+      body: file,
+      cookie: other.cookie,
+    });
+    expect(imported.status).toBe(200);
+    const [restored] = await sides.b.db
+      .select()
+      .from(federationLinks)
+      .where(eq(federationLinks.companyId, other.company));
+    expect(restored).toMatchObject({
+      state: 'imported',
+      publicKey: null,
+      privateKey: null,
+      peerPublicKey: null,
+    });
+    await sides.b.db.delete(companies).where(eq(companies.id, other.company));
+  });
+
+  test('revoking on one side deletes the keys and totals on both', async () => {
+    const [link] = (await get('a', '/api/settings/federation')).links;
+    expect((await call('a', `/api/settings/federation/links/${link.id}`, { method: 'DELETE' })).status).toBe(
+      204,
+    );
+    expect((await get('a', '/api/settings/federation')).links).toEqual([]);
+    expect((await get('b', '/api/settings/federation')).links).toEqual([]);
+    expect(await sides.b.db.select().from(federationTotals)).toEqual([]);
+    expect((await get('b', '/api/outlook')).outlook.linked).toEqual([]);
+    expect(
+      (await sides.a.app.request('/api/federation/exchange', { method: 'POST', body: '{}' })).status,
+    ).toBe(404);
+  });
+});

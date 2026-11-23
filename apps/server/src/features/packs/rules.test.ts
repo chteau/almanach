@@ -259,4 +259,86 @@ describe('France 2026', () => {
     expect(ceiling?.id).toBe('micro_ceiling_services');
     expect(vat).toMatchObject({ id: 'vat_franchise_services', exceeded: true, toleranceExceeded: false });
   });
+
+  describe('one micro-entreprise with activities tracked in linked instances', () => {
+    const year = { start: '2026-01-01', end: '2026-12-31' };
+    /**
+     * Measures the thresholds of the liberal activity with receipts of linked activities
+     *
+     * @param local {number} - revenue of the liberal activity, in cents
+     * @param linked {[string, number][]} - status and revenue of each linked activity
+     * @returns {Record<string, object>} - thresholds by id
+     */
+    const measure = (local: number, linked: [string, number][]) =>
+      Object.fromEntries(
+        measureThresholds(
+          rulesOf('FR', 2026),
+          liberal,
+          [
+            { date: '2026-03-10', cents: local },
+            ...linked.map(([category, cents]) => ({ date: '2026-04-01', cents, category, linked: true })),
+          ],
+          year,
+          '2026-11-18',
+          null,
+        ).map(({ id, reachedCents, linkedCents, exceeded, toleranceExceeded }) => [
+          id,
+          { reachedCents, linkedCents, exceeded, toleranceExceeded },
+        ]),
+      );
+
+    test('BNC and BIC services share the services ceilings', () => {
+      expect(measure(3_000_000, [['micro_bic_services', 2_000_000]])).toEqual({
+        micro_ceiling_services: {
+          reachedCents: 5_000_000,
+          linkedCents: 2_000_000,
+          exceeded: false,
+          toleranceExceeded: false,
+        },
+        // 50,000 € together: above 41,250 €, VAT is due at once although each activity alone is below 37,500 €.
+        vat_franchise_services: {
+          reachedCents: 5_000_000,
+          linkedCents: 2_000_000,
+          exceeded: true,
+          toleranceExceeded: true,
+        },
+      });
+    });
+
+    test('mixed activity: global sales ceiling on everything, services sub-ceiling on services only', () => {
+      expect(measure(3_000_000, [['micro_bic_sales', 10_000_000]])).toEqual({
+        micro_ceiling_services: {
+          reachedCents: 3_000_000,
+          linkedCents: 0,
+          exceeded: false,
+          toleranceExceeded: false,
+        },
+        micro_ceiling_sales: {
+          reachedCents: 13_000_000,
+          linkedCents: 10_000_000,
+          exceeded: false,
+          toleranceExceeded: false,
+        },
+        vat_franchise_services: {
+          reachedCents: 3_000_000,
+          linkedCents: 0,
+          exceeded: false,
+          toleranceExceeded: false,
+        },
+        vat_franchise_sales: {
+          reachedCents: 13_000_000,
+          linkedCents: 10_000_000,
+          exceeded: true,
+          toleranceExceeded: true,
+        },
+      });
+      const services = measure(7_000_000, [
+        ['micro_bic_sales', 5_000_000],
+        ['micro_bic_services', 2_000_000],
+      ]);
+      // 90,000 € of services is above 83,600 € even though 140,000 € in total stays below 203,100 €.
+      expect(services.micro_ceiling_services).toMatchObject({ reachedCents: 9_000_000, exceeded: true });
+      expect(services.micro_ceiling_sales).toMatchObject({ reachedCents: 14_000_000, exceeded: false });
+    });
+  });
 });

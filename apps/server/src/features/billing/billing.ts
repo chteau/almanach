@@ -15,6 +15,7 @@ import type { Database } from '../../db/client.ts';
 import { auditLog, billingSettings, documents, profiles } from '../../db/schema.ts';
 import { parseBody } from '../../http/errors.ts';
 import type { AppEnv } from '../../http/request.ts';
+import { ownerOf } from '../companies/companies.ts';
 import { type PdfStyle, renderPdf } from '../documents/pdf.ts';
 import { instanceToday } from '../planning/planning.routes.ts';
 
@@ -34,16 +35,20 @@ const DEFAULT_PDF: BillingView['pdf'] = { accent: '#c2410c', layout: 'classic', 
  * Loads the billing preferences of a person, with defaults for anything never chosen
  *
  * @param db {Database} - database or transaction
- * @param userId {string} - owner
+ * @param companyId {string} - owner
  * @param country {string} - country of the profile, for default prefixes
  * @returns {Promise<BillingView & { logo: PdfStyle['logo'] }>} - preferences and decoded logo
  */
 export async function loadBilling(
   db: Pick<Database, 'select'>,
-  userId: string,
+  companyId: string,
   country: string,
 ): Promise<BillingView & { logo: PdfStyle['logo'] }> {
-  const [row] = await db.select().from(billingSettings).where(eq(billingSettings.userId, userId)).limit(1);
+  const [row] = await db
+    .select()
+    .from(billingSettings)
+    .where(eq(billingSettings.companyId, companyId))
+    .limit(1);
   const mime = row?.logoMime === 'image/png' || row?.logoMime === 'image/jpeg' ? row.logoMime : null;
   const logo: PdfStyle['logo'] =
     row?.logo && mime ? { mime, bytes: new Uint8Array(Buffer.from(row.logo, 'base64')) } : null;
@@ -119,25 +124,25 @@ export function imageSize(
  * later change of country never changes the numbers of a series already started
  *
  * @param db {Pick<Database, 'insert'>} - database or transaction
- * @param userId {string} - owner
+ * @param companyId {string} - owner
  * @param country {string} - country the numbers were given under
  * @returns {Promise<void>} - resolves when saved
  */
 export async function pinNumbering(
   db: Pick<Database, 'insert'>,
-  userId: string,
+  companyId: string,
   country: string,
 ): Promise<void> {
   await db
     .insert(billingSettings)
     .values({
-      userId,
+      companyId,
       numbering: [{ ...defaultNumberFormat(country), fromYear: 0 }],
       pdf: DEFAULT_PDF,
       defaultTermsDays: 30,
       defaultNote: null,
     })
-    .onConflictDoNothing({ target: billingSettings.userId });
+    .onConflictDoNothing({ target: billingSettings.companyId });
 }
 
 /**
@@ -152,31 +157,31 @@ export function billingRoutes(db: Database): Hono<AppEnv> {
   /**
    * Country of the profile, or undefined before onboarding
    *
-   * @param userId {string} - owner
+   * @param companyId {string} - owner
    * @returns {Promise<string | undefined>} - country code
    */
-  const countryOf = async (userId: string): Promise<string | undefined> =>
+  const countryOf = async (companyId: string): Promise<string | undefined> =>
     (
       await db
         .select({ country: profiles.country })
         .from(profiles)
-        .where(eq(profiles.userId, userId))
+        .where(eq(profiles.companyId, companyId))
         .limit(1)
     )[0]?.country;
 
   /**
    * Latest year an invoice, deposit or credit note was numbered in: the numbering then only changes after it
    *
-   * @param userId {string} - owner
+   * @param companyId {string} - owner
    * @returns {Promise<number | null>} - year, or null when no number was given yet
    */
-  const numberedUntil = async (userId: string): Promise<number | null> => {
+  const numberedUntil = async (companyId: string): Promise<number | null> => {
     const [row] = await db
       .select({ last: max(documents.issueDate) })
       .from(documents)
       .where(
         and(
-          eq(documents.userId, userId),
+          eq(documents.companyId, companyId),
           inArray(documents.type, ['invoice', 'deposit', 'credit_note']),
           ne(documents.state, 'draft'),
         ),
@@ -185,30 +190,30 @@ export function billingRoutes(db: Database): Hono<AppEnv> {
   };
 
   router.get('/', async (c) => {
-    const country = await countryOf(c.var.user.id);
+    const country = await countryOf(c.var.company.id);
     if (!country) return c.json({ error: 'no_profile' }, 409);
-    const { logo: _logo, ...settings } = await loadBilling(db, c.var.user.id, country);
+    const { logo: _logo, ...settings } = await loadBilling(db, c.var.company.id, country);
     const year = Number((await instanceToday(db)).slice(0, 4));
     return c.json({
       settings,
       year,
-      locked: (await numberedUntil(c.var.user.id)) !== null,
+      locked: (await numberedUntil(c.var.company.id)) !== null,
       current: numberingFor(settings.numbering, year, country),
       next: numberingFor(settings.numbering, year + 1, country),
     });
   });
 
   router.put('/', async (c) => {
-    const userId = c.var.user.id;
-    const country = await countryOf(userId);
+    const companyId = c.var.company.id;
+    const country = await countryOf(companyId);
     if (!country) return c.json({ error: 'no_profile' }, 409);
     const { data, response } = await parseBody(c, billingSettingsSchema);
     if (response) return response;
     const year = Number((await instanceToday(db)).slice(0, 4));
-    const existing = await loadBilling(db, userId, country);
+    const existing = await loadBilling(db, companyId, country);
     let numbering: NumberFormatPeriod[];
     let appliesFrom: number | null = null;
-    const until = await numberedUntil(userId);
+    const until = await numberedUntil(companyId);
     if (until === null) numbering = [{ ...data.numbering, fromYear: 0 }];
     else {
       // A year that already has numbers must stay one unbroken sequence, documents dated ahead included.
@@ -228,15 +233,17 @@ export function billingRoutes(db: Database): Hono<AppEnv> {
     };
     await db
       .insert(billingSettings)
-      .values({ userId, ...values })
-      .onConflictDoUpdate({ target: billingSettings.userId, set: values });
-    await db.insert(auditLog).values({ userId, action: 'billing.updated', meta: { appliesFrom } });
+      .values({ companyId, ...values })
+      .onConflictDoUpdate({ target: billingSettings.companyId, set: values });
+    await db
+      .insert(auditLog)
+      .values({ userId: ownerOf(companyId), action: 'billing.updated', meta: { appliesFrom } });
     return c.json({ ok: true, appliesFrom });
   });
 
   router.put('/logo', async (c) => {
-    const userId = c.var.user.id;
-    const country = await countryOf(userId);
+    const companyId = c.var.company.id;
+    const country = await countryOf(companyId);
     if (!country) return c.json({ error: 'no_profile' }, 409);
     const { data, response } = await parseBody(c, logoSchema);
     if (response) return response;
@@ -245,13 +252,13 @@ export function billingRoutes(db: Database): Hono<AppEnv> {
     const size = isImage(bytes, data.mime) ? imageSize(bytes, data.mime) : null;
     if (!size || size.width > LOGO_MAX_SIDE || size.height > LOGO_MAX_SIDE)
       return c.json({ error: 'invalid_image' }, 422);
-    const existing = await loadBilling(db, userId, country);
+    const existing = await loadBilling(db, companyId, country);
     const { hasLogo: _has, logo: _old, ...rest } = existing;
     await db
       .insert(billingSettings)
-      .values({ userId, ...rest, logo: data.data, logoMime: data.mime })
+      .values({ companyId, ...rest, logo: data.data, logoMime: data.mime })
       .onConflictDoUpdate({
-        target: billingSettings.userId,
+        target: billingSettings.companyId,
         set: { logo: data.data, logoMime: data.mime, updatedAt: new Date() },
       });
     return c.body(null, 204);
@@ -261,13 +268,13 @@ export function billingRoutes(db: Database): Hono<AppEnv> {
     await db
       .update(billingSettings)
       .set({ logo: null, logoMime: null, updatedAt: new Date() })
-      .where(eq(billingSettings.userId, c.var.user.id));
+      .where(eq(billingSettings.companyId, c.var.company.id));
     return c.body(null, 204);
   });
 
   router.get('/logo', async (c) => {
-    const country = await countryOf(c.var.user.id);
-    const logo = country ? (await loadBilling(db, c.var.user.id, country)).logo : null;
+    const country = await countryOf(c.var.company.id);
+    const logo = country ? (await loadBilling(db, c.var.company.id, country)).logo : null;
     if (!logo) return c.json({ error: 'not_found' }, 404);
     return new Response(logo.bytes as Uint8Array<ArrayBuffer>, {
       headers: {
@@ -279,10 +286,10 @@ export function billingRoutes(db: Database): Hono<AppEnv> {
   });
 
   router.get('/preview.pdf', async (c) => {
-    const userId = c.var.user.id;
-    const [profile] = await db.select().from(profiles).where(eq(profiles.userId, userId)).limit(1);
+    const companyId = c.var.company.id;
+    const [profile] = await db.select().from(profiles).where(eq(profiles.companyId, companyId)).limit(1);
     if (!profile) return c.json({ error: 'no_profile' }, 409);
-    const { pdf, logo, numbering, defaultNote } = await loadBilling(db, userId, profile.country);
+    const { pdf, logo, numbering, defaultNote } = await loadBilling(db, companyId, profile.country);
     const today = await instanceToday(db);
     const year = Number(today.slice(0, 4));
     const language = c.var.user.locale === 'de' || c.var.user.locale === 'en' ? c.var.user.locale : 'fr';

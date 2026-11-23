@@ -1,4 +1,4 @@
-import { type Client, type Mission, vatSituation } from '@almanach/shared';
+import { type Client, formatMoney, type Mission, vatSituation } from '@almanach/shared';
 import { type ReactNode, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { Badge } from '../../components/Badge/Badge.tsx';
@@ -28,14 +28,18 @@ export function ClientDetailPage() {
   const { t, locale } = useI18n();
   const navigate = useNavigate();
   const profile = useProfile();
-  const { data, error, reload } = useResource<{ client: Client; missionCount: number }>(`/api/clients/${id}`);
+  const { data, error, reload } = useResource<{
+    client: Client;
+    missionCount: number;
+    receipts: { id: string; date: string; amountCents: number; currency: string; reference: string | null }[];
+  }>(`/api/clients/${id}`);
   const missions = useResource<{ missions: Mission[] }>('/api/missions');
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [failure, setFailure] = useState<string>();
 
   if (error !== undefined) return <LoadError error={error} onRetry={reload} />;
   if (!data) return <Skeleton />;
-  const { client } = data;
+  const { client, receipts } = data;
   const own = (missions.data?.missions ?? []).filter((mission) => mission.clientId === client.id);
   const situation = profile ? vatSituation(profile.country, client) : undefined;
 
@@ -79,6 +83,7 @@ export function ClientDetailPage() {
     [t('clients.address'), client.address ?? '—'],
     [t('clients.country'), countryName(client.country, locale)],
     [t('clients.vat'), client.vatNumber ?? '—'],
+    [t('clients.siret'), client.siret ?? '—'],
     [t('clients.language'), t(`lang.${client.language}`)],
     [t('clients.currency'), client.currency],
     [t('clients.terms'), t('clients.terms.days', { days: client.paymentTermsDays })],
@@ -107,6 +112,7 @@ export function ClientDetailPage() {
       </PageHeader>
       <div className={form.form}>
         {failure && <Notice tone="error">{failure}</Notice>}
+        {client.stripeDeletedAt && <Notice tone="warn">{t('clients.stripe.deleted')}</Notice>}
         {situation && situation !== 'domestic' && (
           <Notice tone={situation === 'eu_b2b_missing_vat' ? 'warn' : 'info'}>{t(`vat.${situation}`)}</Notice>
         )}
@@ -143,6 +149,27 @@ export function ClientDetailPage() {
           <section className={form.section} aria-labelledby="client-notes">
             <h2 id="client-notes">{t('clients.notes')}</h2>
             <p className={form.summary}>{client.notes}</p>
+          </section>
+        )}
+        {receipts.length > 0 && (
+          <section aria-labelledby="client-receipts">
+            <PageHeaderLite id="client-receipts" title={t('clients.receipts')} />
+            <ul className={list.list}>
+              {receipts.map((receipt) => (
+                <li key={receipt.id} className={list.item}>
+                  <div className={list.row}>
+                    <span className={list.primary}>
+                      <strong>{formatMoney(receipt.amountCents, receipt.currency, locale)}</strong>
+                    </span>
+                    <span className={list.secondary}>{formatDate(receipt.date, locale)}</span>
+                    <span>{receipt.reference ?? ''}</span>
+                    <span className={list.badges}>
+                      <Badge>Stripe</Badge>
+                    </span>
+                  </div>
+                </li>
+              ))}
+            </ul>
           </section>
         )}
         <section aria-labelledby="client-missions">

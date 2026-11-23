@@ -23,9 +23,9 @@ export function profileRoutes(db: Database, packs: PackRegistry): Hono<AppEnv> {
   router.get('/packs', (c) => c.json({ packs: packs.list() }));
 
   router.get('/profile', async (c) => {
-    const [row] = await db.select().from(profiles).where(eq(profiles.userId, c.var.user.id)).limit(1);
+    const [row] = await db.select().from(profiles).where(eq(profiles.companyId, c.var.company.id)).limit(1);
     if (!row) return c.json({ error: 'not_found' }, 404);
-    const { userId: _userId, updatedAt: _updatedAt, ...profile } = row;
+    const { companyId: _companyId, updatedAt: _updatedAt, ...profile } = row;
     return c.json({
       profile: profile satisfies Profile,
       pack: packs.get(row.country) ?? null,
@@ -37,7 +37,7 @@ export function profileRoutes(db: Database, packs: PackRegistry): Hono<AppEnv> {
     const [draft] = await db
       .select({ step: onboardingDrafts.step, data: onboardingDrafts.data })
       .from(onboardingDrafts)
-      .where(eq(onboardingDrafts.userId, c.var.user.id))
+      .where(eq(onboardingDrafts.companyId, c.var.company.id))
       .limit(1);
     return c.json({ draft: draft ?? null });
   });
@@ -45,11 +45,11 @@ export function profileRoutes(db: Database, packs: PackRegistry): Hono<AppEnv> {
   router.put('/onboarding', async (c) => {
     const { data, response } = await parseBody(c, onboardingDraftSchema);
     if (response) return response;
-    const values = { userId: c.var.user.id, step: data.step, data: data.data, updatedAt: new Date() };
+    const values = { companyId: c.var.company.id, step: data.step, data: data.data, updatedAt: new Date() };
     await db
       .insert(onboardingDrafts)
       .values(values)
-      .onConflictDoUpdate({ target: onboardingDrafts.userId, set: values });
+      .onConflictDoUpdate({ target: onboardingDrafts.companyId, set: values });
     return c.body(null, 204);
   });
 
@@ -65,13 +65,13 @@ export function profileRoutes(db: Database, packs: PackRegistry): Hono<AppEnv> {
         .map(([key, value]) => [key, normalizeIdentifier(value)] as const)
         .filter(([, value]) => value),
     );
-    const values = { ...data, identifiers, userId: c.var.user.id, updatedAt: new Date() };
-    const userId = c.var.user.id;
-    const [stored] = await db.select().from(profiles).where(eq(profiles.userId, userId)).limit(1);
+    const values = { ...data, identifiers, companyId: c.var.company.id, updatedAt: new Date() };
+    const companyId = c.var.company.id;
+    const [stored] = await db.select().from(profiles).where(eq(profiles.companyId, companyId)).limit(1);
     const [first] = await db
       .select({ effectiveOn: situationChanges.effectiveOn })
       .from(situationChanges)
-      .where(eq(situationChanges.userId, userId))
+      .where(eq(situationChanges.companyId, companyId))
       .orderBy(asc(situationChanges.effectiveOn))
       .limit(1);
     if (stored && first) {
@@ -82,10 +82,15 @@ export function profileRoutes(db: Database, packs: PackRegistry): Hono<AppEnv> {
       if (moved || data.activityStart >= first.effectiveOn) return c.json({ error: 'use_situation' }, 409);
     }
     await db.transaction(async (tx) => {
-      if (stored && stored.country !== data.country) await pinNumbering(tx, userId, stored.country);
-      await tx.insert(profiles).values(values).onConflictDoUpdate({ target: profiles.userId, set: values });
-      await tx.delete(onboardingDrafts).where(eq(onboardingDrafts.userId, userId));
-      await tx.insert(auditLog).values({ userId, action: 'profile.saved', meta: { country: data.country } });
+      if (stored && stored.country !== data.country) await pinNumbering(tx, companyId, stored.country);
+      await tx
+        .insert(profiles)
+        .values(values)
+        .onConflictDoUpdate({ target: profiles.companyId, set: values });
+      await tx.delete(onboardingDrafts).where(eq(onboardingDrafts.companyId, companyId));
+      await tx
+        .insert(auditLog)
+        .values({ userId: c.var.user.id, action: 'profile.saved', meta: { country: data.country } });
     });
     return c.body(null, 204);
   });

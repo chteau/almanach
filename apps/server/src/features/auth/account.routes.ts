@@ -184,7 +184,7 @@ export function accountRoutes(db: Database, options: AccountOptions): Hono<AppEn
 
   router.post('/import', async (c) => {
     const body = await c.req.json().catch(() => null);
-    const result = await importData(db, c.var.user.id, body);
+    const result = await importData(db, { userId: c.var.user.id, companyId: c.var.company.id }, body);
     if ('error' in result) return c.json(result, result.error === 'not_empty' ? 409 : 422);
     return c.json(result);
   });

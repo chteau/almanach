@@ -138,6 +138,11 @@ export const appFr: Record<keyof typeof appEn, string> = {
   'clients.address': 'Adresse',
   'clients.country': 'Pays',
   'clients.vat': 'N° de TVA',
+  'clients.siret': 'SIRET',
+  'clients.receipts': 'Encaissements',
+  'clients.stripe.deleted': 'Client supprimé dans Stripe : la fiche et son historique sont conservés.',
+  'clients.stripe.edit':
+    'Ce client vient de Stripe. Une fois enregistré ici, la synchronisation ne modifie plus ses informations.',
   'clients.vat.hint': 'Nécessaire pour l’autoliquidation dans l’UE.',
   'clients.vat.missing':
     'Client entreprise de l’UE sans n° de TVA : l’autoliquidation ne peut pas s’appliquer. Demandez-lui son numéro.',

@@ -8,6 +8,7 @@ import list from '../../components/RowList/RowList.module.css';
 import { SelectField } from '../../components/SelectField/SelectField.tsx';
 import { useI18n } from '../../i18n/I18nProvider.tsx';
 import { useAuth, useMe } from '../auth/AuthProvider.tsx';
+import { activateCompany, useCompanies } from '../companies/useCompanies.ts';
 
 /**
  * Phone menu listing every section that does not fit in the bottom tab bar, plus language and sign-out
@@ -18,6 +19,7 @@ export function MenuPage() {
   const { t, locale, setLocale } = useI18n();
   const { logout } = useAuth();
   const me = useMe();
+  const companies = useCompanies().data;
   return (
     <>
       <PageHeader title={t('nav.menu')} />
@@ -36,6 +38,19 @@ export function MenuPage() {
         ))}
       </ul>
       <section className={form.section} aria-label={me.email}>
+        {companies && companies.companies.length > 1 && (
+          <SelectField
+            label={t('companies.switch')}
+            value={companies.active}
+            onChange={(event) => void activateCompany(event.target.value)}
+          >
+            {companies.companies.map((company) => (
+              <option key={company.id} value={company.id}>
+                {company.name}
+              </option>
+            ))}
+          </SelectField>
+        )}
         <SelectField
           label={t('nav.language')}
           value={locale}

@@ -44,29 +44,29 @@ export function documentRoutes(db: Database, service: DocumentService): Hono<App
   /**
    * PDF look chosen by the person (S-235)
    *
-   * @param userId {string} - owner
+   * @param companyId {string} - owner
    * @returns {Promise<PdfStyle | undefined>} - style, or undefined before onboarding
    */
-  const styleFor = async (userId: string): Promise<PdfStyle | undefined> => {
-    const profile = await service.profile(userId);
+  const styleFor = async (companyId: string): Promise<PdfStyle | undefined> => {
+    const profile = await service.profile(companyId);
     if (!profile) return undefined;
-    const { pdf, logo } = await loadBilling(db, userId, profile.country);
+    const { pdf, logo } = await loadBilling(db, companyId, profile.country);
     return { ...pdf, logo };
   };
 
   /**
    * Loads one of the user's documents
    *
-   * @param userId {string} - owner
+   * @param companyId {string} - owner
    * @param id {string} - document id from the URL
    * @returns {Promise<typeof documents.$inferSelect | undefined>} - the row, if owned
    */
-  async function owned(userId: string, id: string) {
+  async function owned(companyId: string, id: string) {
     if (!idSchema.safeParse(id).success) return undefined;
     const [row] = await db
       .select()
       .from(documents)
-      .where(and(eq(documents.id, id), eq(documents.userId, userId)))
+      .where(and(eq(documents.id, id), eq(documents.companyId, companyId)))
       .limit(1);
     return row;
   }
@@ -74,13 +74,13 @@ export function documentRoutes(db: Database, service: DocumentService): Hono<App
   /**
    * Validates references of a draft and computes its derived fields
    *
-   * @param userId {string} - owner
+   * @param companyId {string} - owner
    * @param draft {DocumentDraft} - validated draft
    * @returns {Promise<{ values: Record<string, unknown> } | { error: string }>} - row values or an error code
    */
-  async function prepare(userId: string, draft: z.output<typeof documentDraftSchema>) {
-    const profile = await service.profile(userId);
-    const client = await service.client(userId, draft.clientId);
+  async function prepare(companyId: string, draft: z.output<typeof documentDraftSchema>) {
+    const profile = await service.profile(companyId);
+    const client = await service.client(companyId, draft.clientId);
     if (!profile) return { error: 'no_profile' };
     if (!client) return { error: 'unknown_client' };
     if (draft.missionId) {
@@ -90,21 +90,21 @@ export function documentRoutes(db: Database, service: DocumentService): Hono<App
         .where(
           and(
             eq(missions.id, draft.missionId),
-            eq(missions.userId, userId),
+            eq(missions.companyId, companyId),
             eq(missions.clientId, client.id),
           ),
         )
         .limit(1);
       if (!mission) return { error: 'unknown_mission' };
     }
-    const derived = await service.derive(userId, draft, profile, client);
+    const derived = await service.derive(companyId, draft, profile, client);
     const { depositIds: _ids, ...rest } = draft;
     return { values: { ...rest, ...derived, validUntil: draft.type === 'quote' ? draft.validUntil : null } };
   }
 
   router.get('/documents', async (c) => {
     const type = c.req.query('type');
-    const all = await service.views(c.var.user.id, todayFrom(c.req.query('today')));
+    const all = await service.views(c.var.company.id, todayFrom(c.req.query('today')));
     const wanted =
       type === 'quote'
         ? ['quote']
@@ -119,10 +119,10 @@ export function documentRoutes(db: Database, service: DocumentService): Hono<App
   router.get('/documents/:id', async (c) => {
     const id = c.req.param('id');
     if (!idSchema.safeParse(id).success) return c.json({ error: 'not_found' }, 404);
-    const [view] = await service.views(c.var.user.id, todayFrom(c.req.query('today')), id);
+    const [view] = await service.views(c.var.company.id, todayFrom(c.req.query('today')), id);
     if (!view) return c.json({ error: 'not_found' }, 404);
-    const profile = await service.profile(c.var.user.id);
-    const client = await service.client(c.var.user.id, view.clientId);
+    const profile = await service.profile(c.var.company.id);
+    const client = await service.client(c.var.company.id, view.clientId);
     const missing =
       view.state === 'draft' && profile && client
         ? service.missing(profile, client, view.lines, view.vatMode)
@@ -133,13 +133,13 @@ export function documentRoutes(db: Database, service: DocumentService): Hono<App
   router.post('/documents', async (c) => {
     const { data, response } = await parseBody(c, documentDraftSchema);
     if (response) return response;
-    const prepared = await prepare(c.var.user.id, data);
+    const prepared = await prepare(c.var.company.id, data);
     if ('error' in prepared) return c.json({ error: prepared.error }, 422);
     const [row] = await db
       .insert(documents)
       .values({
         ...(prepared.values as typeof documents.$inferInsert),
-        userId: c.var.user.id,
+        companyId: c.var.company.id,
         state: 'draft',
       })
       .returning({ id: documents.id });
@@ -147,13 +147,13 @@ export function documentRoutes(db: Database, service: DocumentService): Hono<App
   });
 
   router.put('/documents/:id', async (c) => {
-    const existing = await owned(c.var.user.id, c.req.param('id'));
+    const existing = await owned(c.var.company.id, c.req.param('id'));
     if (!existing) return c.json({ error: 'not_found' }, 404);
     if (existing.state !== 'draft') return c.json({ error: 'not_draft' }, 409);
     const { data, response } = await parseBody(c, documentDraftSchema);
     if (response) return response;
     if (data.type !== existing.type) return c.json({ error: 'type_change' }, 422);
-    const prepared = await prepare(c.var.user.id, data);
+    const prepared = await prepare(c.var.company.id, data);
     if ('error' in prepared) return c.json({ error: prepared.error }, 422);
     await db
       .update(documents)
@@ -165,7 +165,7 @@ export function documentRoutes(db: Database, service: DocumentService): Hono<App
   router.post('/documents/from-time', async (c) => {
     const { data, response } = await parseBody(c, timeInvoiceSchema);
     if (response) return response;
-    const userId = c.var.user.id;
+    const companyId = c.var.company.id;
     const entries = await db
       .select({
         id: timeEntries.id,
@@ -176,7 +176,7 @@ export function documentRoutes(db: Database, service: DocumentService): Hono<App
       .from(timeEntries)
       .where(
         and(
-          eq(timeEntries.userId, userId),
+          eq(timeEntries.companyId, companyId),
           inArray(timeEntries.id, data.entryIds),
           isNull(timeEntries.documentId),
           isNull(timeEntries.startedAt),
@@ -190,7 +190,7 @@ export function documentRoutes(db: Database, service: DocumentService): Hono<App
     const [mission] = await db
       .select()
       .from(missions)
-      .where(and(eq(missions.id, [...missionIds][0] ?? ''), eq(missions.userId, userId)))
+      .where(and(eq(missions.id, [...missionIds][0] ?? ''), eq(missions.companyId, companyId)))
       .limit(1);
     if (!mission) return c.json({ error: 'invalid_entries' }, 422);
     if (mission.billing !== 'hourly' && mission.billing !== 'daily')
@@ -219,19 +219,19 @@ export function documentRoutes(db: Database, service: DocumentService): Hono<App
       note: null,
       depositIds: [],
     });
-    const prepared = await prepare(userId, draft);
+    const prepared = await prepare(companyId, draft);
     if ('error' in prepared) return c.json({ error: prepared.error }, 422);
     const id = await db.transaction(async (tx) => {
       const [row] = await tx
         .insert(documents)
-        .values({ ...(prepared.values as typeof documents.$inferInsert), userId, state: 'draft' })
+        .values({ ...(prepared.values as typeof documents.$inferInsert), companyId, state: 'draft' })
         .returning({ id: documents.id });
       const linked = await tx
         .update(timeEntries)
         .set({ documentId: row?.id })
         .where(
           and(
-            eq(timeEntries.userId, userId),
+            eq(timeEntries.companyId, companyId),
             inArray(timeEntries.id, data.entryIds),
             isNull(timeEntries.documentId),
           ),
@@ -245,7 +245,7 @@ export function documentRoutes(db: Database, service: DocumentService): Hono<App
   });
 
   router.delete('/documents/:id', async (c) => {
-    const existing = await owned(c.var.user.id, c.req.param('id'));
+    const existing = await owned(c.var.company.id, c.req.param('id'));
     if (!existing) return c.json({ error: 'not_found' }, 404);
     const removable =
       existing.state === 'draft' || (existing.type === 'quote' && existing.state !== 'accepted');
@@ -257,22 +257,22 @@ export function documentRoutes(db: Database, service: DocumentService): Hono<App
   });
 
   router.post('/documents/:id/issue', async (c) => {
-    const existing = await owned(c.var.user.id, c.req.param('id'));
+    const existing = await owned(c.var.company.id, c.req.param('id'));
     if (!existing) return c.json({ error: 'not_found' }, 404);
-    const result = await service.issue(c.var.user.id, existing.id);
+    const result = await service.issue(c.var.company.id, existing.id);
     if ('ok' in result) return c.body(null, 204);
     return c.json(result, result.error === 'missing_fields' ? 422 : 409);
   });
 
   router.post('/documents/:id/sent', async (c) => {
-    const existing = await owned(c.var.user.id, c.req.param('id'));
+    const existing = await owned(c.var.company.id, c.req.param('id'));
     if (!existing || existing.state === 'draft') return c.json({ error: 'not_found' }, 404);
     await db.update(documents).set({ sentAt: new Date() }).where(eq(documents.id, existing.id));
     return c.body(null, 204);
   });
 
   router.post('/documents/:id/answer', async (c) => {
-    const existing = await owned(c.var.user.id, c.req.param('id'));
+    const existing = await owned(c.var.company.id, c.req.param('id'));
     if (existing?.type !== 'quote' || existing.state === 'draft') return c.json({ error: 'not_found' }, 404);
     const { data, response } = await parseBody(
       c,
@@ -288,7 +288,7 @@ export function documentRoutes(db: Database, service: DocumentService): Hono<App
 
   /** Copies a document into a new draft: duplicate, quote to invoice or deposit, or credit note. */
   router.post('/documents/:id/derive', async (c) => {
-    const existing = await owned(c.var.user.id, c.req.param('id'));
+    const existing = await owned(c.var.company.id, c.req.param('id'));
     if (!existing) return c.json({ error: 'not_found' }, 404);
     const { data, response } = await parseBody(
       c,
@@ -339,14 +339,14 @@ export function documentRoutes(db: Database, service: DocumentService): Hono<App
       note: existing.note,
       depositIds: [],
     } satisfies z.output<typeof documentDraftSchema>;
-    const prepared = await prepare(c.var.user.id, draft);
+    const prepared = await prepare(c.var.company.id, draft);
     if ('error' in prepared) return c.json({ error: prepared.error }, 422);
     const related = data.as === 'duplicate' ? null : existing.id;
     const [row] = await db
       .insert(documents)
       .values({
         ...(prepared.values as typeof documents.$inferInsert),
-        userId: c.var.user.id,
+        companyId: c.var.company.id,
         state: 'draft',
         relatedId: related,
       })
@@ -358,24 +358,25 @@ export function documentRoutes(db: Database, service: DocumentService): Hono<App
   });
 
   router.get('/documents/:id/pdf', async (c) => {
-    const existing = await owned(c.var.user.id, c.req.param('id'));
+    const existing = await owned(c.var.company.id, c.req.param('id'));
     if (!existing) return c.json({ error: 'not_found' }, 404);
     let { seller, buyer } = existing;
     if (!seller || !buyer) {
-      const profile = await service.profile(c.var.user.id);
-      const client = await service.client(c.var.user.id, existing.clientId);
+      const profile = await service.profile(c.var.company.id);
+      const client = await service.client(c.var.company.id, existing.clientId);
       if (!profile || !client) return c.json({ error: 'not_found' }, 404);
       ({ seller, buyer } = service.snapshots(profile, client));
     }
     let relatedNumber: string | null = null;
-    if (existing.relatedId) relatedNumber = (await owned(c.var.user.id, existing.relatedId))?.number ?? null;
+    if (existing.relatedId)
+      relatedNumber = (await owned(c.var.company.id, existing.relatedId))?.number ?? null;
     const bytes = await renderPdf({
       ...existing,
       draft: existing.state === 'draft',
       relatedNumber,
       seller,
       buyer,
-      style: await styleFor(c.var.user.id),
+      style: await styleFor(c.var.company.id),
     });
     const name = `${existing.number ?? `draft-${existing.id.slice(0, 8)}`}.pdf`;
     return new Response(bytes as Uint8Array<ArrayBuffer>, {
@@ -389,7 +390,7 @@ export function documentRoutes(db: Database, service: DocumentService): Hono<App
   });
 
   router.post('/documents/:id/payments', async (c) => {
-    const existing = await owned(c.var.user.id, c.req.param('id'));
+    const existing = await owned(c.var.company.id, c.req.param('id'));
     if (existing?.state !== 'issued' || existing.type === 'quote' || existing.type === 'credit_note') {
       return c.json({ error: 'not_payable' }, 409);
     }
@@ -399,7 +400,7 @@ export function documentRoutes(db: Database, service: DocumentService): Hono<App
       return c.json({ error: 'validation_failed', issues: [{ path: 'date', message: 'before_issue' }] }, 422);
     const [row] = await db
       .insert(payments)
-      .values({ ...data, userId: c.var.user.id, documentId: existing.id })
+      .values({ ...data, companyId: c.var.company.id, documentId: existing.id })
       .returning({ id: payments.id });
     await db
       .insert(auditLog)
@@ -418,7 +419,7 @@ export function documentRoutes(db: Database, service: DocumentService): Hono<App
       .from(payments)
       .innerJoin(documents, eq(documents.id, payments.documentId))
       .innerJoin(clients, eq(clients.id, documents.clientId))
-      .where(eq(payments.userId, c.var.user.id))
+      .where(eq(payments.companyId, c.var.company.id))
       .orderBy(desc(payments.date));
     const list: PaymentView[] = rows.map(({ payment, documentNumber, currency, clientName }) => ({
       id: payment.id,
@@ -441,7 +442,7 @@ export function documentRoutes(db: Database, service: DocumentService): Hono<App
     if (!idSchema.safeParse(id).success) return c.json({ error: 'not_found' }, 404);
     const deleted = await db
       .delete(payments)
-      .where(and(eq(payments.id, id), eq(payments.userId, c.var.user.id)))
+      .where(and(eq(payments.id, id), eq(payments.companyId, c.var.company.id)))
       .returning({ id: payments.id });
     if (deleted.length === 0) return c.json({ error: 'not_found' }, 404);
     await db.insert(auditLog).values({ userId: c.var.user.id, action: 'payment.deleted', meta: { id } });

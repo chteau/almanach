@@ -1,5 +1,12 @@
 import { z } from 'zod';
-import { countrySchema, currencySchema, EU_COUNTRIES, isEuVatNumber, optionalText } from './common.ts';
+import {
+  countrySchema,
+  currencySchema,
+  EU_COUNTRIES,
+  isEuVatNumber,
+  isLuhnValid,
+  optionalText,
+} from './common.ts';
 import { LOCALES } from './install.ts';
 
 export const contactSchema = z
@@ -26,12 +33,16 @@ export const clientInputSchema = z
     paymentTermsDays: z.number().int().min(0).max(120),
     contacts: z.array(contactSchema).max(10),
     notes: optionalText(5000),
+    siret: optionalText(14),
     allowDuplicate: z.boolean().optional(),
   })
   .strict()
   .superRefine((client, ctx) => {
     if (client.vatNumber && isEuCountry(client.country) && !isEuVatNumber(client.vatNumber)) {
       ctx.addIssue({ code: 'custom', path: ['vatNumber'], message: 'invalid_vat' });
+    }
+    if (client.siret && !(client.siret.length === 14 && isLuhnValid(client.siret))) {
+      ctx.addIssue({ code: 'custom', path: ['siret'], message: 'invalid_format' });
     }
     if (client.contacts.filter((contact) => contact.billing).length > 1) {
       ctx.addIssue({ code: 'custom', path: ['contacts'], message: 'one_billing_contact' });
@@ -44,6 +55,9 @@ export type ClientInput = z.input<typeof clientInputSchema>;
 export interface Client extends Omit<z.output<typeof clientInputSchema>, 'allowDuplicate'> {
   id: string;
   archived: boolean;
+  /** Stripe customer the client comes from, and when it was deleted there. */
+  stripeId: string | null;
+  stripeDeletedAt: string | null;
   createdAt: string;
 }
 

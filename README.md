@@ -71,6 +71,17 @@ l'application le dit à l'inscription. Le détail est dans le
   jour reçue n'est jamais appliquée d'office : tu lis ce qui change, en clair (« le taux passe de
   25,6 % à 26 % au 1er juillet 2026 »), puis tu appliques ou tu reportes. Retour au pack livré en
   un clic.
+- **Sépare tes entreprises.** Plusieurs structures dans un même compte (une micro-entreprise et une
+  SASU, ou une activité dans un autre pays), chacune avec ses clients, factures, temps, échéances,
+  seuils et estimations. Une deuxième micro-entreprise française active déclenche un avertissement :
+  on n'en a qu'une, les activités se déclarent sous le même SIRET.
+- **Branche Stripe.** Les clients Stripe deviennent des clients de l'entreprise et les paiements
+  encaissés des recettes rattachées à leur client, avec une clé en lecture seule
+  ([détails](docs/stripe.md)).
+- **Relie deux instances.** Une micro-entreprise, deux activités suivies dans deux instances (une
+  derrière un VPN, l'autre perso) : plafonds, franchise de TVA et alertes comptent le cumul. Seuls
+  des totaux mensuels par catégorie fiscale transitent, par requêtes signées Ed25519
+  ([détails](docs/federation.md)).
 - **Garde tes données.** Export JSON complet, réimport dans une instance neuve. Double
   authentification (TOTP), sessions révocables, verrouillage après plusieurs échecs.
 
@@ -79,7 +90,9 @@ l'application le dit à l'inscription. Le détail est dans le
 - Gratuit et libre, pour toujours, sous licence [AGPL-3.0](LICENSE).
 - Pas de version hébergée, pas d'offre payante, pas de télémétrie.
 - Aucune requête vers l'extérieur tant qu'un administrateur ne l'a pas activée (mises à jour de
-  packs, annonce de nouvelle version).
+  packs, annonce de nouvelle version, synchronisation Stripe, liaisons entre instances). L'autorisation
+  se donne dans les réglages ou, pour Stripe et les liaisons, dans la configuration du serveur
+  (`STRIPE_SYNC`, `FEDERATION`).
 
 ## Installation
 
@@ -110,7 +123,10 @@ Tout est facultatif.
 | `PACK_PUBLIC_KEYS` | Clés publiques Ed25519 autorisées à signer des packs, séparées par des virgules. Sans elles, aucune mise à jour n'est acceptée et seuls les packs livrés servent. |
 | `PACK_UPDATE_URL` | Dossier HTTPS qui publie `index.json` et les packs signés. Vérifié une fois par jour, seulement si un administrateur l'active dans les réglages. |
 | `MAINTENANCE` | `true` ne sert que la page de maintenance, par exemple pendant une restauration de sauvegarde. |
+| `SECRETS_KEY` | Clé de 32 octets en base64 (`openssl rand -base64 32`) qui chiffre les secrets stockés (clés Stripe, clés privées des liaisons entre instances). Sans elle, aucune clé Stripe ne peut être enregistrée ni aucune liaison créée. |
 | `RELEASE_CHECK_URL` | Adresse interrogée une fois par jour pour annoncer une nouvelle version, seulement si un administrateur l'active. |
+| `STRIPE_SYNC` | `true` autorise la synchronisation Stripe sur l'instance, comme la case de **Réglages → Instance** (alors cochée et verrouillée). Absente : la case décide. Chaque entreprise l'active ensuite avec sa propre clé. |
+| `FEDERATION` | `true` autorise les liaisons entre instances, de la même façon. |
 
 ### Publier une mise à jour de pack
 

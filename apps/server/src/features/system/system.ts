@@ -129,18 +129,51 @@ export class ReleaseCheck {
 }
 
 /**
- * Version information and the administrator's release-check switch, mounted behind requireUser on /api/system
+ * Version information and the administrator's switches, mounted behind requireUser on /api/system
  *
- * @param _db {Database} - database
+ * @param db {Database} - database
  * @param releases {ReleaseCheck} - release checker
+ * @param preset {{ stripeSync: boolean; federation: boolean }} - permissions the server configuration grants
  * @returns {Hono<AppEnv>} - router
  */
-export function systemRoutes(_db: Database, releases: ReleaseCheck): Hono<AppEnv> {
+export function systemRoutes(
+  db: Database,
+  releases: ReleaseCheck,
+  preset: { stripeSync: boolean; federation: boolean } = { stripeSync: false, federation: false },
+): Hono<AppEnv> {
   const router = new Hono<AppEnv>();
 
-  router.get('/', async (c) =>
-    c.json({ version: APP_VERSION, update: releases.newer(), versionCheck: await releases.enabled() }),
-  );
+  router.get('/', async (c) => {
+    const [row] = await db
+      .select({ stripeSync: instance.stripeSync, federation: instance.federation })
+      .from(instance)
+      .limit(1);
+    return c.json({
+      version: APP_VERSION,
+      update: releases.newer(),
+      versionCheck: await releases.enabled(),
+      stripeSync: preset.stripeSync || (row?.stripeSync ?? false),
+      federation: preset.federation || (row?.federation ?? false),
+      preset,
+    });
+  });
+
+  // Instance-wide permissions, off by default: nothing leaves the instance until an administrator allows it,
+  // here or in the server configuration (STRIPE_SYNC, FEDERATION), which then cannot be undone from here.
+  for (const [path, column, action] of [
+    ['stripe-sync', 'stripeSync', 'system.stripe_sync'],
+    ['federation', 'federation', 'system.federation'],
+  ] as const) {
+    router.put(`/${path}`, async (c) => {
+      if (c.var.user.role !== 'admin') return c.json({ error: 'forbidden' }, 403);
+      if (preset[column]) return c.json({ error: 'set_by_config' }, 409);
+      const body = await c.req.json().catch(() => null);
+      if (typeof body?.enabled !== 'boolean') return c.json({ error: 'validation_failed' }, 422);
+      await db.update(instance).set({ [column]: body.enabled });
+      await db.insert(auditLog).values({ userId: c.var.user.id, action, meta: { enabled: body.enabled } });
+      return c.body(null, 204);
+    });
+  }
 
   router.put('/version-check', async (c) => {
     if (c.var.user.role !== 'admin') return c.json({ error: 'forbidden' }, 403);

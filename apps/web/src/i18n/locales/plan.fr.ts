@@ -292,12 +292,13 @@ export const planFr: Record<keyof typeof planEn, string> = {
   'packs.error.': 'L’opération a échoué.',
   'data.title': 'Vos données',
   'data.body':
-    'Téléchargez tout ce qu’Almanach conserve sur votre activité dans un fichier JSON : profil, clients, missions, documents, paiements, temps et échéances. Les PDF émis peuvent être régénérés à partir de lui.',
+    'Téléchargez tout ce qu’Almanach conserve sur toutes vos entreprises dans un fichier JSON : profils, clients, missions, documents, paiements, temps et échéances. Les PDF émis peuvent être régénérés à partir de lui.',
   'data.export': 'Télécharger mes données',
   'data.import': 'Importer un export',
   'data.import.hint':
     'L’import n’est possible que dans un compte sans client ni document, par exemple sur une nouvelle instance.',
-  'data.imported': 'Import terminé : {clients} client(s) et {documents} document(s) restaurés.',
+  'data.imported':
+    'Import terminé : {companies} entreprise(s), {clients} client(s) et {documents} document(s) restaurés.',
   'data.error.not_empty':
     'Ce compte contient déjà des clients ou des documents : importez dans un nouveau compte.',
   'data.error.invalid': 'Ce fichier n’est pas un export Almanach valide.',
@@ -478,4 +479,118 @@ export const planFr: Record<keyof typeof planEn, string> = {
   'common.error.useSituation':
     'Votre statut ou votre pays a un historique : changez-le depuis Réglages → Changement de situation, avec une date.',
   'common.error.ceased': 'Votre activité a cessé : ceci n’est plus modifiable.',
+  'companies.switch': 'Entreprise active',
+  'companies.title': 'Entreprises',
+  'companies.body':
+    'Chaque entreprise a ses propres clients, factures, paiements, temps, échéances, seuils et estimations. Les rappels et le flux d’agenda couvrent toutes vos entreprises et nomment chacune.',
+  'companies.legal':
+    'En France, une personne ne peut avoir qu’une seule micro-entreprise : plusieurs activités (par exemple services et ventes) se déclarent sous le même SIRET, avec des seuils et des cotisations calculés sur leur total. Ajoutez une entreprise pour une autre structure (SASU, EURL…) ou une activité dans un autre pays.',
+  'companies.name': 'Nom',
+  'companies.add': 'Ajouter l’entreprise',
+  'companies.new': 'Nouvelle entreprise',
+  'companies.activate': 'Y basculer',
+  'companies.active': 'Active',
+  'companies.rename': 'Renommer',
+  'companies.microConflict':
+    'Vous avez déjà une micro-entreprise française active ({name}). Une personne ne peut en avoir qu’une : déclarez plutôt cette activité dans cette entreprise, sous le même SIRET, au lieu d’en créer une deuxième. Seuils et cotisations se calculent sur le total de vos activités ; les activités mixtes ventes et services ont des seuils spécifiques.',
+  'stripe.title': 'Synchronisation Stripe',
+  'stripe.body':
+    'Importe les clients Stripe comme clients de cette entreprise, et les paiements encaissés via Stripe comme recettes, rattachées à leur client : factures payées, paiements sans facture, et remboursements en négatif. Ils comptent dans le chiffre d’affaires, les seuils et les estimations. Montants hors taxes quand Stripe les fournit ; aucune donnée de carte n’est conservée.',
+  'stripe.notAllowed':
+    'Un administrateur doit d’abord autoriser la synchronisation Stripe dans Réglages → Instance. D’ici là, Almanach ne contacte jamais Stripe.',
+  'stripe.noSecretsKey':
+    'Pour enregistrer une clé Stripe, le serveur a besoin de SECRETS_KEY (voir .env.example).',
+  'stripe.key': 'Clé restreinte (rk_…)',
+  'stripe.key.hint':
+    'Dans Stripe, créez une clé restreinte avec Lecture sur Charges, Customers, Invoices et Balance transactions (et Refunds s’il apparaît), Aucun ailleurs. Elle est stockée chiffrée.',
+  'stripe.key.saved': 'Une clé est enregistrée. N’en saisissez une nouvelle que pour la remplacer.',
+  'stripe.enabled': 'Synchroniser toutes les 6 heures',
+  'stripe.save': 'Enregistrer',
+  'stripe.sync': 'Synchroniser maintenant',
+  'stripe.remove': 'Supprimer la clé',
+  'stripe.status': '{count} recette(s) importée(s). Dernière synchronisation : {date}.',
+  'stripe.never': 'jamais',
+  'stripe.synced': '{count} nouvelle(s) recette(s) importée(s).',
+  'stripe.error.stripe_unauthorized': 'Stripe a refusé la clé.',
+  'stripe.error.stripe_forbidden':
+    'Il manque une permission de lecture à la clé (Charges, Customers, Invoices, Balance transactions ou Refunds).',
+  'stripe.error.stripe_unreachable': 'Stripe est injoignable.',
+  'stripe.error.stripe_failed': 'Stripe a répondu par une erreur.',
+  'system.preset': 'Autorisé par la configuration du serveur.',
+  'system.stripeSync': 'Autoriser la synchronisation des entreprises avec Stripe',
+  'system.stripeSync.hint':
+    'Désactivé par défaut. Une fois autorisé, chacun active la synchronisation d’une entreprise avec sa propre clé en lecture seule.',
+  'federation.title': 'Instances liées',
+  'federation.body':
+    'Une entreprise, plusieurs activités suivies dans des instances Almanach séparées : liez-les pour que plafonds, franchise de TVA et alertes comptent le chiffre d’affaires de toute l’entreprise. Seuls les totaux mensuels par catégorie fiscale et le nom de l’activité transitent ; factures, clients et cotisations restent dans chaque instance.',
+  'federation.notAllowed':
+    'Un administrateur doit d’abord autoriser les liaisons entre instances dans Réglages → Instance. D’ici là, rien n’est envoyé.',
+  'federation.noSecretsKey':
+    'Les liaisons ont besoin de SECRETS_KEY sur le serveur pour stocker leurs clés (voir .env.example).',
+  'federation.label': 'Nom de cette activité',
+  'federation.label.hint':
+    'Affiché sur l’instance liée, par exemple « Freelance » ou le nom de votre produit.',
+  'federation.enabled': 'Lier cette entreprise à d’autres instances',
+  'federation.save': 'Enregistrer',
+  'federation.waiting': 'En attente de l’autre instance',
+  'federation.state.pending': 'Code émis',
+  'federation.state.active': 'Liée',
+  'federation.state.imported': 'À refaire',
+  'federation.expires': 'Le code expire à {time}.',
+  'federation.imported':
+    'Restaurée depuis un export : les clés ne sont jamais exportées. Révoquez-la et refaites l’appairage.',
+  'federation.fingerprints':
+    'Cette instance : {own} · autre instance : {peer}. Les deux écrans doivent afficher la même paire, inversée.',
+  'federation.syncedAt': 'Dernier échange : {synced}. Totaux reçus : {received}.',
+  'federation.never': 'jamais',
+  'federation.share': 'Partager les totaux de cette activité',
+  'federation.receive': 'Recevoir les totaux de l’autre activité',
+  'federation.pulls': 'Cette instance appelle l’autre (toutes les 6 heures)',
+  'federation.sync': 'Synchroniser',
+  'federation.synced': 'Totaux échangés.',
+  'federation.revoke': 'Révoquer',
+  'federation.revoke.title': 'Révoquer cette liaison ?',
+  'federation.revoke.body':
+    'La clé de l’autre instance et les totaux reçus d’elle sont supprimés, des deux côtés si elle est joignable. Pour relier à nouveau, il faudra un nouveau code.',
+  'federation.issue': 'Lier une autre instance',
+  'federation.issue.hint':
+    'Générez le code sur l’instance que l’autre peut joindre (hors VPN), puis saisissez-le sur l’autre dans les 15 minutes.',
+  'federation.issue.submit': 'Générer un code d’appairage',
+  'federation.code':
+    'Code à usage unique, valable jusqu’à {time}. Empreinte de cette instance : {fingerprint}.',
+  'federation.code.field': 'Code d’appairage',
+  'federation.ownUrl': 'Adresse de cette instance',
+  'federation.ownUrl.hint':
+    'Telle que l’autre instance la joint. HTTPS, ou HTTP sur une adresse de réseau privé.',
+  'federation.join': 'Saisir un code',
+  'federation.join.submit': 'Appairer',
+  'federation.paired': 'Instances liées. Comparez les empreintes sur les deux écrans.',
+  'federation.error.federation_not_allowed':
+    'Les liaisons entre instances ne sont pas autorisées sur cette instance.',
+  'federation.error.federation_off': 'Activez d’abord les liaisons pour cette entreprise.',
+  'federation.error.secrets_key_missing': 'Le serveur n’a pas de SECRETS_KEY.',
+  'federation.error.invalid_url':
+    'Utilisez une adresse HTTPS, ou HTTP sur localhost ou une adresse de réseau privé.',
+  'federation.error.invalid_code': 'Ce code n’est pas valide. Copiez-le à nouveau en entier.',
+  'federation.error.code_unknown':
+    'L’autre instance ne connaît pas ce code : il a déjà servi ou a été révoqué.',
+  'federation.error.code_expired': 'Ce code a expiré. Générez-en un nouveau.',
+  'federation.error.peer_unreachable':
+    'L’autre instance est injoignable. Les derniers totaux reçus sont conservés.',
+  'federation.error.peer_refused':
+    'L’autre instance a refusé la requête : la liaison y a peut-être été révoquée.',
+  'federation.error.peer_failed': 'L’autre instance a répondu par une erreur.',
+  'federation.error.peer_bad_signature':
+    'La réponse n’est pas signée par la clé attendue. Rien n’a été enregistré.',
+  'federation.error.peer_invalid': 'L’autre instance a envoyé une réponse inattendue.',
+  'federation.error.peer_too_large': 'La réponse de l’autre instance est trop volumineuse.',
+  'federation.error.currency_mismatch':
+    'L’autre instance compte dans une autre devise : ses totaux sont ignorés.',
+  'system.federation': 'Autoriser les liaisons entre instances',
+  'system.federation.hint':
+    'Désactivé par défaut. Une fois autorisé, chacun peut lier une entreprise à une autre instance Almanach pour compter le chiffre d’affaires de toute l’entreprise.',
+  'outlook.linked': 'dont {amount} d’une instance liée ({labels})',
+  'outlook.linkedEstimates':
+    'Autre activité ({label}) : {amount} encaissés, cotisations gérées par l’autre instance.',
+  'outlook.linkedStale': 'Totaux du {date} : l’autre instance est injoignable depuis.',
 };

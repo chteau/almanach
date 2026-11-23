@@ -31,6 +31,7 @@ export function DataSettings() {
       setMessage({
         tone: 'info',
         text: t('data.imported', {
+          companies: result.counts.companies ?? 1,
           clients: result.counts.clients ?? 0,
           documents: result.counts.documents ?? 0,
         }),

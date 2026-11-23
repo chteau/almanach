@@ -11,6 +11,7 @@ import { TextField } from '../../components/TextField/TextField.tsx';
 import { useI18n } from '../../i18n/I18nProvider.tsx';
 import { formatDate, formatMoney } from '../../lib/format.ts';
 import { useResource } from '../../lib/useResource.ts';
+import { LinkedActivities } from './LinkedActivities.tsx';
 import styles from './Planning.module.css';
 import { labelOf, type Outlook } from './types.ts';
 
@@ -97,6 +98,14 @@ export function ThresholdsPage() {
                     limit: money(threshold.limitCents),
                   })}
                 />
+                {threshold.linkedCents !== 0 && (
+                  <p className={styles.caption}>
+                    {t('outlook.linked', {
+                      amount: money(threshold.linkedCents),
+                      labels: outlook.linked.map((link) => link.label).join(', '),
+                    })}
+                  </p>
+                )}
                 <p className={styles.caption}>
                   {t(`outlook.window.${threshold.window}`, {
                     from: formatDate(threshold.windowStart, locale),
@@ -144,6 +153,7 @@ export function ThresholdsPage() {
                 <dd>{money(outlook.projectedRevenueCents)}</dd>
               </div>
             </dl>
+            <LinkedActivities outlook={outlook} money={money} />
             <TableScroll>
               <table className={styles.table}>
                 <caption className="visually-hidden">{t('outlook.estimates')}</caption>

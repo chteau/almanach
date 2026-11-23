@@ -549,10 +549,10 @@ test('signed pack updates, data export, search and system pages (P20 to P22)', a
   expect(exported.headers()['content-disposition']).toContain('attachment');
   const data = (await exported.json()) as {
     format: string;
-    data: { clients: unknown[]; documents: unknown[] };
+    companies: { data: { clients: unknown[] } }[];
   };
-  expect(data.format).toBe('almanach-export/1');
-  expect(data.data.clients.length).toBeGreaterThan(0);
+  expect(data.format).toBe('almanach-export/2');
+  expect(data.companies[0]?.data.clients.length).toBeGreaterThan(0);
   expect(JSON.stringify(data)).not.toContain('icalTokenHash":"');
   const reimport = await page.request.post('/api/account/import', { data });
   expect(reimport.status()).toBe(409);

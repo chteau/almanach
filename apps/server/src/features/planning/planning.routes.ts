@@ -1,9 +1,18 @@
-import { addDays, fiscalYearOf, idSchema, isoDateSchema, LOCALES, optionalText } from '@almanach/shared';
+import {
+  addDays,
+  fiscalYearOf,
+  idSchema,
+  isoDateSchema,
+  LOCALES,
+  type Localized,
+  optionalText,
+} from '@almanach/shared';
 import { and, desc, eq, gte, inArray, isNull, lte, ne, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { z } from 'zod';
 import type { Database } from '../../db/client.ts';
 import {
+  companies,
   customDeadlines,
   deadlineMarks,
   documents,
@@ -17,7 +26,7 @@ import type { AppEnv } from '../../http/request.ts';
 import { randomToken, sha256 } from '../../security/tokens.ts';
 import type { PackRegistry } from '../packs/packs.ts';
 import { renderIcal } from './ical.ts';
-import { occurrencesOf, type PlanningService } from './planning.service.ts';
+import { type CalendarItem, occurrencesOf, type PlanningService } from './planning.service.ts';
 import type { ReminderJob } from './reminders.ts';
 
 const KEY = /^(?:[a-z0-9_]{1,60}:\d{4}-\d{2}-\d{2}|custom:[0-9a-f-]{36}:\d{4}-\d{2}-\d{2})$/;
@@ -112,13 +121,13 @@ export function planningRoutes(
     const from = dateParam(c.req.query('from'), addDays(today, -31));
     const to = dateParam(c.req.query('to'), addDays(today, 62));
     if (!from || !to || to < from || addDays(from, 400) < to) return c.json({ error: 'invalid_range' }, 422);
-    return c.json({ today, items: await planning.calendar(c.var.user.id, from, to, today) });
+    return c.json({ today, items: await planning.calendar(c.var.company.id, from, to, today) });
   });
 
   api.get('/deadlines/:key', async (c) => {
     const key = c.req.param('key');
     if (!KEY.test(key) || key.startsWith('custom:')) return c.json({ error: 'not_found' }, 404);
-    const detail = await planning.deadline(c.var.user.id, key);
+    const detail = await planning.deadline(c.var.company.id, key);
     return detail
       ? c.json({ deadline: detail, today: await instanceToday(db) })
       : c.json({ error: 'not_found' }, 404);
@@ -127,11 +136,11 @@ export function planningRoutes(
   /**
    * Checks that a deadline key belongs to the person: an existing pack occurrence or one of their custom deadlines
    *
-   * @param userId {string} - owner
+   * @param companyId {string} - owner
    * @param key {string} - occurrence key
    * @returns {Promise<boolean>} - true when the key is theirs
    */
-  async function ownsKey(userId: string, key: string): Promise<boolean> {
+  async function ownsKey(companyId: string, key: string): Promise<boolean> {
     if (!KEY.test(key)) return false;
     if (key.startsWith('custom:')) {
       const [, id, date] = key.split(':');
@@ -139,23 +148,23 @@ export function planningRoutes(
       const [row] = await db
         .select()
         .from(customDeadlines)
-        .where(and(eq(customDeadlines.id, id), eq(customDeadlines.userId, userId)))
+        .where(and(eq(customDeadlines.id, id), eq(customDeadlines.companyId, companyId)))
         .limit(1);
       return Boolean(row && occurrencesOf(row, date, date).length === 1);
     }
-    return (await planning.deadline(userId, key)) !== undefined;
+    return (await planning.deadline(companyId, key)) !== undefined;
   }
 
   api.put('/deadlines/:key/mark', async (c) => {
     const key = c.req.param('key');
-    if (!(await ownsKey(c.var.user.id, key))) return c.json({ error: 'not_found' }, 404);
+    if (!(await ownsKey(c.var.company.id, key))) return c.json({ error: 'not_found' }, 404);
     const { data, response } = await parseBody(c, markSchema);
     if (response) return response;
     await db
       .insert(deadlineMarks)
-      .values({ userId: c.var.user.id, key, ...data })
+      .values({ companyId: c.var.company.id, key, ...data })
       .onConflictDoUpdate({
-        target: [deadlineMarks.userId, deadlineMarks.key],
+        target: [deadlineMarks.companyId, deadlineMarks.key],
         set: { ...data, updatedAt: new Date() },
       });
     if (data.doneOn) {
@@ -164,7 +173,7 @@ export function planningRoutes(
         .set({ readAt: new Date() })
         .where(
           and(
-            eq(notifications.userId, c.var.user.id),
+            eq(notifications.companyId, c.var.company.id),
             sql`${notifications.dedupeKey} LIKE ${`deadline:${key}:%`}`,
             isNull(notifications.readAt),
           ),
@@ -175,14 +184,14 @@ export function planningRoutes(
 
   api.put('/deadlines/:key/hidden', async (c) => {
     const key = c.req.param('key');
-    if (!(await ownsKey(c.var.user.id, key))) return c.json({ error: 'not_found' }, 404);
+    if (!(await ownsKey(c.var.company.id, key))) return c.json({ error: 'not_found' }, 404);
     const { data, response } = await parseBody(c, z.object({ hidden: z.boolean() }).strict());
     if (response) return response;
     await db
       .insert(deadlineMarks)
-      .values({ userId: c.var.user.id, key, hidden: data.hidden })
+      .values({ companyId: c.var.company.id, key, hidden: data.hidden })
       .onConflictDoUpdate({
-        target: [deadlineMarks.userId, deadlineMarks.key],
+        target: [deadlineMarks.companyId, deadlineMarks.key],
         set: { hidden: data.hidden, updatedAt: new Date() },
       });
     return c.body(null, 204);
@@ -192,9 +201,9 @@ export function planningRoutes(
     const rows = await db
       .select()
       .from(customDeadlines)
-      .where(eq(customDeadlines.userId, c.var.user.id))
+      .where(eq(customDeadlines.companyId, c.var.company.id))
       .orderBy(customDeadlines.date);
-    return c.json({ deadlines: rows.map(({ userId: _owner, ...row }) => row) });
+    return c.json({ deadlines: rows.map(({ companyId: _owner, ...row }) => row) });
   });
 
   api.post('/custom-deadlines', async (c) => {
@@ -202,7 +211,7 @@ export function planningRoutes(
     if (response) return response;
     const [row] = await db
       .insert(customDeadlines)
-      .values({ ...data, userId: c.var.user.id })
+      .values({ ...data, companyId: c.var.company.id })
       .returning({ id: customDeadlines.id });
     return c.json({ id: row?.id }, 201);
   });
@@ -215,7 +224,7 @@ export function planningRoutes(
     const updated = await db
       .update(customDeadlines)
       .set(data)
-      .where(and(eq(customDeadlines.id, id), eq(customDeadlines.userId, c.var.user.id)))
+      .where(and(eq(customDeadlines.id, id), eq(customDeadlines.companyId, c.var.company.id)))
       .returning({ id: customDeadlines.id });
     return updated.length > 0 ? c.body(null, 204) : c.json({ error: 'not_found' }, 404);
   });
@@ -225,13 +234,16 @@ export function planningRoutes(
     if (!idSchema.safeParse(id).success) return c.json({ error: 'not_found' }, 404);
     const deleted = await db
       .delete(customDeadlines)
-      .where(and(eq(customDeadlines.id, id), eq(customDeadlines.userId, c.var.user.id)))
+      .where(and(eq(customDeadlines.id, id), eq(customDeadlines.companyId, c.var.company.id)))
       .returning({ id: customDeadlines.id });
     if (deleted.length === 0) return c.json({ error: 'not_found' }, 404);
     await db
       .delete(deadlineMarks)
       .where(
-        and(eq(deadlineMarks.userId, c.var.user.id), sql`${deadlineMarks.key} LIKE ${`custom:${id}:%`}`),
+        and(
+          eq(deadlineMarks.companyId, c.var.company.id),
+          sql`${deadlineMarks.key} LIKE ${`custom:${id}:%`}`,
+        ),
       );
     return c.body(null, 204);
   });
@@ -241,14 +253,14 @@ export function planningRoutes(
     if (!Number.isSafeInteger(simulate) || simulate < 0 || simulate > 100_000_000_000) {
       return c.json({ error: 'invalid_simulation' }, 422);
     }
-    const outlook = await planning.outlook(c.var.user.id, await instanceToday(db), simulate);
+    const outlook = await planning.outlook(c.var.company.id, await instanceToday(db), simulate);
     return c.json({ outlook });
   });
 
   api.get('/dashboard', async (c) => {
-    const userId = c.var.user.id;
+    const companyId = c.var.company.id;
     const today = await instanceToday(db);
-    const profile = await planning.profile(userId);
+    const profile = await planning.profile(companyId);
     if (!profile) return c.json({ error: 'not_found' }, 404);
     const pack = packs.get(profile.country);
     const fiscal = fiscalYearOf(today, pack?.fiscalYearStart ?? '01-01');
@@ -274,13 +286,13 @@ export function planningRoutes(
       year: { start: `${fiscal.year - 1}${fiscal.start.slice(4)}`, end: addDays(fiscal.start, -1) },
     };
     const earliest = [previous.year.start, previous.quarter.start].sort()[0] ?? previous.year.start;
-    const collected = await planning.receipts(userId, profile.currency, earliest, fiscal.end);
+    const collected = await planning.receipts(companyId, profile.currency, earliest, fiscal.end);
     const invoiced = await db
       .select({ type: documents.type, issueDate: documents.issueDate, totals: documents.totals })
       .from(documents)
       .where(
         and(
-          eq(documents.userId, userId),
+          eq(documents.companyId, companyId),
           ne(documents.state, 'draft'),
           inArray(documents.type, ['invoice', 'deposit', 'credit_note']),
           eq(documents.currency, profile.currency),
@@ -302,9 +314,9 @@ export function planningRoutes(
         .filter((doc) => doc.issueDate >= range.start && doc.issueDate <= range.end)
         .reduce((total, doc) => total + (doc.type === 'credit_note' ? -1 : 1) * doc.totals.netCents, 0),
     });
-    const calendar = await planning.calendar(userId, addDays(today, -366), addDays(today, 30), today);
+    const calendar = await planning.calendar(companyId, addDays(today, -366), addDays(today, 30), today);
     const visible = calendar.filter((item) => !item.hidden && !item.done && item.type !== 'mission');
-    const outlook = await planning.outlook(userId, today);
+    const outlook = await planning.outlook(companyId, today);
     return c.json({
       today,
       currency: profile.currency,
@@ -316,7 +328,7 @@ export function planningRoutes(
       unconverted: collected.unconverted,
       overdueDeadlines: visible.filter((item) => item.overdue && item.type !== 'invoice'),
       upcoming: visible.filter((item) => item.date >= today).slice(0, 8),
-      overdueInvoices: (await planning.openInvoices(userId, today)).filter(
+      overdueInvoices: (await planning.openInvoices(companyId, today)).filter(
         (invoice) => invoice.status === 'overdue',
       ),
       outlook,
@@ -327,7 +339,7 @@ export function planningRoutes(
     const rows = await db
       .select()
       .from(notifications)
-      .where(eq(notifications.userId, c.var.user.id))
+      .where(eq(notifications.companyId, c.var.company.id))
       .orderBy(desc(notifications.createdAt))
       .limit(100);
     return c.json({
@@ -346,7 +358,7 @@ export function planningRoutes(
     await db
       .update(notifications)
       .set({ readAt: new Date() })
-      .where(and(eq(notifications.userId, c.var.user.id), isNull(notifications.readAt)));
+      .where(and(eq(notifications.companyId, c.var.company.id), isNull(notifications.readAt)));
     return c.body(null, 204);
   });
 
@@ -356,7 +368,7 @@ export function planningRoutes(
     await db
       .update(notifications)
       .set({ readAt: new Date() })
-      .where(and(eq(notifications.id, id), eq(notifications.userId, c.var.user.id)));
+      .where(and(eq(notifications.id, id), eq(notifications.companyId, c.var.company.id)));
     return c.body(null, 204);
   });
 
@@ -438,7 +450,16 @@ export function planningRoutes(
       .limit(1);
     if (!row) return c.text('Not found', 404);
     const today = await instanceToday(db);
-    const items = await planning.calendar(row.userId, addDays(today, -90), addDays(today, 400), today);
+    // One feed per person: with several companies, each event names its company and keeps a distinct UID.
+    const owned = await db
+      .select({ id: companies.id, name: companies.name })
+      .from(companies)
+      .where(eq(companies.userId, row.userId));
+    const items: CalendarItem[] = [];
+    for (const company of owned) {
+      const found = await planning.calendar(company.id, addDays(today, -90), addDays(today, 400), today);
+      items.push(...(owned.length > 1 ? found.map((item) => withCompany(item, company)) : found));
+    }
     return c.body(
       renderIcal(
         items.filter((item) => !item.hidden),
@@ -453,6 +474,23 @@ export function planningRoutes(
   });
 
   return { api, feed };
+}
+
+/**
+ * Prefixes a calendar item with its company, for the feed that mixes several companies
+ *
+ * @param item {CalendarItem} - item of one company
+ * @param company {{ id: string; name: string }} - its company
+ * @returns {CalendarItem} - the item with a company-specific key and title
+ */
+function withCompany(item: CalendarItem, company: { id: string; name: string }): CalendarItem {
+  const title =
+    typeof item.title === 'string'
+      ? `${company.name} · ${item.title}`
+      : (Object.fromEntries(
+          Object.entries(item.title).map(([locale, text]) => [locale, `${company.name} · ${text}`]),
+        ) as Localized);
+  return { ...item, key: `${company.id}:${item.key}`, title };
 }
 
 /**

@@ -68,6 +68,15 @@ picture is in the [specification](docs/cahier-des-charges.md) (French).
 - **Stay in control of the rules.** Pack updates are signed (Ed25519). A received update is never
   applied by itself: you read what changes, in plain words ("the rate goes from 25.6 % to 26 % on
   Jul 1, 2026"), then apply it or leave it for later. Back to the shipped pack in one click.
+- **Keep your companies apart.** Several structures in one account (a micro-entreprise and a
+  SASU, or a business in another country), each with its own clients, invoices, time, deadlines,
+  thresholds and estimates. A second active French micro-entreprise triggers a warning: a person
+  has only one, and activities are declared under the same SIRET.
+- **Connect Stripe.** Stripe customers become clients of the company and collected payments become
+  receipts linked to their client, with a read-only key ([details, French](docs/stripe.md)).
+- **Link two instances.** One micro-entreprise, two activities tracked in two instances (one behind a
+  VPN, one personal): ceilings, VAT franchise and alerts count the sum. Only monthly totals per tax
+  category travel, through Ed25519-signed requests ([details, French](docs/federation.md)).
 - **Keep your data.** Full JSON export, re-import into a fresh instance. Two-factor
   authentication (TOTP), revocable sessions, lockout after repeated failures.
 
@@ -75,7 +84,7 @@ picture is in the [specification](docs/cahier-des-charges.md) (French).
 
 - Free and open source, forever, under the [AGPL-3.0](LICENSE).
 - No hosted version, no paid plan, no telemetry.
-- No outgoing request until an administrator turns it on (pack updates, new-release notice).
+- No outgoing request until an administrator turns it on (pack updates, new-release notice, Stripe sync, links between instances), in Settings or, for Stripe and links, in the server configuration (`STRIPE_SYNC`, `FEDERATION`).
 
 ## Install
 
@@ -106,7 +115,10 @@ Everything is optional.
 | `PACK_PUBLIC_KEYS` | Ed25519 public keys allowed to sign packs, comma-separated. Without them, no update is accepted and only the shipped packs are used. |
 | `PACK_UPDATE_URL` | HTTPS folder serving `index.json` and signed packs. Checked once a day, only once an administrator turns it on in Settings. |
 | `MAINTENANCE` | `true` serves only the maintenance page, for example while restoring a backup. |
+| `SECRETS_KEY` | 32-byte key in base64 (`openssl rand -base64 32`) encrypting stored secrets (Stripe keys, private keys of links between instances). Without it, no Stripe key can be saved and no link created. |
 | `RELEASE_CHECK_URL` | Endpoint asked once a day for a new release, only once an administrator turns it on. |
+| `STRIPE_SYNC` | `true` allows Stripe syncs on the instance, like the box in **Settings → Instance** (then shown checked and locked). When absent, the box decides. Each company still turns it on with its own key. |
+| `FEDERATION` | `true` allows links between instances, the same way. |
 
 ### Publish a pack update
 

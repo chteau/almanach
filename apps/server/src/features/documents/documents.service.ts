@@ -25,6 +25,7 @@ import {
   profiles,
 } from '../../db/schema.ts';
 import { loadBilling, numberingFor } from '../billing/billing.ts';
+import { ownerOf } from '../companies/companies.ts';
 import type { PackRegistry } from '../packs/packs.ts';
 import { mentionsFor, vatModeFor, vatRateFor } from './vat.ts';
 
@@ -63,26 +64,26 @@ export class DocumentService {
   /**
    * Loads the profile of a user, which every document needs
    *
-   * @param userId {string} - user id
+   * @param companyId {string} - user id
    * @returns {Promise<ProfileRow | undefined>} - profile, undefined before onboarding
    */
-  async profile(userId: string): Promise<ProfileRow | undefined> {
-    const [row] = await this.db.select().from(profiles).where(eq(profiles.userId, userId)).limit(1);
+  async profile(companyId: string): Promise<ProfileRow | undefined> {
+    const [row] = await this.db.select().from(profiles).where(eq(profiles.companyId, companyId)).limit(1);
     return row;
   }
 
   /**
    * Loads one of the user's clients
    *
-   * @param userId {string} - owner
+   * @param companyId {string} - owner
    * @param clientId {string} - client id
    * @returns {Promise<ClientRow | undefined>} - client, undefined when absent or not owned
    */
-  async client(userId: string, clientId: string): Promise<ClientRow | undefined> {
+  async client(companyId: string, clientId: string): Promise<ClientRow | undefined> {
     const [row] = await this.db
       .select()
       .from(clients)
-      .where(and(eq(clients.id, clientId), eq(clients.userId, userId)))
+      .where(and(eq(clients.id, clientId), eq(clients.companyId, companyId)))
       .limit(1);
     return row;
   }
@@ -91,13 +92,13 @@ export class DocumentService {
    * Computes everything derived from a draft: VAT treatment, mentions and totals (never trusted from
    * the browser). Deposits deducted must be issued deposit invoices of the same client.
    *
-   * @param userId {string} - owner
+   * @param companyId {string} - owner
    * @param draft {DocumentDraft} - validated draft
    * @param profile {ProfileRow} - seller profile
    * @param client {ClientRow} - client
    * @returns {Promise<Pick<DocumentRow, 'vatMode' | 'mentions' | 'totals' | 'depositIds'>>} - derived fields
    */
-  async derive(userId: string, draft: DocumentDraft, profile: ProfileRow, client: ClientRow) {
+  async derive(companyId: string, draft: DocumentDraft, profile: ProfileRow, client: ClientRow) {
     const pack = this.packs.get(profile.country);
     const vatMode = vatModeFor(pack, profile.options, vatSituation(profile.country, client), client.kind);
     let depositIds: string[] = [];
@@ -108,7 +109,7 @@ export class DocumentService {
         .from(documents)
         .where(
           and(
-            eq(documents.userId, userId),
+            eq(documents.companyId, companyId),
             eq(documents.clientId, client.id),
             eq(documents.type, 'deposit'),
             eq(documents.state, 'issued'),
@@ -196,20 +197,20 @@ export class DocumentService {
    * Issues a draft: checks completeness and chronology, assigns the next number of its series under
    * a row lock, freezes seller and client details and recomputes every amount (S-166, S-171, S-174)
    *
-   * @param userId {string} - owner
+   * @param companyId {string} - owner
    * @param id {string} - draft id
    * @returns {Promise<{ ok: true } | IssueError>} - success or why it was refused
    */
-  async issue(userId: string, id: string): Promise<{ ok: true } | IssueError> {
+  async issue(companyId: string, id: string): Promise<{ ok: true } | IssueError> {
     return this.db.transaction(async (tx) => {
       const [doc] = await tx
         .select()
         .from(documents)
-        .where(and(eq(documents.id, id), eq(documents.userId, userId)))
+        .where(and(eq(documents.id, id), eq(documents.companyId, companyId)))
         .for('update');
       if (doc?.state !== 'draft') return { error: 'not_draft' as const };
-      const profile = await this.profile(userId);
-      const client = await this.client(userId, doc.clientId);
+      const profile = await this.profile(companyId);
+      const client = await this.client(companyId, doc.clientId);
       if (!profile || !client) return { error: 'missing_fields' as const, missing: ['profile'] };
 
       const missing = this.missing(profile, client, doc.lines, doc.vatMode);
@@ -224,7 +225,7 @@ export class DocumentService {
           .from(documents)
           .where(
             and(
-              eq(documents.userId, userId),
+              eq(documents.companyId, companyId),
               inArray(documents.type, [...familyTypes]),
               ne(documents.state, 'draft'),
             ),
@@ -247,7 +248,7 @@ export class DocumentService {
         note: doc.note,
         depositIds: doc.depositIds,
       };
-      const derived = await this.derive(userId, draft, profile, client);
+      const derived = await this.derive(companyId, draft, profile, client);
 
       if (doc.type === 'credit_note' && doc.relatedId) {
         const [invoice] = await tx
@@ -264,15 +265,15 @@ export class DocumentService {
 
       const year = Number(doc.issueDate.slice(0, 4));
       const format = numberingFor(
-        (await loadBilling(tx, userId, profile.country)).numbering,
+        (await loadBilling(tx, companyId, profile.country)).numbering,
         year,
         profile.country,
       );
       const [sequence] = await tx
         .insert(numberSequences)
-        .values({ userId, family, year: sequenceYear(format, year), last: 1 })
+        .values({ companyId, family, year: sequenceYear(format, year), last: 1 })
         .onConflictDoUpdate({
-          target: [numberSequences.userId, numberSequences.family, numberSequences.year],
+          target: [numberSequences.companyId, numberSequences.family, numberSequences.year],
           set: { last: sql`${numberSequences.last} + 1` },
         })
         .returning({ last: numberSequences.last });
@@ -293,7 +294,9 @@ export class DocumentService {
           updatedAt: new Date(),
         })
         .where(eq(documents.id, doc.id));
-      await tx.insert(auditLog).values({ userId, action: 'document.issued', meta: { id: doc.id, number } });
+      await tx
+        .insert(auditLog)
+        .values({ userId: ownerOf(companyId), action: 'document.issued', meta: { id: doc.id, number } });
       return { ok: true as const };
     });
   }
@@ -321,17 +324,17 @@ export class DocumentService {
   /**
    * Lists documents with client names, payments and credits folded in
    *
-   * @param userId {string} - owner
+   * @param companyId {string} - owner
    * @param today {string} - today, for overdue and expiry
    * @param id {string} - optional single document id
    * @returns {Promise<DocumentView[]>} - documents, newest first
    */
-  async views(userId: string, today: string, id?: string): Promise<DocumentView[]> {
+  async views(companyId: string, today: string, id?: string): Promise<DocumentView[]> {
     const rows = await this.db
       .select({ doc: documents, clientName: clients.name })
       .from(documents)
       .innerJoin(clients, eq(clients.id, documents.clientId))
-      .where(and(eq(documents.userId, userId), id ? eq(documents.id, id) : undefined))
+      .where(and(eq(documents.companyId, companyId), id ? eq(documents.id, id) : undefined))
       .orderBy(sql`${documents.issueDate} desc, ${documents.createdAt} desc`);
     const ids = rows.map((row) => row.doc.id);
     const paid = new Map<string, number>();
@@ -352,7 +355,11 @@ export class DocumentService {
       .select({ relatedId: documents.relatedId, totals: documents.totals })
       .from(documents)
       .where(
-        and(eq(documents.userId, userId), eq(documents.type, 'credit_note'), eq(documents.state, 'issued')),
+        and(
+          eq(documents.companyId, companyId),
+          eq(documents.type, 'credit_note'),
+          eq(documents.state, 'issued'),
+        ),
       )) {
       if (row.relatedId)
         credited.set(row.relatedId, (credited.get(row.relatedId) ?? 0) + row.totals.totalCents);

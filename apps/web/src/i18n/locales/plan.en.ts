@@ -286,12 +286,13 @@ export const planEn = {
   'packs.error.': 'The operation failed.',
   'data.title': 'Your data',
   'data.body':
-    'Download everything Almanach holds about your business in one JSON file: profile, clients, missions, documents, payments, time and deadlines. Issued PDFs can be generated again from it.',
+    'Download everything Almanach holds about your companies in one JSON file: profiles, clients, missions, documents, payments, time and deadlines. Issued PDFs can be generated again from it.',
   'data.export': 'Download my data',
   'data.import': 'Import an export',
   'data.import.hint':
     'Importing is only possible into an account with no clients or documents yet, for example on a new instance.',
-  'data.imported': 'Import done: {clients} client(s) and {documents} document(s) restored.',
+  'data.imported':
+    'Import done: {companies} company(ies), {clients} client(s) and {documents} document(s) restored.',
   'data.error.not_empty': 'This account already has clients or documents: import into a new account.',
   'data.error.invalid': 'This file is not a valid Almanach export.',
   'search.open': 'Search',
@@ -469,4 +470,109 @@ export const planEn = {
   'common.error.useSituation':
     'Your status or country has a history: change it from Settings → Change of situation, with a date.',
   'common.error.ceased': 'Your activity has ended: this cannot be changed any more.',
+  'companies.switch': 'Active company',
+  'companies.title': 'Companies',
+  'companies.body':
+    'Each company keeps its own clients, invoices, payments, time, deadlines, thresholds and estimates. Reminders and the calendar feed cover all your companies and name each one.',
+  'companies.legal':
+    'In France, a person can run only one micro-entreprise: several activities (for example services and sales) are declared under the same SIRET, with thresholds and contributions computed on their total. Add a company for another structure (SASU, EURL…) or a business in another country.',
+  'companies.name': 'Name',
+  'companies.add': 'Add the company',
+  'companies.new': 'New company',
+  'companies.activate': 'Switch to it',
+  'companies.active': 'Active',
+  'companies.rename': 'Rename',
+  'companies.microConflict':
+    'You already have an active French micro-entreprise ({name}). A person can run only one: declare this activity in that company, under the same SIRET, rather than creating a second one. Thresholds and contributions are computed on the total of your activities; mixed sales and services activities have specific thresholds.',
+  'stripe.title': 'Stripe sync',
+  'stripe.body':
+    'Imports Stripe customers as clients of this company, and payments collected through Stripe as receipts linked to their client: paid invoices, payments without an invoice, and refunds as negative amounts. They count in revenue, thresholds and estimates. Amounts are before tax when Stripe gives it; no card data is stored.',
+  'stripe.notAllowed':
+    'An administrator must first allow Stripe syncs in Settings → Instance. Until then, Almanach never contacts Stripe.',
+  'stripe.noSecretsKey': 'To store a Stripe key, the server needs SECRETS_KEY (see .env.example).',
+  'stripe.key': 'Restricted key (rk_…)',
+  'stripe.key.hint':
+    'In Stripe, create a restricted key with Read on Charges, Customers, Invoices and Balance transactions (and Refunds if listed), None elsewhere. It is stored encrypted.',
+  'stripe.key.saved': 'A key is saved. Enter a new one only to replace it.',
+  'stripe.enabled': 'Sync every 6 hours',
+  'stripe.save': 'Save',
+  'stripe.sync': 'Sync now',
+  'stripe.remove': 'Remove the key',
+  'stripe.status': '{count} receipt(s) imported. Last sync: {date}.',
+  'stripe.never': 'never',
+  'stripe.synced': '{count} new receipt(s) imported.',
+  'stripe.error.stripe_unauthorized': 'Stripe refused the key.',
+  'stripe.error.stripe_forbidden':
+    'The key lacks a read permission (Charges, Customers, Invoices, Balance transactions or Refunds).',
+  'stripe.error.stripe_unreachable': 'Stripe could not be reached.',
+  'stripe.error.stripe_failed': 'Stripe answered with an error.',
+  'system.preset': 'Allowed by the server configuration.',
+  'system.stripeSync': 'Allow syncing companies with Stripe',
+  'system.stripeSync.hint':
+    'Off by default. Once allowed, each person turns the sync on for a company with their own read-only key.',
+  'federation.title': 'Linked instances',
+  'federation.body':
+    'One business, several activities tracked in separate Almanach instances: link them so ceilings, VAT franchise and alerts count the revenue of the whole business. Only monthly totals per tax category and the activity name travel; invoices, clients and contributions stay in each instance.',
+  'federation.notAllowed':
+    'An administrator must first allow links between instances in Settings → Instance. Until then, nothing is sent.',
+  'federation.noSecretsKey': 'Links need SECRETS_KEY on the server to store their keys (see .env.example).',
+  'federation.label': 'Name of this activity',
+  'federation.label.hint': 'Shown to the linked instance, e.g. "Freelance" or your product name.',
+  'federation.enabled': 'Link this company with other instances',
+  'federation.save': 'Save',
+  'federation.waiting': 'Waiting for the other instance',
+  'federation.state.pending': 'Code issued',
+  'federation.state.active': 'Linked',
+  'federation.state.imported': 'To pair again',
+  'federation.expires': 'The code expires at {time}.',
+  'federation.imported': 'Restored from an export: keys are never exported. Revoke it and pair again.',
+  'federation.fingerprints':
+    'This instance: {own} · other instance: {peer}. Both screens must show the same pair, swapped.',
+  'federation.syncedAt': 'Last exchange: {synced}. Totals received: {received}.',
+  'federation.never': 'never',
+  'federation.share': 'Share the totals of this activity',
+  'federation.receive': 'Receive the totals of the other activity',
+  'federation.pulls': 'This instance calls the other one (every 6 hours)',
+  'federation.sync': 'Sync',
+  'federation.synced': 'Totals exchanged.',
+  'federation.revoke': 'Revoke',
+  'federation.revoke.title': 'Revoke this link?',
+  'federation.revoke.body':
+    'The key of the other instance and the totals received from it are deleted on both sides when it can be reached. Linking again needs a new code.',
+  'federation.issue': 'Link another instance',
+  'federation.issue.hint':
+    'Generate the code on the instance the other one can reach (outside the VPN), then enter it on the other one within 15 minutes.',
+  'federation.issue.submit': 'Generate a pairing code',
+  'federation.code': 'One-time code, valid until {time}. Fingerprint of this instance: {fingerprint}.',
+  'federation.code.field': 'Pairing code',
+  'federation.ownUrl': 'Address of this instance',
+  'federation.ownUrl.hint': 'As the other instance reaches it. HTTPS, or HTTP on a private network address.',
+  'federation.join': 'Enter a code',
+  'federation.join.submit': 'Pair',
+  'federation.paired': 'Instances linked. Compare the fingerprints on both screens.',
+  'federation.error.federation_not_allowed': 'Links between instances are not allowed on this instance.',
+  'federation.error.federation_off': 'Turn on links for this company first.',
+  'federation.error.secrets_key_missing': 'The server has no SECRETS_KEY.',
+  'federation.error.invalid_url': 'Use an HTTPS address, or HTTP on localhost or a private network address.',
+  'federation.error.invalid_code': 'This code is not valid. Copy it again in full.',
+  'federation.error.code_unknown':
+    'The other instance does not know this code: it was already used or revoked.',
+  'federation.error.code_expired': 'This code has expired. Generate a new one.',
+  'federation.error.peer_unreachable':
+    'The other instance could not be reached. The last totals received are kept.',
+  'federation.error.peer_refused':
+    'The other instance refused the request: the link may have been revoked there.',
+  'federation.error.peer_failed': 'The other instance answered with an error.',
+  'federation.error.peer_bad_signature': 'The answer is not signed by the expected key. Nothing was saved.',
+  'federation.error.peer_invalid': 'The other instance sent an unexpected answer.',
+  'federation.error.peer_too_large': 'The answer of the other instance is too large.',
+  'federation.error.currency_mismatch':
+    'The other instance counts in another currency: its totals are ignored.',
+  'system.federation': 'Allow links between instances',
+  'system.federation.hint':
+    'Off by default. Once allowed, each person may link a company with another Almanach instance to count the revenue of the whole business.',
+  'outlook.linked': 'including {amount} from a linked instance ({labels})',
+  'outlook.linkedEstimates':
+    'Other activity ({label}): {amount} collected; its contributions are handled by the other instance.',
+  'outlook.linkedStale': 'Totals of {date}: the other instance could not be reached since.',
 };

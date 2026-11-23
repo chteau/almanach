@@ -2,6 +2,7 @@ import { LOCALES, type Locale } from '@almanach/shared';
 import { useEffect, useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router';
 import { useAuth, useMe } from '../../features/auth/AuthProvider.tsx';
+import { activateCompany, useCompanies } from '../../features/companies/useCompanies.ts';
 import { useI18n } from '../../i18n/I18nProvider.tsx';
 import type { MessageKey } from '../../i18n/messages.ts';
 import { useResource } from '../../lib/useResource.ts';
@@ -61,6 +62,7 @@ export function AppShell() {
   const inbox = useResource<{ notifications: { read: boolean }[] }>('/api/notifications');
   const unread = inbox.data?.notifications.filter((item) => !item.read).length ?? 0;
   const [searching, setSearching] = useState(false);
+  const companies = useCompanies().data;
 
   useEffect(() => {
     /**
@@ -140,6 +142,18 @@ export function AppShell() {
             <span className={styles.bellLabel}>{t('nav.notifications')}</span>
             {unread > 0 && <span className={styles.count}>{unread > 99 ? '99+' : unread}</span>}
           </NavLink>
+          {companies && companies.companies.length > 1 && (
+            <label className={styles.language}>
+              <span className="visually-hidden">{t('companies.switch')}</span>
+              <select value={companies.active} onChange={(event) => void activateCompany(event.target.value)}>
+                {companies.companies.map((company) => (
+                  <option key={company.id} value={company.id}>
+                    {company.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
           <label className={styles.language}>
             <span className="visually-hidden">{t('nav.language')}</span>
             <select value={locale} onChange={(event) => setLocale(event.target.value as Locale)}>

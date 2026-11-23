@@ -19,6 +19,7 @@ COPY --from=build --chown=root:root /app/node_modules ./node_modules
 COPY --from=build --chown=root:root /app/packages/shared ./packages/shared
 COPY --from=build --chown=root:root /app/apps/server ./apps/server
 COPY --from=build --chown=root:root /app/apps/web/dist ./apps/web/dist
+COPY --from=build --chown=root:root /app/packs ./packs
 USER bun
 EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s \

@@ -11,9 +11,9 @@ const empty = {
   timeEntries: [],
   customDeadlines: [],
   deadlineMarks: [],
-  userSettings: [],
   billingSettings: [],
   situationChanges: [],
+  externalRevenues: [],
 };
 
 describe('import references', () => {

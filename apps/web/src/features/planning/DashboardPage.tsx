@@ -13,6 +13,7 @@ import { Skeleton } from '../../components/Skeleton/Skeleton.tsx';
 import { useI18n } from '../../i18n/I18nProvider.tsx';
 import { formatDate, formatMoney } from '../../lib/format.ts';
 import { useResource } from '../../lib/useResource.ts';
+import { LinkedActivities } from './LinkedActivities.tsx';
 import styles from './Planning.module.css';
 import { type CalendarItem, labelOf, type Outlook, TYPE_STYLE } from './types.ts';
 
@@ -247,6 +248,14 @@ export function DashboardPage() {
                     limit: money(threshold.limitCents),
                   })}
                 />
+                {threshold.linkedCents !== 0 && (
+                  <p className={styles.caption}>
+                    {t('outlook.linked', {
+                      amount: money(threshold.linkedCents),
+                      labels: outlook.linked.map((link) => link.label).join(', '),
+                    })}
+                  </p>
+                )}
                 {threshold.exceeded && <Notice tone="warn">{labelOf(threshold.consequence, locale)}</Notice>}
               </div>
             ))}
@@ -272,6 +281,7 @@ export function DashboardPage() {
                 </li>
               ))}
             </ul>
+            <LinkedActivities outlook={outlook} money={money} />
             <p className={styles.caption}>{t('outlook.disclaimer')}</p>
           </section>
         </div>

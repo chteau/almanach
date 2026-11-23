@@ -14,8 +14,14 @@ export interface SessionUser {
   locale: string;
 }
 
+/** The company the request works on, checked to belong to the signed-in person. */
+export interface ActiveCompany {
+  id: string;
+  name: string;
+}
+
 /** Hono environment shared by every router. */
-export type AppEnv = { Bindings: BunServerBinding; Variables: { user: SessionUser } };
+export type AppEnv = { Bindings: BunServerBinding; Variables: { user: SessionUser; company: ActiveCompany } };
 
 /**
  * Extracts the facts the server trusts about a request; forwarded headers are only honoured behind a

@@ -45,6 +45,15 @@ const envSchema = z.object({
     .pipe(z.url({ protocol: /^https$/ }).optional()),
   /** Puts the whole instance in maintenance, for example during a manual backup restore (S-272). */
   MAINTENANCE: booleanFromEnv.default(false),
+  SECRETS_KEY: z
+    .string()
+    .optional()
+    .transform((value) => (value ? Buffer.from(value, 'base64') : undefined))
+    .refine((key) => key === undefined || key.length === 32, 'secrets_key_length'),
+  /** The server administrator allows Stripe syncs here instead of in Settings → Instance. */
+  STRIPE_SYNC: booleanFromEnv.default(false),
+  /** The server administrator allows links between instances here instead of in Settings → Instance. */
+  FEDERATION: booleanFromEnv.default(false),
   RELEASE_CHECK_URL: z
     .url({ protocol: /^https$/ })
     .default('https://api.github.com/repos/chteau/almanach/releases/latest'),
@@ -72,6 +81,12 @@ export interface Config {
   maintenance: boolean;
   /** GitHub "latest release" endpoint, queried daily only when an administrator allows it (S-273). */
   releaseCheckUrl: string;
+  /** Key encrypting stored secrets (Stripe keys); without it, no secret can be saved. */
+  secretsKey: Buffer | undefined;
+  /** STRIPE_SYNC=true: Stripe syncs allowed by the server configuration, locked on in the interface. */
+  stripeSync: boolean;
+  /** FEDERATION=true: links between instances allowed by the server configuration, locked on in the interface. */
+  federation: boolean;
 }
 
 /**
@@ -102,5 +117,8 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     packUpdateUrl: value.PACK_UPDATE_URL,
     maintenance: value.MAINTENANCE,
     releaseCheckUrl: value.RELEASE_CHECK_URL,
+    secretsKey: value.SECRETS_KEY,
+    stripeSync: value.STRIPE_SYNC,
+    federation: value.FEDERATION,
   };
 }

@@ -382,6 +382,12 @@
   user-select: all;
 }
 
+/* Long codes, addresses and fingerprints wrap on small screens. */
+.wrap {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
 .fileButton {
   cursor: pointer;
 }

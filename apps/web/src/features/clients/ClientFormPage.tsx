@@ -28,11 +28,15 @@ import { describeError } from '../install/errors.ts';
 import { CURRENCIES } from '../onboarding/form.ts';
 import { useProfile } from '../profile/useProfile.ts';
 
-type Draft = Omit<ClientInput, 'email' | 'phone' | 'address' | 'vatNumber' | 'notes' | 'allowDuplicate'> & {
+type Draft = Omit<
+  ClientInput,
+  'email' | 'phone' | 'address' | 'vatNumber' | 'siret' | 'notes' | 'allowDuplicate'
+> & {
   email: string;
   phone: string;
   address: string;
   vatNumber: string;
+  siret: string;
   notes: string;
 };
 
@@ -51,6 +55,7 @@ function toDraft(client: Client): Draft {
     address: client.address ?? '',
     country: client.country,
     vatNumber: client.vatNumber ?? '',
+    siret: client.siret ?? '',
     currency: client.currency,
     language: client.language,
     paymentTermsDays: client.paymentTermsDays,
@@ -107,6 +112,7 @@ function ClientForm({ initial, defaultTerms }: { initial?: Client | undefined; d
           address: '',
           country: 'FR',
           vatNumber: '',
+          siret: '',
           currency: 'EUR',
           language: locale,
           paymentTermsDays: defaultTerms,
@@ -191,6 +197,7 @@ function ClientForm({ initial, defaultTerms }: { initial?: Client | undefined; d
       <PageHeader title={initial ? t('clients.edit', { name: initial.name }) : t('clients.new')} />
       <form className={form.form} onSubmit={(event) => void save(event)} noValidate>
         {failure && <Notice tone="error">{failure}</Notice>}
+        {initial?.stripeId && <Notice tone="info">{t('clients.stripe.edit')}</Notice>}
         {duplicates.length > 0 && (
           <Notice tone="warn">
             <p className={form.summary}>
@@ -266,6 +273,16 @@ function ClientForm({ initial, defaultTerms }: { initial?: Client | undefined; d
                 value={draft.vatNumber}
                 onChange={(e) => change({ vatNumber: e.target.value })}
                 error={err('vatNumber')}
+                spellCheck={false}
+              />
+            )}
+            {draft.kind === 'company' && (
+              <TextField
+                label={t('clients.siret')}
+                value={draft.siret}
+                onChange={(e) => change({ siret: e.target.value.replace(/\s/g, '') })}
+                error={err('siret')}
+                inputMode="numeric"
                 spellCheck={false}
               />
             )}

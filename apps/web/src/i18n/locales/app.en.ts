@@ -132,6 +132,11 @@ export const appEn = {
   'clients.address': 'Address',
   'clients.country': 'Country',
   'clients.vat': 'VAT number',
+  'clients.siret': 'SIRET',
+  'clients.receipts': 'Receipts',
+  'clients.stripe.deleted': 'Customer deleted in Stripe: the record and its history are kept.',
+  'clients.stripe.edit':
+    'This client comes from Stripe. Once saved here, the sync no longer changes its details.',
   'clients.vat.hint': 'Required for reverse charge within the EU.',
   'clients.vat.missing':
     'EU business client without a VAT number: reverse charge cannot apply. Ask them for their VAT number.',

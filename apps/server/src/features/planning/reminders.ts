@@ -1,9 +1,9 @@
 import { addDays, daysBetween, LOCALES, type Locale } from '@almanach/shared';
-import { and, eq, gte, isNull, lt } from 'drizzle-orm';
+import { and, eq, gte, isNull, lt, sql } from 'drizzle-orm';
 import { createTransport, type Transporter } from 'nodemailer';
 import type { Config } from '../../config.ts';
 import type { Database } from '../../db/client.ts';
-import { instance, notifications, profiles, userSettings, users } from '../../db/schema.ts';
+import { companies, instance, notifications, profiles, userSettings, users } from '../../db/schema.ts';
 import type { PlanningService } from './planning.service.ts';
 
 type NotificationRow = typeof notifications.$inferSelect;
@@ -142,15 +142,25 @@ export class ReminderJob {
       const today = `${part('year')}-${part('month')}-${part('day')}`;
       const time = `${part('hour')}:${part('minute')}`;
       const people = await this.db
-        .select({ userId: profiles.userId, settings: userSettings, locale: users.locale, email: users.email })
+        .select({
+          companyId: profiles.companyId,
+          company: companies.name,
+          several: sql<number>`count(*) over (partition by ${companies.userId})`,
+          settings: userSettings,
+          locale: users.locale,
+          email: users.email,
+        })
         .from(profiles)
-        .innerJoin(users, eq(users.id, profiles.userId))
-        .leftJoin(userSettings, eq(userSettings.userId, profiles.userId));
+        .innerJoin(companies, eq(companies.id, profiles.companyId))
+        .innerJoin(users, eq(users.id, companies.userId))
+        .leftJoin(userSettings, eq(userSettings.userId, users.id));
       for (const person of people) {
         const locale = LOCALES.find((code) => code === person.locale) ?? 'en';
-        await this.collect(person.userId, today, person.settings?.reminderDays ?? [7, 1, 0], locale);
+        await this.collect(person.companyId, today, person.settings?.reminderDays ?? [7, 1, 0], locale);
         if (!inQuietHours(time, person.settings?.quietHours ?? null)) {
-          await this.deliver(person.userId, locale, person.email, person.settings ?? null);
+          // Settings and channels are per person; with several companies, each message names its company.
+          const title = Number(person.several) > 1 ? `Almanach — ${person.company}` : 'Almanach';
+          await this.deliver(person.companyId, locale, person.email, person.settings ?? null, title);
         }
       }
     } catch (error) {
@@ -163,15 +173,15 @@ export class ReminderJob {
   /**
    * Inserts the notifications that are due for one person; duplicates are ignored by the dedupe key
    *
-   * @param userId {string} - person
+   * @param companyId {string} - person
    * @param today {string} - YYYY-MM-DD in the instance time zone
    * @param offsets {number[]} - reminder days
    * @param locale {Locale} - language of the titles stored with the notification
    * @returns {Promise<void>} - resolves when done
    */
-  async collect(userId: string, today: string, offsets: number[], locale: Locale): Promise<void> {
+  async collect(companyId: string, today: string, offsets: number[], locale: Locale): Promise<void> {
     const horizon = Math.max(0, ...offsets);
-    const items = await this.planning.calendar(userId, addDays(today, -7), addDays(today, horizon), today);
+    const items = await this.planning.calendar(companyId, addDays(today, -7), addDays(today, horizon), today);
     const rows: (typeof notifications.$inferInsert)[] = [];
     for (const item of items) {
       if (item.done || item.hidden || !['tax', 'social', 'custom'].includes(item.type)) continue;
@@ -180,7 +190,7 @@ export class ReminderJob {
       const left = daysBetween(today, item.date);
       if (left < 0) {
         rows.push({
-          userId,
+          companyId,
           kind: 'deadline_late',
           dedupeKey: `deadline:${item.key}:late`,
           params: { title, date: item.date, key: item.key },
@@ -191,30 +201,30 @@ export class ReminderJob {
       const offset = dueOffset(left, offsets);
       if (offset === null) continue;
       rows.push({
-        userId,
+        companyId,
         kind: 'deadline_soon',
         dedupeKey: `deadline:${item.key}:${offset}`,
         params: { title, date: item.date, days: left, key: item.key },
         link,
       });
     }
-    for (const invoice of await this.planning.openInvoices(userId, today)) {
+    for (const invoice of await this.planning.openInvoices(companyId, today)) {
       if (invoice.status !== 'overdue') continue;
       rows.push({
-        userId,
+        companyId,
         kind: 'invoice_overdue',
         dedupeKey: `invoice:${invoice.id}:overdue`,
         params: { number: invoice.number, client: invoice.clientName },
         link: `/documents/${invoice.id}`,
       });
     }
-    const outlook = await this.planning.outlook(userId, today);
+    const outlook = await this.planning.outlook(companyId, today);
     for (const threshold of outlook?.thresholds ?? []) {
       if (threshold.window === 'previous_fiscal_year') continue;
       const key = `threshold:${threshold.id}:${threshold.windowStart.slice(0, 7)}`;
       if (threshold.exceeded) {
         rows.push({
-          userId,
+          companyId,
           kind: 'threshold_exceeded',
           dedupeKey: `${key}:100`,
           params: { label: threshold.label[locale], id: threshold.id },
@@ -222,7 +232,7 @@ export class ReminderJob {
         });
       } else if (threshold.reachedBp >= 8000) {
         rows.push({
-          userId,
+          companyId,
           kind: 'threshold_near',
           dedupeKey: `${key}:80`,
           params: {
@@ -240,17 +250,19 @@ export class ReminderJob {
   /**
    * Sends pending notifications by ntfy and e-mail; failures are retried on later passes, up to five times
    *
-   * @param userId {string} - person
+   * @param companyId {string} - person
    * @param locale {Locale} - language of the messages
    * @param email {string} - address for e-mail reminders
    * @param settings {typeof userSettings.$inferSelect | null} - channels
+   * @param title {string} - push title and e-mail subject prefix, naming the company when there are several
    * @returns {Promise<void>} - resolves when done
    */
   async deliver(
-    userId: string,
+    companyId: string,
     locale: Locale,
     email: string,
     settings: typeof userSettings.$inferSelect | null,
+    title = 'Almanach',
   ): Promise<void> {
     const wantsMail = (settings?.emailReminders ?? true) && this.mailer !== null;
     const ntfy = settings?.ntfy ?? null;
@@ -260,7 +272,7 @@ export class ReminderJob {
       .from(notifications)
       .where(
         and(
-          eq(notifications.userId, userId),
+          eq(notifications.companyId, companyId),
           isNull(notifications.pushedAt),
           isNull(notifications.readAt),
           lt(notifications.pushAttempts, 5),
@@ -278,7 +290,7 @@ export class ReminderJob {
               method: 'POST',
               body: text,
               headers: {
-                Title: 'Almanach',
+                Title: title,
                 ...(ntfy.token ? { Authorization: `Bearer ${ntfy.token}` } : {}),
               },
               signal: AbortSignal.timeout(10_000),
@@ -290,7 +302,7 @@ export class ReminderJob {
           await this.mailer.sendMail({
             from: this.config.smtpFrom ?? 'Almanach <almanach@localhost>',
             to: email,
-            subject: `Almanach — ${text}`,
+            subject: `${title} — ${text}`,
             text,
           });
         }

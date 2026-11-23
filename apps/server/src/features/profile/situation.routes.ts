@@ -59,7 +59,7 @@ export function readOnlyAfterCessation(db: Database): MiddlewareHandler<AppEnv> 
     const [row] = await db
       .select({ ceasedOn: profiles.ceasedOn })
       .from(profiles)
-      .where(eq(profiles.userId, c.var.user.id))
+      .where(eq(profiles.companyId, c.var.company.id))
       .limit(1);
     if (row?.ceasedOn && row.ceasedOn < (await instanceToday(db))) {
       return c.json({ error: 'ceased', ceasedOn: row.ceasedOn }, 409);
@@ -82,35 +82,35 @@ export function situationRoutes(db: Database, packs: PackRegistry): Hono<AppEnv>
   /**
    * Profile of the person
    *
-   * @param userId {string} - owner
+   * @param companyId {string} - owner
    * @returns {Promise<typeof profiles.$inferSelect | undefined>} - profile
    */
-  const profileOf = async (userId: string) =>
-    (await db.select().from(profiles).where(eq(profiles.userId, userId)).limit(1))[0];
+  const profileOf = async (companyId: string) =>
+    (await db.select().from(profiles).where(eq(profiles.companyId, companyId)).limit(1))[0];
 
   /**
    * Most recent change of a person
    *
-   * @param userId {string} - owner
+   * @param companyId {string} - owner
    * @returns {Promise<typeof situationChanges.$inferSelect | undefined>} - change
    */
-  const latestChange = async (userId: string) =>
+  const latestChange = async (companyId: string) =>
     (
       await db
         .select()
         .from(situationChanges)
-        .where(eq(situationChanges.userId, userId))
+        .where(eq(situationChanges.companyId, companyId))
         .orderBy(desc(situationChanges.effectiveOn))
         .limit(1)
     )[0];
 
   router.get('/', async (c) => {
-    const profile = await profileOf(c.var.user.id);
+    const profile = await profileOf(c.var.company.id);
     if (!profile) return c.json({ error: 'no_profile' }, 409);
     const changes = await db
       .select()
       .from(situationChanges)
-      .where(eq(situationChanges.userId, profile.userId))
+      .where(eq(situationChanges.companyId, profile.companyId))
       .orderBy(desc(situationChanges.effectiveOn));
     return c.json({
       today: await instanceToday(db),
@@ -122,15 +122,15 @@ export function situationRoutes(db: Database, packs: PackRegistry): Hono<AppEnv>
   });
 
   router.post('/changes', async (c) => {
-    const userId = c.var.user.id;
-    const profile = await profileOf(userId);
+    const companyId = c.var.company.id;
+    const profile = await profileOf(companyId);
     if (!profile) return c.json({ error: 'no_profile' }, 409);
     if (profile.ceasedOn) return c.json({ error: 'ceased' }, 409);
     const { data, response } = await parseBody(c, situationChangeSchema);
     if (response) return response;
     const { effectiveOn, ...after } = data;
     const today = await instanceToday(db);
-    const latest = await latestChange(userId);
+    const latest = await latestChange(companyId);
     // Changes are recorded in order and never in the future, so the current profile is always "today".
     if (
       effectiveOn <= profile.activityStart ||
@@ -152,16 +152,16 @@ export function situationRoutes(db: Database, packs: PackRegistry): Hono<AppEnv>
     const next = { ...after, identifiers };
     await db.transaction(async (tx) => {
       // The numbering series in progress keeps the prefixes of the country it started in.
-      await pinNumbering(tx, userId, profile.country);
+      await pinNumbering(tx, companyId, profile.country);
       await tx
         .insert(situationChanges)
-        .values({ userId, effectiveOn, before: situationOf(profile), after: next });
+        .values({ companyId, effectiveOn, before: situationOf(profile), after: next });
       await tx
         .update(profiles)
         .set({ ...next, updatedAt: new Date() })
-        .where(eq(profiles.userId, userId));
+        .where(eq(profiles.companyId, companyId));
       await tx.insert(auditLog).values({
-        userId,
+        userId: c.var.user.id,
         action: 'situation.changed',
         meta: { effectiveOn, country: next.country, status: next.status },
       });
@@ -170,9 +170,9 @@ export function situationRoutes(db: Database, packs: PackRegistry): Hono<AppEnv>
   });
 
   router.delete('/changes/latest', async (c) => {
-    const userId = c.var.user.id;
-    const profile = await profileOf(userId);
-    const latest = await latestChange(userId);
+    const companyId = c.var.company.id;
+    const profile = await profileOf(companyId);
+    const latest = await latestChange(companyId);
     if (!profile || !latest) return c.json({ error: 'not_found' }, 404);
     if (profile.ceasedOn) return c.json({ error: 'ceased' }, 409);
     // Only fields still holding what the change wrote go back: later edits (a new VAT number…) stay.
@@ -186,25 +186,27 @@ export function situationRoutes(db: Database, packs: PackRegistry): Hono<AppEnv>
       await tx
         .update(profiles)
         .set({ ...restored, updatedAt: new Date() })
-        .where(eq(profiles.userId, userId));
+        .where(eq(profiles.companyId, companyId));
       await tx
         .delete(situationChanges)
-        .where(and(eq(situationChanges.id, latest.id), eq(situationChanges.userId, userId)));
-      await tx
-        .insert(auditLog)
-        .values({ userId, action: 'situation.undone', meta: { effectiveOn: latest.effectiveOn } });
+        .where(and(eq(situationChanges.id, latest.id), eq(situationChanges.companyId, companyId)));
+      await tx.insert(auditLog).values({
+        userId: c.var.user.id,
+        action: 'situation.undone',
+        meta: { effectiveOn: latest.effectiveOn },
+      });
     });
     return c.body(null, 204);
   });
 
   router.put('/cessation', async (c) => {
-    const userId = c.var.user.id;
-    const profile = await profileOf(userId);
+    const companyId = c.var.company.id;
+    const profile = await profileOf(companyId);
     if (!profile) return c.json({ error: 'no_profile' }, 409);
     const { data, response } = await parseBody(c, cessationSchema);
     if (response) return response;
     const today = await instanceToday(db);
-    const latest = await latestChange(userId);
+    const latest = await latestChange(companyId);
     if (
       data.effectiveOn < profile.activityStart ||
       data.effectiveOn > addDays(today, 366) ||
@@ -218,20 +220,20 @@ export function situationRoutes(db: Database, packs: PackRegistry): Hono<AppEnv>
     await db
       .update(profiles)
       .set({ ceasedOn: data.effectiveOn, updatedAt: new Date() })
-      .where(eq(profiles.userId, userId));
+      .where(eq(profiles.companyId, companyId));
     await db
       .insert(auditLog)
-      .values({ userId, action: 'activity.ceased', meta: { ceasedOn: data.effectiveOn } });
+      .values({ userId: c.var.user.id, action: 'activity.ceased', meta: { ceasedOn: data.effectiveOn } });
     return c.body(null, 204);
   });
 
   router.delete('/cessation', async (c) => {
-    const userId = c.var.user.id;
+    const companyId = c.var.company.id;
     await db
       .update(profiles)
       .set({ ceasedOn: null, updatedAt: new Date() })
-      .where(eq(profiles.userId, userId));
-    await db.insert(auditLog).values({ userId, action: 'activity.resumed', meta: {} });
+      .where(eq(profiles.companyId, companyId));
+    await db.insert(auditLog).values({ userId: c.var.user.id, action: 'activity.resumed', meta: {} });
     return c.body(null, 204);
   });
 

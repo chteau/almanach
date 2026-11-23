@@ -28,32 +28,32 @@ export function timeRoutes(db: Database): Hono<AppEnv> {
   /**
    * Checks that a mission belongs to the person
    *
-   * @param userId {string} - owner
+   * @param companyId {string} - owner
    * @param missionId {string} - mission
    * @returns {Promise<boolean>} - true when owned
    */
-  const ownsMission = async (userId: string, missionId: string): Promise<boolean> =>
+  const ownsMission = async (companyId: string, missionId: string): Promise<boolean> =>
     (
       await db
         .select({ id: missions.id })
         .from(missions)
-        .where(and(eq(missions.id, missionId), eq(missions.userId, userId)))
+        .where(and(eq(missions.id, missionId), eq(missions.companyId, companyId)))
         .limit(1)
     ).length > 0;
 
   /**
    * Loads one entry of the person
    *
-   * @param userId {string} - owner
+   * @param companyId {string} - owner
    * @param id {string} - entry id
    * @returns {Promise<typeof timeEntries.$inferSelect | undefined>} - entry
    */
-  const owned = async (userId: string, id: string) => {
+  const owned = async (companyId: string, id: string) => {
     if (!idSchema.safeParse(id).success) return undefined;
     const [row] = await db
       .select()
       .from(timeEntries)
-      .where(and(eq(timeEntries.id, id), eq(timeEntries.userId, userId)))
+      .where(and(eq(timeEntries.id, id), eq(timeEntries.companyId, companyId)))
       .limit(1);
     return row;
   };
@@ -90,7 +90,7 @@ export function timeRoutes(db: Database): Hono<AppEnv> {
       .innerJoin(clients, eq(clients.id, missions.clientId))
       .where(
         and(
-          eq(timeEntries.userId, c.var.user.id),
+          eq(timeEntries.companyId, c.var.company.id),
           unbilled
             ? and(
                 isNull(timeEntries.documentId),
@@ -109,7 +109,7 @@ export function timeRoutes(db: Database): Hono<AppEnv> {
         note: timeEntries.note,
       })
       .from(timeEntries)
-      .where(and(eq(timeEntries.userId, c.var.user.id), isNotNull(timeEntries.startedAt)))
+      .where(and(eq(timeEntries.companyId, c.var.company.id), isNotNull(timeEntries.startedAt)))
       .limit(1);
     return c.json({
       today,
@@ -130,21 +130,23 @@ export function timeRoutes(db: Database): Hono<AppEnv> {
   router.post('/', async (c) => {
     const { data, response } = await parseBody(c, timeEntrySchema);
     if (response) return response;
-    if (!(await ownsMission(c.var.user.id, data.missionId))) return c.json({ error: 'unknown_mission' }, 422);
+    if (!(await ownsMission(c.var.company.id, data.missionId)))
+      return c.json({ error: 'unknown_mission' }, 422);
     const [row] = await db
       .insert(timeEntries)
-      .values({ ...data, userId: c.var.user.id })
+      .values({ ...data, companyId: c.var.company.id })
       .returning({ id: timeEntries.id });
     return c.json({ id: row?.id }, 201);
   });
 
   router.put('/:id', async (c) => {
-    const existing = await owned(c.var.user.id, c.req.param('id'));
+    const existing = await owned(c.var.company.id, c.req.param('id'));
     if (!existing) return c.json({ error: 'not_found' }, 404);
     if (existing.documentId) return c.json({ error: 'locked' }, 409);
     const { data, response } = await parseBody(c, timeEntrySchema);
     if (response) return response;
-    if (!(await ownsMission(c.var.user.id, data.missionId))) return c.json({ error: 'unknown_mission' }, 422);
+    if (!(await ownsMission(c.var.company.id, data.missionId)))
+      return c.json({ error: 'unknown_mission' }, 422);
     await db
       .update(timeEntries)
       .set(data)
@@ -153,7 +155,7 @@ export function timeRoutes(db: Database): Hono<AppEnv> {
   });
 
   router.delete('/:id', async (c) => {
-    const existing = await owned(c.var.user.id, c.req.param('id'));
+    const existing = await owned(c.var.company.id, c.req.param('id'));
     if (!existing) return c.json({ error: 'not_found' }, 404);
     if (existing.documentId) return c.json({ error: 'locked' }, 409);
     await db.delete(timeEntries).where(and(eq(timeEntries.id, existing.id), isNull(timeEntries.documentId)));
@@ -163,12 +165,13 @@ export function timeRoutes(db: Database): Hono<AppEnv> {
   router.post('/timer/start', async (c) => {
     const { data, response } = await parseBody(c, timerStartSchema);
     if (response) return response;
-    if (!(await ownsMission(c.var.user.id, data.missionId))) return c.json({ error: 'unknown_mission' }, 422);
+    if (!(await ownsMission(c.var.company.id, data.missionId)))
+      return c.json({ error: 'unknown_mission' }, 422);
     const inserted = await db
       .insert(timeEntries)
       .values({
         ...data,
-        userId: c.var.user.id,
+        companyId: c.var.company.id,
         date: await instanceToday(db),
         minutes: 0,
         startedAt: new Date(),
@@ -186,7 +189,7 @@ export function timeRoutes(db: Database): Hono<AppEnv> {
     const [running] = await db
       .select()
       .from(timeEntries)
-      .where(and(eq(timeEntries.userId, c.var.user.id), isNotNull(timeEntries.startedAt)))
+      .where(and(eq(timeEntries.companyId, c.var.company.id), isNotNull(timeEntries.startedAt)))
       .limit(1);
     if (!running?.startedAt) return c.json({ error: 'no_timer' }, 409);
     const elapsed = Math.max(1, Math.round((Date.now() - running.startedAt.getTime()) / 60_000));

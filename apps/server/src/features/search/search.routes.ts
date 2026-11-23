@@ -28,14 +28,17 @@ export function searchRoutes(db: Database): Hono<AppEnv> {
     const q = (c.req.query('q') ?? '').trim();
     if (q.length < 2 || q.length > 80)
       return c.json({ clients: [], missions: [], documents: [], deadlines: [] });
-    const userId = c.var.user.id;
+    const companyId = c.var.company.id;
     const pattern = containsPattern(q);
     const [clientRows, missionRows, documentRows, deadlineRows] = await Promise.all([
       db
         .select({ id: clients.id, name: clients.name })
         .from(clients)
         .where(
-          and(eq(clients.userId, userId), or(ilike(clients.name, pattern), ilike(clients.email, pattern))),
+          and(
+            eq(clients.companyId, companyId),
+            or(ilike(clients.name, pattern), ilike(clients.email, pattern)),
+          ),
         )
         .orderBy(asc(clients.name))
         .limit(6),
@@ -43,7 +46,7 @@ export function searchRoutes(db: Database): Hono<AppEnv> {
         .select({ id: missions.id, name: missions.name, clientName: clients.name })
         .from(missions)
         .innerJoin(clients, eq(clients.id, missions.clientId))
-        .where(and(eq(missions.userId, userId), ilike(missions.name, pattern)))
+        .where(and(eq(missions.companyId, companyId), ilike(missions.name, pattern)))
         .orderBy(asc(missions.name))
         .limit(6),
       db
@@ -58,7 +61,7 @@ export function searchRoutes(db: Database): Hono<AppEnv> {
         .innerJoin(clients, eq(clients.id, documents.clientId))
         .where(
           and(
-            eq(documents.userId, userId),
+            eq(documents.companyId, companyId),
             or(eq(documents.number, q), ilike(documents.number, pattern), ilike(clients.name, pattern)),
           ),
         )
@@ -66,7 +69,7 @@ export function searchRoutes(db: Database): Hono<AppEnv> {
       db
         .select({ id: customDeadlines.id, title: customDeadlines.title, date: customDeadlines.date })
         .from(customDeadlines)
-        .where(and(eq(customDeadlines.userId, userId), ilike(customDeadlines.title, pattern)))
+        .where(and(eq(customDeadlines.companyId, companyId), ilike(customDeadlines.title, pattern)))
         .limit(5),
     ]);
     // An exact invoice number comes first (S-261).

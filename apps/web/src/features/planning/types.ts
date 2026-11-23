@@ -24,6 +24,8 @@ export interface Outlook {
   projectedRevenueCents: number;
   unconverted: number;
   thresholds: ThresholdProgress[];
+  /** Other activities of the same business, from linked instances: revenue of the fiscal year. */
+  linked: { label: string; cents: number; receivedAt: string | null; error: string | null }[];
   estimates: EstimateResult[];
   projection: EstimateResult[];
   months: { month: string; revenueCents: number; estimateCents: number }[];

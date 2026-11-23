@@ -71,6 +71,27 @@
       "when": 1795007978781,
       "tag": "0009_situation_changes",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1795008378781,
+      "tag": "0010_companies",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1795443767136,
+      "tag": "0011_federation",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1795444680430,
+      "tag": "0012_stripe_customers",
+      "breakpoints": true
     }
   ]
 }

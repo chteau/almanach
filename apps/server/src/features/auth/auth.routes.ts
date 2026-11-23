@@ -9,6 +9,7 @@ import { clearSessionCookie, readSessionCookie, setSessionCookie } from '../../h
 import { LoginThrottle } from '../../security/login-throttle.ts';
 import { sha256 } from '../../security/tokens.ts';
 import { verifyTotp } from '../../security/totp.ts';
+import { requireCompany } from '../companies/companies.ts';
 import { requireUser, type SessionStore } from './sessions.ts';
 
 /** Hash compared against when the e-mail is unknown, so both paths cost the same time (S-011). */
@@ -106,12 +107,12 @@ export function authRoutes(db: Database, store: SessionStore, options: AuthOptio
     return c.body(null, 204);
   });
 
-  router.get('/me', requireUser(store, options.cookieSecure), async (c) => {
+  router.get('/me', requireUser(store, options.cookieSecure), requireCompany(db), async (c) => {
     const user = c.var.user;
     const [profile] = await db
-      .select({ userId: profiles.userId })
+      .select({ companyId: profiles.companyId })
       .from(profiles)
-      .where(eq(profiles.userId, user.id))
+      .where(eq(profiles.companyId, c.var.company.id))
       .limit(1);
     const me: Me = { ...user, onboarded: Boolean(profile) };
     return c.json(me);

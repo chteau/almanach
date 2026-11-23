@@ -3,7 +3,7 @@ import type { profiles } from '../../db/schema.ts';
 import { situationPeriods } from './planning.service.ts';
 
 const base = {
-  userId: '00000000-0000-0000-0000-000000000001',
+  companyId: '00000000-0000-0000-0000-000000000001',
   country: 'FR',
   status: 'micro_bic_services',
   activityStart: '2025-03-01',

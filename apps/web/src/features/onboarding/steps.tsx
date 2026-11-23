@@ -4,6 +4,7 @@ import {
   companySchema,
   isLuhnValid,
   isoDateSchema,
+  microConflict,
   parseAmount,
 } from '@almanach/shared';
 import { useState } from 'react';
@@ -17,6 +18,7 @@ import type { MessageKey } from '../../i18n/messages.ts';
 import { ApiError } from '../../lib/api.ts';
 import { fieldErrors, zodIssues } from '../../lib/form-errors.ts';
 import { countryName, formatDate, formatMoney } from '../../lib/format.ts';
+import { useCompanies } from '../companies/useCompanies.ts';
 import { describeError } from '../install/errors.ts';
 import wizard from '../install/InstallWizard.module.css';
 import { StepShell } from '../install/steps/StepShell.tsx';
@@ -144,7 +146,17 @@ export function CountryStep({ form, pack, packs, update, next }: OnboardingStepP
 export function StatusStep({ form, pack, update, next, back }: OnboardingStepProps) {
   const { t, locale } = useI18n();
   const [errors, setErrors] = useState<{ status?: string; activityStart?: string }>({});
+  const companies = useCompanies().data;
   if (!pack) return null;
+  // A person may only run one French micro-entreprise: point to the existing one instead.
+  const conflict =
+    companies &&
+    microConflict(companies.companies, {
+      id: companies.active,
+      country: pack.country,
+      status: form.status || null,
+      activityStart: form.activityStart || null,
+    });
 
   /**
    * Requires a status and a valid start date
@@ -167,7 +179,10 @@ export function StatusStep({ form, pack, update, next, back }: OnboardingStepPro
       onSubmit={submit}
       onBack={back}
     >
-      <fieldset className={wizard.choices} aria-describedby={errors.status ? 'status-error' : undefined}>
+      <fieldset
+        className={`${wizard.choices} ${wizard.choicesList}`}
+        aria-describedby={errors.status ? 'status-error' : undefined}
+      >
         <legend className={wizard.commandLabel}>{t('onboarding.status.label')}</legend>
         {pack.statuses.map((status) => (
           <label key={status.id} className={wizard.choice}>
@@ -189,6 +204,7 @@ export function StatusStep({ form, pack, update, next, back }: OnboardingStepPro
           {errors.status}
         </p>
       )}
+      {conflict && <Notice tone="warn">{t('companies.microConflict', { name: conflict.name })}</Notice>}
       <TextField
         label={t('onboarding.status.start')}
         hint={t('onboarding.status.start.hint')}

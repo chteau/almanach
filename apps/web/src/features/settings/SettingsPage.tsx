@@ -10,13 +10,16 @@ import { useI18n } from '../../i18n/I18nProvider.tsx';
 import { formatDate } from '../../lib/format.ts';
 import { useResource } from '../../lib/useResource.ts';
 import { useMe } from '../auth/AuthProvider.tsx';
+import { CompaniesSettings } from '../companies/CompaniesSettings.tsx';
 import styles from '../planning/Planning.module.css';
 import { RemindersSettings } from '../planning/RemindersSettings.tsx';
 import { BillingSettings } from './BillingSettings.tsx';
 import { DataSettings } from './DataSettings.tsx';
+import { FederationSettings } from './FederationSettings.tsx';
 import { PackAdmin } from './PackAdmin.tsx';
 import { SecuritySettings } from './SecuritySettings.tsx';
 import { SituationSettings } from './SituationSettings.tsx';
+import { StripeSettings } from './StripeSettings.tsx';
 import { SystemSettings } from './SystemSettings.tsx';
 
 /**
@@ -74,6 +77,9 @@ export function SettingsPage() {
         )}
         {data?.profile && <SituationSettings />}
         {data?.profile && <BillingSettings />}
+        {data?.profile && <StripeSettings />}
+        {data?.profile && <FederationSettings />}
+        <CompaniesSettings />
         {data?.pack && (
           <section className={form.section} aria-labelledby="pack-title">
             <h2 id="pack-title" className={styles.sectionTitle}>

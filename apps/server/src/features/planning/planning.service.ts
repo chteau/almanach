@@ -18,14 +18,18 @@ import { and, asc, eq, gte, inArray, lte, ne } from 'drizzle-orm';
 import type { Database } from '../../db/client.ts';
 import {
   clients,
+  companies,
   customDeadlines,
   deadlineMarks,
   documents,
+  externalRevenues,
+  federationLinks,
+  federationTotals,
+  instance,
   missions,
   payments,
   profiles,
   situationChanges,
-  users,
 } from '../../db/schema.ts';
 import type { PackRegistry } from '../packs/packs.ts';
 
@@ -111,24 +115,24 @@ export class PlanningService {
   /**
    * Loads a profile
    *
-   * @param userId {string} - owner
+   * @param companyId {string} - owner
    * @returns {Promise<ProfileRow | undefined>} - the profile once onboarding is done
    */
-  async profile(userId: string): Promise<ProfileRow | undefined> {
-    const [row] = await this.db.select().from(profiles).where(eq(profiles.userId, userId)).limit(1);
+  async profile(companyId: string): Promise<ProfileRow | undefined> {
+    const [row] = await this.db.select().from(profiles).where(eq(profiles.companyId, companyId)).limit(1);
     return row;
   }
 
   /**
    * Money collected between two dates, in the main currency
    *
-   * @param userId {string} - owner
+   * @param companyId {string} - owner
    * @param mainCurrency {string} - profile currency
    * @param from {string} - first day, inclusive
    * @param to {string} - last day, inclusive
    * @returns {Promise<ReceiptSet>} - receipts and the count of payments that could not be converted
    */
-  async receipts(userId: string, mainCurrency: string, from: string, to: string): Promise<ReceiptSet> {
+  async receipts(companyId: string, mainCurrency: string, from: string, to: string): Promise<ReceiptSet> {
     const rows = await this.db
       .select({
         date: payments.date,
@@ -138,15 +142,80 @@ export class PlanningService {
       })
       .from(payments)
       .innerJoin(documents, eq(documents.id, payments.documentId))
-      .where(and(eq(payments.userId, userId), gte(payments.date, from), lte(payments.date, to)));
+      .where(and(eq(payments.companyId, companyId), gte(payments.date, from), lte(payments.date, to)));
+    const external = await this.db
+      .select({
+        date: externalRevenues.date,
+        amount: externalRevenues.amountCents,
+        received: externalRevenues.receivedCents,
+        currency: externalRevenues.currency,
+      })
+      .from(externalRevenues)
+      .where(
+        and(
+          eq(externalRevenues.companyId, companyId),
+          gte(externalRevenues.date, from),
+          lte(externalRevenues.date, to),
+        ),
+      );
     const receipts: Receipt[] = [];
     let unconverted = 0;
-    for (const row of rows) {
+    for (const row of [...rows, ...external]) {
       if (row.currency === mainCurrency) receipts.push({ date: row.date, cents: row.amount });
       else if (row.received !== null) receipts.push({ date: row.date, cents: row.received });
       else unconverted += 1;
     }
     return { receipts, unconverted };
+  }
+
+  /**
+   * Revenue of the other activities of the same business, received from linked instances (docs/federation.md);
+   * empty unless links are allowed and on for the company
+   *
+   * @param companyId {string} - owner
+   * @param mainCurrency {string} - profile currency; totals in another currency are never stored
+   * @param from {string} - first day; totals are monthly, dated on the first of their month
+   * @returns {Promise<{ label: string; receivedAt: string | null; error: string | null; receipts: Receipt[] }[]>} - one entry per link
+   */
+  async linkedRevenue(companyId: string, mainCurrency: string, from: string) {
+    const rows = await this.db
+      .select({
+        id: federationLinks.id,
+        label: federationLinks.peerLabel,
+        receivedAt: federationLinks.receivedAt,
+        error: federationLinks.error,
+        month: federationTotals.month,
+        category: federationTotals.category,
+        cents: federationTotals.cents,
+      })
+      .from(federationLinks)
+      .innerJoin(companies, and(eq(companies.id, federationLinks.companyId), eq(companies.federation, true)))
+      .innerJoin(instance, and(eq(instance.id, 1), eq(instance.federation, true)))
+      .innerJoin(federationTotals, eq(federationTotals.linkId, federationLinks.id))
+      .where(
+        and(
+          eq(federationLinks.companyId, companyId),
+          eq(federationLinks.state, 'active'),
+          eq(federationLinks.receive, true),
+          eq(federationLinks.peerCurrency, mainCurrency),
+          gte(federationTotals.month, from.slice(0, 7)),
+        ),
+      );
+    const links = new Map<
+      string,
+      { label: string; receivedAt: string | null; error: string | null; receipts: Receipt[] }
+    >();
+    for (const row of rows) {
+      const link = links.get(row.id) ?? {
+        label: row.label ?? '',
+        receivedAt: row.receivedAt?.toISOString() ?? null,
+        error: row.error,
+        receipts: [],
+      };
+      link.receipts.push({ date: `${row.month}-01`, cents: row.cents, category: row.category, linked: true });
+      links.set(row.id, link);
+    }
+    return [...links.values()];
   }
 
   /**
@@ -185,7 +254,7 @@ export class PlanningService {
     const changes = await this.db
       .select()
       .from(situationChanges)
-      .where(eq(situationChanges.userId, profile.userId))
+      .where(eq(situationChanges.companyId, profile.companyId))
       .orderBy(asc(situationChanges.effectiveOn));
     return situationPeriods(profile, changes);
   }
@@ -223,23 +292,23 @@ export class PlanningService {
   /**
    * Calendar entries between two dates (P05)
    *
-   * @param userId {string} - owner
+   * @param companyId {string} - owner
    * @param from {string} - first day
    * @param to {string} - last day
    * @param today {string} - today, to flag overdue entries
    * @returns {Promise<CalendarItem[]>} - entries sorted by date
    */
-  async calendar(userId: string, from: string, to: string, today: string): Promise<CalendarItem[]> {
-    const profile = await this.profile(userId);
+  async calendar(companyId: string, from: string, to: string, today: string): Promise<CalendarItem[]> {
+    const profile = await this.profile(companyId);
     if (!profile) return [];
-    const marks = await this.marks(userId);
+    const marks = await this.marks(companyId);
     const items: CalendarItem[] = [];
     const mark = (key: string) => marks.get(key);
-    // Obligations that fell due before the account existed were handled elsewhere: never flag them late.
+    // Obligations that fell due before the company was added were handled elsewhere: never flag them late.
     const [account] = await this.db
-      .select({ createdAt: users.createdAt })
-      .from(users)
-      .where(eq(users.id, userId))
+      .select({ createdAt: companies.createdAt })
+      .from(companies)
+      .where(eq(companies.id, companyId))
       .limit(1);
     const since = account?.createdAt.toISOString().slice(0, 10) ?? today;
     for (const { occurrence } of await this.situationDeadlines(profile, from, to)) {
@@ -260,7 +329,7 @@ export class PlanningService {
     for (const custom of await this.db
       .select()
       .from(customDeadlines)
-      .where(eq(customDeadlines.userId, userId))) {
+      .where(eq(customDeadlines.companyId, companyId))) {
       for (const date of occurrencesOf(custom, from, to)) {
         const key = `custom:${custom.id}:${date}`;
         const state = mark(key);
@@ -281,7 +350,7 @@ export class PlanningService {
     const missionRows = await this.db
       .select({ id: missions.id, name: missions.name, endDate: missions.endDate, status: missions.status })
       .from(missions)
-      .where(and(eq(missions.userId, userId), gte(missions.endDate, from), lte(missions.endDate, to)));
+      .where(and(eq(missions.companyId, companyId), gte(missions.endDate, from), lte(missions.endDate, to)));
     for (const mission of missionRows) {
       if (!mission.endDate || mission.status === 'cancelled') continue;
       items.push({
@@ -297,7 +366,7 @@ export class PlanningService {
       });
     }
 
-    for (const invoice of await this.openInvoices(userId, today)) {
+    for (const invoice of await this.openInvoices(companyId, today)) {
       if (!invoice.dueDate || invoice.dueDate < from || invoice.dueDate > to) continue;
       items.push({
         key: `invoice:${invoice.id}`,
@@ -317,11 +386,11 @@ export class PlanningService {
   /**
    * Issued invoices not yet settled, with their status
    *
-   * @param userId {string} - owner
+   * @param companyId {string} - owner
    * @param today {string} - YYYY-MM-DD
    * @returns {Promise<{ id: string; number: string; clientName: string; dueDate: string | null; currency: string; dueCents: number; status: string }[]>} - open invoices
    */
-  async openInvoices(userId: string, today: string) {
+  async openInvoices(companyId: string, today: string) {
     const rows = await this.db
       .select({
         id: documents.id,
@@ -337,7 +406,7 @@ export class PlanningService {
       .innerJoin(clients, eq(clients.id, documents.clientId))
       .where(
         and(
-          eq(documents.userId, userId),
+          eq(documents.companyId, companyId),
           ne(documents.state, 'draft'),
           inArray(documents.type, ['invoice', 'deposit', 'credit_note']),
         ),
@@ -346,7 +415,7 @@ export class PlanningService {
     for (const row of await this.db
       .select({ documentId: payments.documentId, amount: payments.amountCents })
       .from(payments)
-      .where(eq(payments.userId, userId))) {
+      .where(eq(payments.companyId, companyId))) {
       paid.set(row.documentId, (paid.get(row.documentId) ?? 0) + row.amount);
     }
     const credited = new Map<string, number>();
@@ -386,23 +455,23 @@ export class PlanningService {
   /**
    * Every mark of a person, keyed by deadline key
    *
-   * @param userId {string} - owner
+   * @param companyId {string} - owner
    * @returns {Promise<Map<string, MarkRow>>} - marks
    */
-  async marks(userId: string): Promise<Map<string, MarkRow>> {
-    const rows = await this.db.select().from(deadlineMarks).where(eq(deadlineMarks.userId, userId));
+  async marks(companyId: string): Promise<Map<string, MarkRow>> {
+    const rows = await this.db.select().from(deadlineMarks).where(eq(deadlineMarks.companyId, companyId));
     return new Map(rows.map((row) => [row.key, row]));
   }
 
   /**
    * Full detail of a pack deadline: revenue of the period and estimated amounts (P06)
    *
-   * @param userId {string} - owner
+   * @param companyId {string} - owner
    * @param key {string} - occurrence key
    * @returns {Promise<object | undefined>} - detail, undefined when unknown
    */
-  async deadline(userId: string, key: string) {
-    const current = await this.profile(userId);
+  async deadline(companyId: string, key: string) {
+    const current = await this.profile(companyId);
     if (!current) return undefined;
     const [ruleId, anchor] = key.split(':');
     if (!ruleId || !anchor || !/^\d{4}-\d{2}-\d{2}$/.test(anchor)) return undefined;
@@ -414,12 +483,17 @@ export class PlanningService {
     const [mark] = await this.db
       .select()
       .from(deadlineMarks)
-      .where(and(eq(deadlineMarks.userId, userId), eq(deadlineMarks.key, key)))
+      .where(and(eq(deadlineMarks.companyId, companyId), eq(deadlineMarks.key, key)))
       .limit(1);
     let revenue: ReceiptSet | null = null;
     let estimates: EstimateResult[] = [];
     if (occurrence.periodStart && occurrence.periodEnd) {
-      revenue = await this.receipts(userId, profile.currency, occurrence.periodStart, occurrence.periodEnd);
+      revenue = await this.receipts(
+        companyId,
+        profile.currency,
+        occurrence.periodStart,
+        occurrence.periodEnd,
+      );
       const rules = this.packs.rules(
         pack.country,
         fiscalYearOf(occurrence.periodStart, pack.fiscalYearStart).year,
@@ -448,13 +522,13 @@ export class PlanningService {
   /**
    * Thresholds and yearly estimates, optionally with simulated extra revenue today (P18, S-213)
    *
-   * @param userId {string} - owner
+   * @param companyId {string} - owner
    * @param today {string} - YYYY-MM-DD
    * @param simulateCents {number} - extra revenue to add on today's date
    * @returns {Promise<object | null>} - null when the country has no rules
    */
-  async outlook(userId: string, today: string, simulateCents = 0) {
-    const profile = await this.profile(userId);
+  async outlook(companyId: string, today: string, simulateCents = 0) {
+    const profile = await this.profile(companyId);
     const pack = profile && this.packs.get(profile.country);
     if (!profile || !pack) return null;
     const fiscal = fiscalYearOf(today, pack.fiscalYearStart);
@@ -463,14 +537,16 @@ export class PlanningService {
     const previousStart = `${fiscal.year - 1}${fiscal.start.slice(4)}`;
     const rollingStart = addDays(`${Number(today.slice(0, 4)) - 1}${today.slice(4)}`, 1);
     const from = previousStart < rollingStart ? previousStart : rollingStart;
-    const set = await this.receipts(userId, profile.currency, from, fiscal.end);
+    const set = await this.receipts(companyId, profile.currency, from, fiscal.end);
     const receipts =
       simulateCents > 0 ? [...set.receipts, { date: today, cents: simulateCents }] : set.receipts;
     const facts = ruleProfile(profile);
+    // Thresholds count the whole business, linked activities included; estimates stay local.
+    const linked = await this.linkedRevenue(companyId, profile.currency, from);
     const thresholds: ThresholdProgress[] = measureThresholds(
       found.rules,
       facts,
-      receipts,
+      [...receipts, ...linked.flatMap((link) => link.receipts)],
       fiscal,
       today,
       profile.priorRevenueCents,
@@ -499,6 +575,12 @@ export class PlanningService {
       projectedRevenueCents: projectedRevenue,
       unconverted: set.unconverted,
       thresholds,
+      linked: linked.map(({ receipts: list, ...link }) => ({
+        ...link,
+        cents: list
+          .filter((receipt) => receipt.date >= fiscal.start && receipt.date <= fiscal.end)
+          .reduce((sum, receipt) => sum + receipt.cents, 0),
+      })),
       estimates: toDate,
       projection,
       months,

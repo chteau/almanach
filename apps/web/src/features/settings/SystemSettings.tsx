@@ -17,6 +17,9 @@ export function SystemSettings() {
   const { data, reload } = useResource<{
     version: string;
     versionCheck: boolean;
+    stripeSync: boolean;
+    federation: boolean;
+    preset: { stripeSync: boolean; federation: boolean };
     update: { version: string; url: string } | null;
   }>('/api/system');
   const [failure, setFailure] = useState<string>();
@@ -44,6 +47,32 @@ export function SystemSettings() {
         {t('system.versionCheck')}
       </label>
       <p className={styles.caption}>{t('system.versionCheck.hint')}</p>
+      {(
+        [
+          ['stripe-sync', 'stripeSync'],
+          ['federation', 'federation'],
+        ] as const
+      ).map(([path, key]) => (
+        <div key={key}>
+          <label className={styles.check}>
+            <input
+              type="checkbox"
+              checked={data[key]}
+              disabled={data.preset[key]}
+              onChange={(event) => {
+                void api(`/api/system/${path}`, { method: 'PUT', body: { enabled: event.target.checked } })
+                  .then(() => {
+                    setFailure(undefined);
+                    reload();
+                  })
+                  .catch((problem) => setFailure(describeError(problem, t)));
+              }}
+            />
+            {t(`system.${key}`)}
+          </label>
+          <p className={styles.caption}>{data.preset[key] ? t('system.preset') : t(`system.${key}.hint`)}</p>
+        </div>
+      ))}
     </section>
   );
 }

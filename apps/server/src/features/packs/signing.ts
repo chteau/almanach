@@ -1,4 +1,11 @@
-import { createPrivateKey, createPublicKey, generateKeyPairSync, sign, verify } from 'node:crypto';
+import {
+  createPrivateKey,
+  createPublicKey,
+  generateKeyPairSync,
+  type KeyObject,
+  sign,
+  verify,
+} from 'node:crypto';
 import { z } from 'zod';
 import { sha256 } from '../../security/tokens.ts';
 
@@ -42,7 +49,17 @@ export function keyIdOf(publicKey: string): string {
 }
 
 /**
- * Creates a new Ed25519 key pair for signing packs
+ * Turns a raw Ed25519 public key into a key object
+ *
+ * @param publicKey {string} - raw public key, base64url
+ * @returns {KeyObject} - key usable with crypto.verify
+ */
+export function ed25519PublicKey(publicKey: string): KeyObject {
+  return createPublicKey({ key: { kty: 'OKP', crv: 'Ed25519', x: publicKey }, format: 'jwk' });
+}
+
+/**
+ * Creates a new Ed25519 key pair for signing packs or federation requests
  *
  * @returns {{ publicKey: string; privateKey: string }} - raw public key (base64url) and private key (PKCS#8 PEM)
  */
@@ -87,8 +104,14 @@ export function verifyBundle(
 ): { payload: BundlePayload } | { error: string } {
   const publicKey = trustedKeys.find((key) => keyIdOf(key) === bundle.keyId);
   if (!publicKey) return { error: 'unknown_key' };
-  const key = createPublicKey({ key: { kty: 'OKP', crv: 'Ed25519', x: publicKey }, format: 'jwk' });
-  if (!verify(null, Buffer.from(bundle.payload), key, Buffer.from(bundle.signature, 'base64url'))) {
+  if (
+    !verify(
+      null,
+      Buffer.from(bundle.payload),
+      ed25519PublicKey(publicKey),
+      Buffer.from(bundle.signature, 'base64url'),
+    )
+  ) {
     return { error: 'bad_signature' };
   }
   let decoded: unknown;

@@ -40,6 +40,11 @@ export const thresholdSchema = z
     limitCents: cents,
     /** Higher ceiling that triggers the consequence immediately, when the country has one. */
     toleranceCents: cents.optional(),
+    /**
+     * Statuses whose revenue counts towards the limit when one business mixes activities (tracked in linked
+     * instances); every activity counts when absent.
+     */
+    counts: z.array(z.string()).min(1).optional(),
     consequence: localized,
     ...sourced,
   })

@@ -139,6 +139,11 @@ export const appDe: Record<keyof typeof appEn, string> = {
   'clients.address': 'Adresse',
   'clients.country': 'Land',
   'clients.vat': 'USt-IdNr.',
+  'clients.siret': 'SIRET',
+  'clients.receipts': 'Zahlungseingänge',
+  'clients.stripe.deleted': 'Kunde in Stripe gelöscht: Datensatz und Verlauf bleiben erhalten.',
+  'clients.stripe.edit':
+    'Dieser Kunde stammt aus Stripe. Sobald er hier gespeichert wird, ändert der Abgleich seine Angaben nicht mehr.',
   'clients.vat.hint': 'Für das Reverse-Charge-Verfahren in der EU erforderlich.',
   'clients.vat.missing':
     'EU-Geschäftskunde ohne USt-IdNr.: Das Reverse-Charge-Verfahren ist nicht anwendbar. Fragen Sie nach der Nummer.',

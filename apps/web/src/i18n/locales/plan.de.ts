@@ -294,12 +294,13 @@ export const planDe: Record<keyof typeof planEn, string> = {
   'packs.error.': 'Der Vorgang ist fehlgeschlagen.',
   'data.title': 'Ihre Daten',
   'data.body':
-    'Laden Sie alles, was Almanach über Ihr Unternehmen speichert, als JSON-Datei herunter: Profil, Kunden, Aufträge, Dokumente, Zahlungen, Zeiten und Fristen. Ausgestellte PDFs lassen sich daraus neu erzeugen.',
+    'Laden Sie alles, was Almanach über alle Ihre Unternehmen speichert, als JSON-Datei herunter: Profile, Kunden, Aufträge, Dokumente, Zahlungen, Zeiten und Fristen. Ausgestellte PDFs lassen sich daraus neu erzeugen.',
   'data.export': 'Meine Daten herunterladen',
   'data.import': 'Export importieren',
   'data.import.hint':
     'Ein Import ist nur in ein Konto ohne Kunden und Dokumente möglich, zum Beispiel auf einer neuen Instanz.',
-  'data.imported': 'Import abgeschlossen: {clients} Kunde(n) und {documents} Dokument(e) wiederhergestellt.',
+  'data.imported':
+    'Import abgeschlossen: {companies} Unternehmen, {clients} Kunde(n) und {documents} Dokument(e) wiederhergestellt.',
   'data.error.not_empty':
     'Dieses Konto enthält bereits Kunden oder Dokumente: Importieren Sie in ein neues Konto.',
   'data.error.invalid': 'Diese Datei ist kein gültiger Almanach-Export.',
@@ -482,4 +483,116 @@ export const planDe: Record<keyof typeof planEn, string> = {
   'common.error.useSituation':
     'Ihr Status oder Land hat einen Verlauf: Ändern Sie ihn unter Einstellungen → Änderung der Situation, mit einem Datum.',
   'common.error.ceased': 'Ihre Tätigkeit ist beendet: Dies kann nicht mehr geändert werden.',
+  'companies.switch': 'Aktives Unternehmen',
+  'companies.title': 'Unternehmen',
+  'companies.body':
+    'Jedes Unternehmen hat eigene Kunden, Rechnungen, Zahlungen, Zeiten, Fristen, Schwellen und Schätzungen. Erinnerungen und der Kalender-Feed umfassen alle Ihre Unternehmen und nennen jeweils dessen Namen.',
+  'companies.legal':
+    'In Frankreich kann eine Person nur ein Micro-Entreprise führen: Mehrere Tätigkeiten (etwa Dienstleistungen und Verkauf) werden unter derselben SIRET erklärt, Schwellen und Beiträge gelten für die Summe. Fügen Sie ein Unternehmen für eine andere Rechtsform (SASU, EURL…) oder ein Geschäft in einem anderen Land hinzu.',
+  'companies.name': 'Name',
+  'companies.add': 'Unternehmen hinzufügen',
+  'companies.new': 'Neues Unternehmen',
+  'companies.activate': 'Wechseln',
+  'companies.active': 'Aktiv',
+  'companies.rename': 'Umbenennen',
+  'companies.microConflict':
+    'Sie haben bereits ein aktives französisches Micro-Entreprise ({name}). Eine Person kann nur eines führen: Erklären Sie diese Tätigkeit dort, unter derselben SIRET, statt ein zweites anzulegen. Schwellen und Beiträge gelten für die Summe Ihrer Tätigkeiten; gemischte Verkaufs- und Dienstleistungstätigkeiten haben eigene Schwellen.',
+  'stripe.title': 'Stripe-Abgleich',
+  'stripe.body':
+    'Importiert Stripe-Kunden als Kunden dieses Unternehmens und über Stripe vereinnahmte Zahlungen als Einnahmen, ihrem Kunden zugeordnet: bezahlte Rechnungen, Zahlungen ohne Rechnung und Erstattungen als negative Beträge. Sie zählen für Umsatz, Schwellen und Schätzungen. Beträge netto, wenn Stripe sie liefert; Kartendaten werden nie gespeichert.',
+  'stripe.notAllowed':
+    'Eine Administratorin oder ein Administrator muss den Stripe-Abgleich zuerst unter Einstellungen → Instanz erlauben. Bis dahin kontaktiert Almanach Stripe nie.',
+  'stripe.noSecretsKey':
+    'Um einen Stripe-Schlüssel zu speichern, braucht der Server SECRETS_KEY (siehe .env.example).',
+  'stripe.key': 'Eingeschränkter Schlüssel (rk_…)',
+  'stripe.key.hint':
+    'Legen Sie in Stripe einen eingeschränkten Schlüssel an: Lesen für Charges, Customers, Invoices und Balance transactions (und Refunds, falls aufgeführt), sonst Keine. Er wird verschlüsselt gespeichert.',
+  'stripe.key.saved': 'Ein Schlüssel ist gespeichert. Geben Sie nur zum Ersetzen einen neuen ein.',
+  'stripe.enabled': 'Alle 6 Stunden abgleichen',
+  'stripe.save': 'Speichern',
+  'stripe.sync': 'Jetzt abgleichen',
+  'stripe.remove': 'Schlüssel entfernen',
+  'stripe.status': '{count} Einnahme(n) importiert. Letzter Abgleich: {date}.',
+  'stripe.never': 'nie',
+  'stripe.synced': '{count} neue Einnahme(n) importiert.',
+  'stripe.error.stripe_unauthorized': 'Stripe hat den Schlüssel abgelehnt.',
+  'stripe.error.stripe_forbidden':
+    'Dem Schlüssel fehlt eine Leseberechtigung (Charges, Customers, Invoices, Balance transactions oder Refunds).',
+  'stripe.error.stripe_unreachable': 'Stripe ist nicht erreichbar.',
+  'stripe.error.stripe_failed': 'Stripe hat mit einem Fehler geantwortet.',
+  'system.preset': 'Durch die Serverkonfiguration erlaubt.',
+  'system.stripeSync': 'Abgleich der Unternehmen mit Stripe erlauben',
+  'system.stripeSync.hint':
+    'Standardmäßig aus. Danach schaltet jede Person den Abgleich pro Unternehmen mit ihrem eigenen Nur-Lese-Schlüssel ein.',
+  'federation.title': 'Verknüpfte Instanzen',
+  'federation.body':
+    'Ein Unternehmen, mehrere Tätigkeiten in getrennten Almanach-Instanzen: Verknüpfen Sie sie, damit Obergrenzen, Umsatzsteuerbefreiung und Hinweise den Umsatz des ganzen Unternehmens zählen. Übertragen werden nur Monatssummen je Steuerkategorie und der Name der Tätigkeit; Rechnungen, Kunden und Beiträge bleiben in jeder Instanz.',
+  'federation.notAllowed':
+    'Ein Administrator muss Verknüpfungen zwischen Instanzen zuerst unter Einstellungen → Instanz erlauben. Bis dahin wird nichts gesendet.',
+  'federation.noSecretsKey':
+    'Verknüpfungen brauchen SECRETS_KEY auf dem Server, um ihre Schlüssel zu speichern (siehe .env.example).',
+  'federation.label': 'Name dieser Tätigkeit',
+  'federation.label.hint': 'Wird der verknüpften Instanz angezeigt, z. B. „Freelance“ oder Ihr Produktname.',
+  'federation.enabled': 'Dieses Unternehmen mit anderen Instanzen verknüpfen',
+  'federation.save': 'Speichern',
+  'federation.waiting': 'Warten auf die andere Instanz',
+  'federation.state.pending': 'Code ausgestellt',
+  'federation.state.active': 'Verknüpft',
+  'federation.state.imported': 'Neu koppeln',
+  'federation.expires': 'Der Code läuft um {time} ab.',
+  'federation.imported':
+    'Aus einem Export wiederhergestellt: Schlüssel werden nie exportiert. Widerrufen und neu koppeln.',
+  'federation.fingerprints':
+    'Diese Instanz: {own} · andere Instanz: {peer}. Beide Bildschirme müssen dasselbe Paar zeigen, vertauscht.',
+  'federation.syncedAt': 'Letzter Austausch: {synced}. Summen erhalten: {received}.',
+  'federation.never': 'nie',
+  'federation.share': 'Summen dieser Tätigkeit teilen',
+  'federation.receive': 'Summen der anderen Tätigkeit empfangen',
+  'federation.pulls': 'Diese Instanz ruft die andere auf (alle 6 Stunden)',
+  'federation.sync': 'Abgleichen',
+  'federation.synced': 'Summen ausgetauscht.',
+  'federation.revoke': 'Widerrufen',
+  'federation.revoke.title': 'Diese Verknüpfung widerrufen?',
+  'federation.revoke.body':
+    'Der Schlüssel der anderen Instanz und die von ihr erhaltenen Summen werden gelöscht, auf beiden Seiten, sofern sie erreichbar ist. Für eine neue Verknüpfung ist ein neuer Code nötig.',
+  'federation.issue': 'Andere Instanz verknüpfen',
+  'federation.issue.hint':
+    'Erzeugen Sie den Code auf der Instanz, die die andere erreichen kann (außerhalb des VPN), und geben Sie ihn innerhalb von 15 Minuten auf der anderen ein.',
+  'federation.issue.submit': 'Kopplungscode erzeugen',
+  'federation.code': 'Einmalcode, gültig bis {time}. Fingerabdruck dieser Instanz: {fingerprint}.',
+  'federation.code.field': 'Kopplungscode',
+  'federation.ownUrl': 'Adresse dieser Instanz',
+  'federation.ownUrl.hint':
+    'So, wie die andere Instanz sie erreicht. HTTPS oder HTTP auf einer privaten Netzwerkadresse.',
+  'federation.join': 'Code eingeben',
+  'federation.join.submit': 'Koppeln',
+  'federation.paired': 'Instanzen verknüpft. Vergleichen Sie die Fingerabdrücke auf beiden Bildschirmen.',
+  'federation.error.federation_not_allowed':
+    'Verknüpfungen zwischen Instanzen sind auf dieser Instanz nicht erlaubt.',
+  'federation.error.federation_off': 'Schalten Sie Verknüpfungen für dieses Unternehmen zuerst ein.',
+  'federation.error.secrets_key_missing': 'Der Server hat keinen SECRETS_KEY.',
+  'federation.error.invalid_url':
+    'Verwenden Sie eine HTTPS-Adresse oder HTTP auf localhost bzw. einer privaten Netzwerkadresse.',
+  'federation.error.invalid_code': 'Dieser Code ist ungültig. Kopieren Sie ihn erneut vollständig.',
+  'federation.error.code_unknown':
+    'Die andere Instanz kennt diesen Code nicht: Er wurde bereits verwendet oder widerrufen.',
+  'federation.error.code_expired': 'Dieser Code ist abgelaufen. Erzeugen Sie einen neuen.',
+  'federation.error.peer_unreachable':
+    'Die andere Instanz ist nicht erreichbar. Die zuletzt erhaltenen Summen bleiben erhalten.',
+  'federation.error.peer_refused':
+    'Die andere Instanz hat die Anfrage abgelehnt: Die Verknüpfung wurde dort vielleicht widerrufen.',
+  'federation.error.peer_failed': 'Die andere Instanz hat mit einem Fehler geantwortet.',
+  'federation.error.peer_bad_signature':
+    'Die Antwort ist nicht mit dem erwarteten Schlüssel signiert. Nichts wurde gespeichert.',
+  'federation.error.peer_invalid': 'Die andere Instanz hat eine unerwartete Antwort gesendet.',
+  'federation.error.peer_too_large': 'Die Antwort der anderen Instanz ist zu groß.',
+  'federation.error.currency_mismatch':
+    'Die andere Instanz rechnet in einer anderen Währung: Ihre Summen werden ignoriert.',
+  'system.federation': 'Verknüpfungen zwischen Instanzen erlauben',
+  'system.federation.hint':
+    'Standardmäßig aus. Danach kann jede Person ein Unternehmen mit einer anderen Almanach-Instanz verknüpfen, um den Umsatz des ganzen Unternehmens zu zählen.',
+  'outlook.linked': 'davon {amount} aus einer verknüpften Instanz ({labels})',
+  'outlook.linkedEstimates':
+    'Andere Tätigkeit ({label}): {amount} vereinnahmt, Beiträge verwaltet die andere Instanz.',
+  'outlook.linkedStale': 'Summen vom {date}: Die andere Instanz ist seitdem nicht erreichbar.',
 };

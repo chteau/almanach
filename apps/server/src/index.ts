@@ -3,6 +3,7 @@ import { loadConfig } from './config.ts';
 import { createDatabase, runMigrations } from './db/client.ts';
 import { SessionStore } from './features/auth/sessions.ts';
 import { DocumentService } from './features/documents/documents.service.ts';
+import { Federation } from './features/federation/federation.ts';
 import { DrizzleInstallRepository } from './features/install/install.repository.ts';
 import { InstallService } from './features/install/install.service.ts';
 import { InstallTokenStore } from './features/install/install-token.ts';
@@ -10,6 +11,7 @@ import { PackRegistry } from './features/packs/packs.ts';
 import { PackUpdates } from './features/packs/updates.ts';
 import { PlanningService } from './features/planning/planning.service.ts';
 import { ReminderJob } from './features/planning/reminders.ts';
+import { StripeSync } from './features/stripe/stripe.ts';
 import { ReleaseCheck } from './features/system/system.ts';
 import { maintenanceFetch } from './http/maintenance.ts';
 
@@ -54,6 +56,8 @@ async function main(): Promise<void> {
   const planning = new PlanningService(db, packs);
   const reminders = new ReminderJob(db, planning, config);
   const releases = new ReleaseCheck(db, config.releaseCheckUrl);
+  const stripe = new StripeSync(db, config.secretsKey, fetch, config.stripeSync);
+  const federation = new Federation(db, planning, config.secretsKey, fetch, config.federation);
   const app = createApp({
     config,
     install,
@@ -65,6 +69,8 @@ async function main(): Promise<void> {
     reminders,
     packUpdates,
     releases,
+    stripe,
+    federation,
   });
   if (config.maintenance) {
     console.log('MAINTENANCE=true: only the maintenance page is served, background jobs are off.');
@@ -73,6 +79,8 @@ async function main(): Promise<void> {
   packUpdates.start();
   if (config.reminders) reminders.start();
   releases.start();
+  stripe.start();
+  federation.start();
   server.reload({ fetch: app.fetch });
   console.log('Almanach is ready.');
 }

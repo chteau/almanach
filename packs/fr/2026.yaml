@@ -22,6 +22,10 @@ holidays:
   - { date: "2026-12-25", name: Noël }
   - { date: "2027-01-01", name: Jour de l'an }
 
+# Activité mixte (art. 50-0 et 293 B du CGI) : le plafond « ventes » s'applique au chiffre d'affaires global,
+# le plafond « services » à la seule part des prestations de services (BIC services et BNC). `counts` liste
+# les statuts dont le chiffre d'affaires compte pour chaque seuil, quand des instances liées suivent les
+# autres activités de la même micro-entreprise.
 thresholds:
   - id: micro_ceiling_services
     label:
@@ -31,6 +35,7 @@ thresholds:
         de: "Obergrenze Mikro-Regime (Dienstleistungen, BNC)",
       }
     appliesTo: { statuses: [micro_bnc, micro_bic_services] }
+    counts: [micro_bnc, micro_bic_services]
     window: fiscal_year
     limitCents: 8360000
     consequence:
@@ -47,6 +52,7 @@ thresholds:
         de: "Obergrenze Mikro-Regime (Warenverkauf)",
       }
     appliesTo: { statuses: [micro_bic_sales] }
+    counts: [micro_bic_sales, micro_bic_services, micro_bnc]
     window: fiscal_year
     limitCents: 20310000
     consequence:
@@ -63,6 +69,7 @@ thresholds:
         de: "Umsatzsteuerbefreiung (Dienstleistungen)",
       }
     appliesTo: { statuses: [micro_bnc, micro_bic_services], withoutOptions: [vat_liable] }
+    counts: [micro_bnc, micro_bic_services]
     window: fiscal_year
     limitCents: 3750000
     toleranceCents: 4125000
@@ -80,6 +87,7 @@ thresholds:
         de: "Umsatzsteuerbefreiung (Warenverkauf)",
       }
     appliesTo: { statuses: [micro_bic_sales], withoutOptions: [vat_liable] }
+    counts: [micro_bic_sales, micro_bic_services, micro_bnc]
     window: fiscal_year
     limitCents: 8500000
     toleranceCents: 9350000
