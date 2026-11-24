@@ -22,6 +22,78 @@ export const PACK_FEATURES = [
   'einvoicing',
 ] as const;
 
+const sourced = { source: z.url({ protocol: /^https$/ }), verified_on: z.iso.date() };
+
+/** E-invoice formats Almanach can produce; `ubl` is modelled for later (XRechnung) but not offered yet. */
+export const EINVOICE_FORMATS = ['facturx', 'ubl'] as const;
+export type EinvoiceFormatId = (typeof EINVOICE_FORMATS)[number];
+
+/** E-invoicing rules of a country (§ 6.3 of the admin-assistant spec); nothing is ever transmitted. */
+const einvoiceRules = z
+  .object({
+    formats: z
+      .array(
+        z
+          .object({
+            id: z.enum(EINVOICE_FORMATS),
+            profile: z.enum(['EN16931']),
+            syntax: z.enum(['CII', 'UBL']).optional(),
+          })
+          .strict(),
+      )
+      .min(1),
+    default: z.enum(EINVOICE_FORMATS),
+    /** When receiving and issuing become mandatory; shown as information, never blocking. */
+    mandates: z
+      .array(
+        z
+          .object({
+            scope: z.enum(['receive', 'issue']),
+            from: z.iso.date(),
+            appliesTo: z
+              .object({ statuses: z.array(z.string()) })
+              .strict()
+              .optional(),
+            ...sourced,
+          })
+          .strict(),
+      )
+      .default([]),
+    /** Extra data the country requires on an e-invoice, beyond EN 16931. */
+    requiredFields: z.array(z.enum(['buyer_legal_id'])).default([]),
+    /** Seller and domestic buyer legal registration (BT-30, BT-47): identifier, ISO 6523 scheme, digits kept. */
+    legalId: z
+      .object({
+        identifier: z.string(),
+        scheme: z.string().regex(/^\d{4}$/),
+        length: z.number().int().min(1),
+      })
+      .strict()
+      .optional(),
+    /** Seller identifier written as tax registration (BT-32, scheme FC), e.g. the German Steuernummer. */
+    taxId: z.string().optional(),
+    /** CEF VATEX exemption reason codes (BT-121) per VAT treatment; the text (BT-120) is the printed mention. */
+    exemptionCodes: z
+      .object({
+        franchise: z
+          .string()
+          .regex(/^VATEX-/)
+          .optional(),
+        reverse_charge: z
+          .string()
+          .regex(/^VATEX-/)
+          .optional(),
+        export: z
+          .string()
+          .regex(/^VATEX-/)
+          .optional(),
+      })
+      .strict()
+      .default({}),
+    note: localized.optional(),
+  })
+  .strict();
+
 const invoiceRules = z
   .object({
     vatRateBp: z.number().int().min(0).max(10_000),
@@ -42,6 +114,7 @@ const invoiceRules = z
         b2b_late: localized.optional(),
       })
       .strict(),
+    einvoice: einvoiceRules.optional(),
   })
   .strict();
 
@@ -83,6 +156,7 @@ export const packMetaSchema = z
   .strict();
 
 export type PackMeta = z.infer<typeof packMetaSchema>;
+export type EinvoiceRules = z.infer<typeof einvoiceRules>;
 export type PackMaturity = (typeof PACK_MATURITIES)[number];
 export type PackFeature = (typeof PACK_FEATURES)[number];
 export type PackFeatures = Partial<Record<PackFeature, PackMaturity>>;

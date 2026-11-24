@@ -370,6 +370,9 @@ export const planFr: Record<keyof typeof planEn, string> = {
   'billing.terms.hint': 'Chaque client peut garder son propre délai.',
   'billing.terms.invalid': 'Saisissez un nombre de jours entre 0 et 120.',
   'billing.note': 'Note par défaut des nouveaux documents',
+  'billing.facturx': 'PDF + Factur-X par défaut sur les factures des clients professionnels',
+  'billing.facturx.hint':
+    'Chaque facture peut ensuite l’activer ou non. Almanach produit la Factur-X mais ne la transmet pas.',
   'billing.note.hint':
     'Pré-remplie sur les nouveaux devis et factures, par exemple les pénalités de retard. Modifiable sur chaque document.',
   'billing.previewPdf': 'Aperçu PDF (réglages enregistrés)',

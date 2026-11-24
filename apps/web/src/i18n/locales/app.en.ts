@@ -130,6 +130,11 @@ export const appEn = {
   'clients.email': 'E-mail',
   'clients.phone': 'Phone',
   'clients.address': 'Address',
+  'clients.street': 'Street (one line per part: street, building…)',
+  'clients.postalCode': 'Postal code',
+  'clients.city': 'City',
+  'clients.einvoice.missing':
+    'For e-invoices (Factur-X), fill in the street, postal code and city. The classic PDF does not depend on them.',
   'clients.country': 'Country',
   'clients.vat': 'VAT number',
   'clients.siret': 'SIRET',

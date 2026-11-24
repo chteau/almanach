@@ -7,6 +7,8 @@ features:
   estimates: experimental
   deadlines: experimental
   activities: experimental
+  # ZUGFeRD/Factur-X EN16931 only; XRechnung (BT-10 Leitweg-ID, CIUS rules) is not produced yet.
+  einvoicing: experimental
 name: { fr: Allemagne, en: Germany, de: Deutschland }
 currency: EUR
 fiscalYearStart: "01-01"
@@ -61,3 +63,24 @@ invoice:
       fr: "Prestation non imposable en Allemagne"
       en: "Service not taxable in Germany"
       de: "Nicht im Inland steuerbare Leistung"
+  # ZUGFeRD from profile EN16931 is accepted as E-Rechnung (§ 14 UStG); Kleinunternehmer may keep issuing other
+  # invoices (§ 34a UStDV). Profiles accepted by the BMF still to be checked: experimental.
+  einvoice:
+    formats:
+      - { id: facturx, profile: EN16931, syntax: CII }
+    default: facturx
+    mandates:
+      - scope: receive
+        from: "2025-01-01"
+        source: https://www.bundesfinanzministerium.de/Content/DE/FAQ/e-rechnung.html
+        verified_on: "2026-11-24"
+      - scope: issue
+        from: "2028-01-01"
+        appliesTo: { statuses: [freiberufler, gewerbe] }
+        source: https://www.bundesfinanzministerium.de/Content/DE/FAQ/e-rechnung.html
+        verified_on: "2026-11-24"
+    taxId: steuernummer
+    note:
+      fr: "Almanach produit une ZUGFeRD/Factur-X EN16931 sans la transmettre ; XRechnung n'est pas encore proposé."
+      en: "Almanach produces a ZUGFeRD/Factur-X EN16931 without transmitting it; XRechnung is not offered yet."
+      de: "Almanach erstellt eine ZUGFeRD/Factur-X EN16931, übermittelt sie aber nicht; XRechnung wird noch nicht angeboten."

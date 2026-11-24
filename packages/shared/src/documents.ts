@@ -47,6 +47,8 @@ export const documentDraftSchema = z
     note: optionalText(2000),
     depositIds: z.array(idSchema).max(20),
     activityId: activityRefSchema,
+    /** Also produce a Factur-X (PDF/A-3 with its EN 16931 XML); absent keeps the current choice or the default. */
+    einvoice: z.boolean().optional(),
   })
   .strict();
 
@@ -221,6 +223,8 @@ export interface DocumentView {
   creditedCents: number;
   depositIds: string[];
   activityId: string | null;
+  /** E-invoice produced with the PDF, frozen at issue. */
+  einvoiceFormat: 'facturx' | null;
   sentAt: string | null;
   createdAt: string;
 }

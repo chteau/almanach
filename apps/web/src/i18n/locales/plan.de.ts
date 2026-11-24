@@ -372,6 +372,9 @@ export const planDe: Record<keyof typeof planEn, string> = {
   'billing.terms.hint': 'Jeder Kunde kann sein eigenes Zahlungsziel behalten.',
   'billing.terms.invalid': 'Geben Sie eine Zahl von 0 bis 120 Tagen ein.',
   'billing.note': 'Standardhinweis auf neuen Dokumenten',
+  'billing.facturx': 'Standardmäßig PDF + Factur-X auf Rechnungen an Geschäftskunden',
+  'billing.facturx.hint':
+    'Jede Rechnung kann es weiterhin ein- oder ausschalten. Almanach erstellt die Factur-X, übermittelt sie aber nicht.',
   'billing.note.hint':
     'Wird bei neuen Angeboten und Rechnungen vorausgefüllt, z. B. Verzugsbedingungen. Auf jedem Dokument änderbar.',
   'billing.previewPdf': 'PDF-Vorschau (gespeicherte Einstellungen)',

@@ -1,4 +1,5 @@
 import {
+  composeAddress,
   countrySchema,
   currencySchema,
   isEuVatNumber,
@@ -30,7 +31,16 @@ type Revenue = Omit<typeof externalRevenues.$inferInsert, 'id' | 'companyId' | '
 /** Client fields the sync keeps in step with Stripe until the client is edited in Almanach. */
 export type CustomerFields = Pick<
   typeof clients.$inferInsert,
-  'kind' | 'name' | 'email' | 'address' | 'country' | 'vatNumber' | 'siret'
+  | 'kind'
+  | 'name'
+  | 'email'
+  | 'address'
+  | 'addressLines'
+  | 'postalCode'
+  | 'city'
+  | 'country'
+  | 'vatNumber'
+  | 'siret'
 >;
 
 interface StripeBalance {
@@ -146,24 +156,22 @@ export function toClientFields(customer: StripeCustomer, fallbackCountry: string
   const siret = (customer.metadata?.siret ?? customer.metadata?.SIRET)?.replace(/\s/g, '');
   const vatNumber = vat && isEuVatNumber(vat) ? vat : null;
   const validSiret = siret?.length === 14 && isLuhnValid(siret) ? siret : null;
-  const lines = [
-    address?.line1,
-    address?.line2,
-    `${address?.postal_code ?? ''} ${address?.city ?? ''}`,
-    address?.state,
-  ];
+  const street = [address?.line1, address?.line2, address?.state]
+    .map((line) => line?.trim().slice(0, 100))
+    .filter((line): line is string => Boolean(line));
+  const postalCode = address?.postal_code?.trim().slice(0, 16) || null;
+  const city = address?.city?.trim().slice(0, 100) || null;
+  const finalCountry = countrySchema.safeParse(country).success ? country : fallbackCountry;
   const email = customer.email?.trim() ?? '';
   return {
     kind: vatNumber || validSiret ? 'company' : 'individual',
     name: (customer.name?.trim() || email || customer.id).slice(0, 160),
     email: email && email.length <= 254 && /^[^\s@]+@[^\s@]+$/.test(email) ? email : null,
-    address:
-      lines
-        .map((line) => line?.trim())
-        .filter(Boolean)
-        .join('\n')
-        .slice(0, 500) || null,
-    country: countrySchema.safeParse(country).success ? country : fallbackCountry,
+    address: composeAddress({ lines: street, postalCode, city }, finalCountry)?.slice(0, 500) ?? null,
+    addressLines: street.length > 0 ? street : null,
+    postalCode,
+    city,
+    country: finalCountry,
     vatNumber,
     siret: validSiret,
   };

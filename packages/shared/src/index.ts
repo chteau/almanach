@@ -6,6 +6,7 @@ export * from './common.ts';
 export * from './companies.ts';
 export * from './csv.ts';
 export * from './documents.ts';
+export * from './einvoice.ts';
 export * from './engine.ts';
 export * from './external.ts';
 export * from './federation.ts';

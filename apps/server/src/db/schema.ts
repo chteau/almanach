@@ -9,6 +9,7 @@ import type {
   NumberFormatPeriod,
   PDF_FONTS,
   PDF_LAYOUTS,
+  PostalAddress,
   Situation,
   Totals,
   VatMode,
@@ -204,6 +205,10 @@ export const clients = pgTable(
     email: text('email'),
     phone: text('phone'),
     address: text('address'),
+    /** Structured address (EN 16931 BG-8); `address` stays the printed text. */
+    addressLines: jsonb('address_lines').$type<string[]>(),
+    postalCode: text('postal_code'),
+    city: text('city'),
     country: text('country').notNull(),
     vatNumber: text('vat_number'),
     currency: text('currency').notNull(),
@@ -272,6 +277,8 @@ export interface PartySnapshot {
   vatNumber: string | null;
   identifiers: Record<string, string>;
   bank?: Bank;
+  /** Structured address for the e-invoice; absent on documents issued before it existed. */
+  postal?: PostalAddress | null;
 }
 
 /** Quotes, invoices, deposit invoices and credit notes share one table and one line format. */
@@ -303,6 +310,8 @@ export const documents = pgTable(
     vatMode: text('vat_mode').$type<VatMode>().notNull(),
     mentions: jsonb('mentions').$type<string[]>().notNull(),
     totals: jsonb('totals').$type<Totals>().notNull(),
+    /** Factur-X produced with the PDF; frozen at issue. */
+    einvoiceFormat: text('einvoice_format').$type<'facturx'>(),
     seller: jsonb('seller').$type<PartySnapshot>(),
     buyer: jsonb('buyer').$type<PartySnapshot>(),
     sentAt: timestamp('sent_at', { withTimezone: true }),
@@ -493,6 +502,7 @@ export const billingSettings = pgTable('billing_settings', {
     .notNull(),
   defaultTermsDays: integer('default_terms_days').notNull().default(30),
   defaultNote: text('default_note'),
+  facturxDefault: boolean('facturx_default').notNull().default(false),
   /** Base64 PNG or JPEG, at most 256 KB once decoded. */
   logo: text('logo'),
   logoMime: text('logo_mime'),

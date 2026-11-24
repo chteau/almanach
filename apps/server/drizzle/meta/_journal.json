@@ -134,6 +134,13 @@
       "when": 1795480089267,
       "tag": "0018_mail_settings",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1795482718181,
+      "tag": "0030_einvoice",
+      "breakpoints": true
     }
   ]
 }

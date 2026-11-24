@@ -48,6 +48,8 @@ export const billingSettingsSchema = z
       .strict(),
     defaultTermsDays: z.number().int().min(0).max(120),
     defaultNote: optionalText(1000),
+    /** New invoices also produce a Factur-X when the country supports it; absent keeps the stored choice. */
+    facturxDefault: z.boolean().optional(),
   })
   .strict();
 

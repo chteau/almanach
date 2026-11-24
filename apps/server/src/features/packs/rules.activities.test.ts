@@ -55,8 +55,15 @@ describe('maturity per function', () => {
         estimates: 'experimental',
         deadlines: 'experimental',
         activities: 'experimental',
+        einvoicing: 'experimental',
       },
-      FR: { thresholds: 'verified', estimates: 'verified', deadlines: 'verified', activities: 'verified' },
+      FR: {
+        thresholds: 'verified',
+        estimates: 'verified',
+        deadlines: 'verified',
+        activities: 'verified',
+        einvoicing: 'verified',
+      },
       GB: { thresholds: 'verified', estimates: 'verified', deadlines: 'verified' },
       US: { estimates: 'experimental', deadlines: 'experimental', activities: 'experimental' },
     });

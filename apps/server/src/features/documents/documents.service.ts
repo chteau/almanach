@@ -1,16 +1,23 @@
 import {
   addDays,
+  buildEinvoice,
   computeTotals,
   type DocumentDraft,
   type DocumentType,
   type DocumentView,
+  type EinvoiceSource,
+  type EnInvoice,
+  einvoiceMissing,
+  facturxRules,
   formatNumber,
   invoiceStatus,
   type Line,
   type NumberFamily,
   quoteStatus,
   sequenceYear,
+  splitAddress,
   type VatMode,
+  vatMentionIn,
   vatSituation,
 } from '@almanach/shared';
 import { and, eq, inArray, max, ne, sql } from 'drizzle-orm';
@@ -58,7 +65,7 @@ export class DocumentService {
    */
   constructor(
     private readonly db: Database,
-    private readonly packs: PackRegistry,
+    readonly packs: PackRegistry,
   ) {}
 
   /**
@@ -154,6 +161,7 @@ export class DocumentService {
         email: profile.company.email,
         vatNumber: profile.identifiers.vat ?? null,
         identifiers: profile.identifiers,
+        postal: splitAddress(profile.company.address, profile.country),
         bank: profile.bank,
       },
       buyer: {
@@ -162,7 +170,8 @@ export class DocumentService {
         country: client.country,
         email: client.contacts.find((contact) => contact.billing)?.email ?? client.email,
         vatNumber: client.vatNumber,
-        identifiers: {},
+        identifiers: client.siret ? { siret: client.siret } : {},
+        postal: { lines: client.addressLines ?? [], postalCode: client.postalCode, city: client.city },
       },
     };
   }
@@ -194,6 +203,68 @@ export class DocumentService {
   }
 
   /**
+   * What a Factur-X of the document still needs, from frozen snapshots once issued or current details before;
+   * null when the seller's pack does not offer Factur-X
+   *
+   * @param profile {ProfileRow} - seller profile
+   * @param client {ClientRow} - client
+   * @param doc {Pick<DocumentRow, 'type' | 'currency' | 'vatMode' | 'mentions' | 'lines' | 'seller' | 'buyer'>} - document
+   * @returns {string[] | null} - missing items (stable codes), or null
+   */
+  einvoiceMissing(
+    profile: ProfileRow,
+    client: ClientRow,
+    doc: Pick<DocumentRow, 'type' | 'currency' | 'vatMode' | 'mentions' | 'lines' | 'seller' | 'buyer'>,
+  ): string[] | null {
+    const pack = this.packs.get(profile.country);
+    const rules = facturxRules(pack);
+    if (!pack || !rules) return null;
+    const parties =
+      doc.seller && doc.buyer ? { seller: doc.seller, buyer: doc.buyer } : this.snapshots(profile, client);
+    return einvoiceMissing(
+      {
+        ...doc,
+        ...parties,
+        buyerKind: client.kind,
+        vatMention: vatMentionIn(pack, doc.vatMode, doc.mentions),
+      },
+      { rules, currency: pack.currency },
+    );
+  }
+
+  /**
+   * EN 16931 model of an issued document, rebuilt identically from its snapshots
+   *
+   * @param profile {ProfileRow} - seller profile, for the country pack
+   * @param client {ClientRow} - client, for its kind
+   * @param doc {DocumentRow} - issued document
+   * @param related {{ number: string; issueDate: string } | null} - invoice a credit note corrects
+   * @returns {ReturnType<typeof buildEinvoice>} - model or what is missing
+   */
+  einvoice(
+    profile: ProfileRow,
+    client: ClientRow,
+    doc: DocumentRow,
+    related: EinvoiceSource['related'],
+  ): { invoice: EnInvoice; missing: [] } | { invoice: null; missing: string[] } {
+    const pack = this.packs.get(profile.country);
+    const rules = facturxRules(pack);
+    if (!pack || !rules || !doc.seller || !doc.buyer)
+      return { invoice: null, missing: ['document.einvoice'] };
+    return buildEinvoice(
+      {
+        ...doc,
+        seller: doc.seller,
+        buyer: doc.buyer,
+        buyerKind: client.kind,
+        vatMention: vatMentionIn(pack, doc.vatMode, doc.mentions),
+        related,
+      },
+      { rules, currency: pack.currency },
+    );
+  }
+
+  /**
    * Issues a draft: checks completeness and chronology, assigns the next number of its series under
    * a row lock, freezes seller and client details and recomputes every amount (S-166, S-171, S-174)
    *
@@ -214,6 +285,11 @@ export class DocumentService {
       if (!profile || !client) return { error: 'missing_fields' as const, missing: ['profile'] };
 
       const missing = this.missing(profile, client, doc.lines, doc.vatMode);
+      // A requested Factur-X must be complete; the classic PDF never waits for it.
+      const einvoice = doc.einvoiceFormat
+        ? this.einvoiceMissing(profile, client, { ...doc, seller: null, buyer: null })
+        : null;
+      missing.push(...(einvoice ?? []).map((item) => `einvoice.${item}`));
       if (missing.length > 0) return { error: 'missing_fields' as const, missing };
 
       const family = FAMILY[doc.type];
@@ -285,6 +361,7 @@ export class DocumentService {
         .set({
           ...derived,
           ...this.snapshots(profile, client),
+          einvoiceFormat: einvoice ? doc.einvoiceFormat : null,
           number,
           state: doc.type === 'quote' ? 'sent' : 'issued',
           dueDate:
@@ -406,6 +483,7 @@ export class DocumentService {
         creditedCents,
         depositIds: doc.depositIds,
         activityId: doc.activityId,
+        einvoiceFormat: doc.einvoiceFormat ?? null,
         sentAt: doc.sentAt?.toISOString() ?? null,
         createdAt: doc.createdAt.toISOString(),
       };

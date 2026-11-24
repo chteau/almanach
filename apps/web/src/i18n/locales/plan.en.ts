@@ -362,6 +362,9 @@ export const planEn = {
   'billing.terms.hint': 'Each client can still have their own terms.',
   'billing.terms.invalid': 'Enter a number of days between 0 and 120.',
   'billing.note': 'Default note on new documents',
+  'billing.facturx': 'PDF + Factur-X by default on invoices to business clients',
+  'billing.facturx.hint':
+    'Each invoice can still turn it on or off. Almanach produces the Factur-X but does not transmit it.',
   'billing.note.hint':
     'Prefilled on new quotes and invoices, for example late payment terms. You can still change it on each document.',
   'billing.previewPdf': 'Preview a PDF (saved settings)',

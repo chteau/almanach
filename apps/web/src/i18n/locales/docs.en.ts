@@ -98,6 +98,30 @@ export const docsEn = {
   'documents.missing.seller.vat': 'your VAT number (profile), required for reverse charge',
   'documents.missing.client.vat': 'the client’s VAT number, required for reverse charge',
   'documents.missing.profile': 'your profile',
+  'documents.einvoice.label': 'PDF + Factur-X',
+  'documents.einvoice.hint':
+    'Embeds the EN 16931 e-invoice (Factur-X) in the PDF. Almanach produces the file but does not transmit it.',
+  'documents.einvoice.title': 'For a valid Factur-X, complete (untick it to keep the classic PDF):',
+  'documents.einvoice.issued':
+    'This document’s PDF contains its Factur-X (EN 16931). Almanach does not transmit it.',
+  'documents.missing.einvoice.document.type': 'a billable document type',
+  'documents.missing.einvoice.lines': 'at least one line',
+  'documents.missing.einvoice.document.currency':
+    'the country’s currency: Factur-X in a foreign currency is not supported yet',
+  'documents.missing.einvoice.document.vat_mode': 'a VAT treatment of the country',
+  'documents.missing.einvoice.document.vat_exemption': 'the VAT exemption mention',
+  'documents.missing.einvoice.client.kind': 'a business client: no Factur-X for a private person',
+  'documents.missing.einvoice.seller.address': 'the street of your address (profile)',
+  'documents.missing.einvoice.seller.postal_code':
+    'the postal code of your address, starting the last line, followed by the city (profile)',
+  'documents.missing.einvoice.seller.city': 'the city of your address (profile)',
+  'documents.missing.einvoice.client.address': 'the street of the client’s address',
+  'documents.missing.einvoice.client.postal_code': 'the client’s postal code',
+  'documents.missing.einvoice.client.city': 'the client’s city',
+  'documents.missing.einvoice.seller.siret': 'your SIRET (profile), which gives the SIREN',
+  'documents.missing.einvoice.seller.vat':
+    'your VAT number (profile), required by EN 16931 even under the franchise',
+  'documents.missing.einvoice.client.vat': 'the client’s VAT number, required for reverse charge',
   'documents.deleteDraft': 'Delete draft',
   'documents.deleteDraft.body': 'The draft will be erased. Issued documents are never deleted.',
   'documents.saveDraft': 'Save draft',
@@ -115,6 +139,7 @@ export const docsEn = {
   'documents.issue.creditExceeds': 'The credit note exceeds what remains on the invoice ({amount}).',
 
   'documents.downloadPdf': 'Download PDF',
+  'documents.downloadFacturx': 'Download PDF + Factur-X',
   'documents.markSent': 'Mark as sent',
   'documents.sent': 'Sent',
   'documents.notSent': 'Not sent yet',

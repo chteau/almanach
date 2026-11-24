@@ -1,4 +1,10 @@
-import { type DocumentView, PAYMENT_METHODS, type PaymentView, parseAmount } from '@almanach/shared';
+import {
+  type DocumentView,
+  facturxRules,
+  PAYMENT_METHODS,
+  type PaymentView,
+  parseAmount,
+} from '@almanach/shared';
 import { type SyntheticEvent, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { Badge } from '../../components/Badge/Badge.tsx';
@@ -15,7 +21,7 @@ import { centsToInput, formatDate, formatMoney, today } from '../../lib/format.t
 import { useResource } from '../../lib/useResource.ts';
 import { ActivitySelect } from '../activities/ActivitySelect.tsx';
 import { describeError } from '../install/errors.ts';
-import { useProfile } from '../profile/useProfile.ts';
+import { usePack, useProfile } from '../profile/useProfile.ts';
 import styles from './DocumentEditor.module.css';
 import { STATUS_TONE } from './labels.ts';
 
@@ -36,6 +42,7 @@ export function DocumentDetail({
   const { t, locale } = useI18n();
   const navigate = useNavigate();
   const profile = useProfile();
+  const einvoiceNote = facturxRules(usePack() ?? undefined)?.note;
   const allPayments = useResource<{ payments: PaymentView[] }>(
     doc.type === 'invoice' || doc.type === 'deposit' ? '/api/payments' : null,
   );
@@ -122,7 +129,7 @@ export function DocumentDetail({
         }
       >
         <a href={`/api/documents/${doc.id}/pdf?download=1`} className={`${styles.link}`}>
-          {t('documents.downloadPdf')}
+          {t(doc.einvoiceFormat === 'facturx' ? 'documents.downloadFacturx' : 'documents.downloadPdf')}
         </a>
         {!doc.sentAt && (
           <Button
@@ -145,6 +152,11 @@ export function DocumentDetail({
           </Notice>
         )}
         <Notice tone="info">{t('documents.frozen')}</Notice>
+        {doc.einvoiceFormat === 'facturx' && (
+          <Notice tone="info">
+            {t('documents.einvoice.issued')} {einvoiceNote?.[locale]}
+          </Notice>
+        )}
         <section className={form.section} aria-label={t('documents.section.totals')}>
           <dl className={form.facts}>
             {facts.map(([label, value]) => (
