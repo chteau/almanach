@@ -10,8 +10,9 @@ import {
   regionalLocale,
   type Totals,
 } from '@almanach/shared';
-import { PDFDocument, type PDFFont, type PDFPage, rgb, StandardFonts } from 'pdf-lib';
+import { PDFDocument, type PDFPage, rgb } from 'pdf-lib';
 import type { PartySnapshot } from '../../db/schema.ts';
+import { type EmbeddedFont, embedFonts, type FacturxAttachment, finishPdfA } from './pdfa.ts';
 
 const LABELS = {
   fr: {
@@ -143,6 +144,10 @@ export interface PdfInput {
   buyer: PartySnapshot;
   /** Look chosen in the billing settings; the classic look is used when absent (S-235). */
   style?: PdfStyle;
+  /** Creation date written in the metadata; the issue time keeps a regenerated file identical. */
+  createdAt?: Date | undefined;
+  /** EN 16931 XML embedded to make the PDF a Factur-X. */
+  facturx?: FacturxAttachment | undefined;
 }
 
 /** Accent colour, layout, font family and optional logo of a document. */
@@ -165,22 +170,18 @@ function hexColor(hex: string): ReturnType<typeof rgb> {
 }
 
 /**
- * Replaces characters the standard PDF fonts cannot encode, so user text can never break rendering
+ * Replaces characters the embedded font has no glyph for, so user text never references a missing glyph
+ * (forbidden by PDF/A) nor breaks rendering
  *
- * @param font {PDFFont} - font used to draw
+ * @param font {EmbeddedFont} - font used to draw
  * @param text {string} - text to sanitize
  * @returns {string} - printable text
  */
-function printable(font: PDFFont, text: string): string {
-  const normalized = text.replace(/[   ]/g, ' ');
+function printable(font: EmbeddedFont, text: string): string {
+  const normalized = text.replace(/[\u202f\u00a0\u2009\t]/g, ' ');
   let out = '';
   for (const char of normalized) {
-    try {
-      font.encodeText(char);
-      out += char;
-    } catch {
-      out += '?';
-    }
+    out += char === '\n' || font.has(char.codePointAt(0) ?? 0) ? char : '?';
   }
   return out;
 }
@@ -188,19 +189,19 @@ function printable(font: PDFFont, text: string): string {
 /**
  * Splits text into lines that fit a width
  *
- * @param font {PDFFont} - font used to draw
+ * @param font {EmbeddedFont} - font used to draw
  * @param text {string} - text to wrap, newlines kept
  * @param size {number} - font size
  * @param width {number} - available width in points
  * @returns {string[]} - wrapped lines
  */
-function wrap(font: PDFFont, text: string, size: number, width: number): string[] {
+function wrap(font: EmbeddedFont, text: string, size: number, width: number): string[] {
   const lines: string[] = [];
   for (const paragraph of printable(font, text).split('\n')) {
     let current = '';
     for (const word of paragraph.split(' ')) {
       const candidate = current ? `${current} ${word}` : word;
-      if (font.widthOfTextAtSize(candidate, size) <= width || !current) current = candidate;
+      if (font.pdf.widthOfTextAtSize(candidate, size) <= width || !current) current = candidate;
       else {
         lines.push(current);
         current = word;
@@ -212,8 +213,8 @@ function wrap(font: PDFFont, text: string, size: number, width: number): string[
 }
 
 /**
- * Renders a quote, invoice or credit note as an A4 PDF using only built-in fonts; no user content is
- * ever interpreted, it is only drawn as text
+ * Renders a quote, invoice or credit note as an A4 PDF/A-3B with embedded fonts, optionally a Factur-X; no
+ * user content is ever interpreted, it is only drawn as text
  *
  * @param input {PdfInput} - document content
  * @returns {Promise<Uint8Array>} - PDF bytes
@@ -226,13 +227,8 @@ export async function renderPdf(input: PdfInput): Promise<Uint8Array> {
   const date = (iso: string) =>
     new Intl.DateTimeFormat(tag, { dateStyle: 'long', timeZone: 'UTC' }).format(new Date(`${iso}T00:00:00Z`));
 
-  const pdf = await PDFDocument.create();
-  pdf.setTitle(`${label[input.type]} ${input.number ?? label.draft}`);
-  pdf.setProducer('Almanach');
-  pdf.setCreator('Almanach');
-  const serif = input.style?.font === 'serif';
-  const regular = await pdf.embedFont(serif ? StandardFonts.TimesRoman : StandardFonts.Helvetica);
-  const bold = await pdf.embedFont(serif ? StandardFonts.TimesRomanBold : StandardFonts.HelveticaBold);
+  const pdf = await PDFDocument.create({ updateMetadata: false });
+  const { regular, bold } = await embedFonts(pdf, input.style?.font === 'serif' ? 'serif' : 'sans');
   const layout = input.style?.layout ?? 'classic';
   const accent = input.style ? hexColor(input.style.accent) : ACCENT;
   const titleColor = layout === 'minimal' ? INK : accent;
@@ -242,10 +238,16 @@ export async function renderPdf(input: PdfInput): Promise<Uint8Array> {
   let y = HEIGHT - MARGIN;
 
   const text = (value: string, x: number, size = 9.5, font = regular, color = INK) =>
-    page.drawText(printable(font, value), { x, y, size, font, color });
+    page.drawText(printable(font, value), { x, y, size, font: font.pdf, color });
   const right = (value: string, xRight: number, size = 9.5, font = regular, color = INK) => {
     const safe = printable(font, value);
-    page.drawText(safe, { x: xRight - font.widthOfTextAtSize(safe, size), y, size, font, color });
+    page.drawText(safe, {
+      x: xRight - font.pdf.widthOfTextAtSize(safe, size),
+      y,
+      size,
+      font: font.pdf,
+      color,
+    });
   };
   const ensure = (needed: number) => {
     if (y - needed > MARGIN + 30) return;
@@ -259,7 +261,7 @@ export async function renderPdf(input: PdfInput): Promise<Uint8Array> {
       x: 150,
       y: 380,
       size: 72,
-      font: bold,
+      font: bold.pdf,
       color: rgb(0.93, 0.93, 0.9),
       opacity: 0.7,
     });
@@ -409,7 +411,7 @@ export async function renderPdf(input: PdfInput): Promise<Uint8Array> {
   }
 
   // Mentions, note and bank details.
-  const footer: [string, PDFFont, number][] = [];
+  const footer: [string, EmbeddedFont, number][] = [];
   for (const mention of input.mentions) footer.push([mention, regular, 8.5]);
   if (input.note) footer.push([input.note, regular, 9]);
   const bank = input.seller.bank;
@@ -438,7 +440,12 @@ export async function renderPdf(input: PdfInput): Promise<Uint8Array> {
       regular,
       `${input.seller.name} · ${label.page} ${index + 1}/${pages.length}`,
     );
-    current.drawText(footerText, { x: MARGIN, y: MARGIN - 20, size: 7.5, font: regular, color: MUTED });
+    current.drawText(footerText, { x: MARGIN, y: MARGIN - 20, size: 7.5, font: regular.pdf, color: MUTED });
   }
+  await finishPdfA(pdf, {
+    title: `${label[input.type]} ${input.number ?? label.draft}`,
+    date: input.createdAt ?? new Date(),
+    facturx: input.facturx,
+  });
   return pdf.save();
 }
