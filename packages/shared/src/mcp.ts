@@ -1,7 +1,10 @@
 import { z } from 'zod';
 
-/** What a personal access token may do on /mcp: read, or also create clients and drafts. */
-export const TOKEN_SCOPES = ['read', 'read_drafts'] as const;
+/**
+ * What a personal access token may do on /mcp: read; or also create clients and drafts; or also write the
+ * pipeline (deals and follow-ups), a separate scope never granted by the other two.
+ */
+export const TOKEN_SCOPES = ['read', 'read_drafts', 'read_pipeline'] as const;
 export type TokenScope = (typeof TOKEN_SCOPES)[number];
 
 /** Creating a personal access token. */

@@ -813,4 +813,7 @@ export const planDe: Record<keyof typeof planEn, string> = {
   'review.disclaimer': 'Aus Ihren Almanach-Daten erstellt, Testdaten ausgenommen. Keine Steuerberatung.',
   'notifications.vault_expiring': '{title} läuft in {days} Tagen ab ({date})',
   'notifications.vault_expired': '{title} ist am {date} abgelaufen',
+  'notifications.deal_follow_up': 'Heute nachfassen: {title} ({name})',
+  'notifications.deal_follow_up_late': 'Nachfassen überfällig seit {date}: {title} ({name})',
+  'tokens.scope.read_pipeline': 'Lesen + Pipeline',
 };

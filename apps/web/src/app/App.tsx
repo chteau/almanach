@@ -19,6 +19,7 @@ import { MissionDetailPage } from '../features/missions/MissionDetailPage.tsx';
 import { MissionFormPage } from '../features/missions/MissionFormPage.tsx';
 import { MissionsPage } from '../features/missions/MissionsPage.tsx';
 import { OnboardingPage } from '../features/onboarding/OnboardingPage.tsx';
+import { PipelinePage } from '../features/pipeline/PipelinePage.tsx';
 import { CalendarPage } from '../features/planning/CalendarPage.tsx';
 import { CustomDeadlinePage } from '../features/planning/CustomDeadlinePage.tsx';
 import { DashboardPage } from '../features/planning/DashboardPage.tsx';
@@ -99,6 +100,7 @@ const router = createBrowserRouter([
           { path: '/payments', element: <PaymentsPage /> },
           { path: '/review', element: <ReviewPage /> },
           { path: '/expenses', element: <ExpensesPage /> },
+          { path: '/pipeline', element: <PipelinePage /> },
           { path: '/vault', element: <VaultPage /> },
           { path: '/vault/:id', element: <VaultItemPage /> },
           { path: '/linked/:kind/:linkId/:id', element: <LinkedRecordPage /> },

@@ -5,6 +5,7 @@ export * from './clients.ts';
 export * from './common.ts';
 export * from './companies.ts';
 export * from './csv.ts';
+export * from './deals.ts';
 export * from './documents.ts';
 export * from './engine.ts';
 export * from './expenses.ts';

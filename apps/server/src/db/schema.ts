@@ -132,7 +132,7 @@ export const apiTokens = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
     name: text('name').notNull(),
-    scope: text('scope', { enum: ['read', 'read_drafts'] }).notNull(),
+    scope: text('scope', { enum: ['read', 'read_drafts', 'read_pipeline'] }).notNull(),
     tokenHash: text('token_hash').notNull().unique(),
     lastUsedAt: timestamp('last_used_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
@@ -375,6 +375,70 @@ export const deadlineMarks = pgTable(
   },
   (table) => [primaryKey({ columns: [table.companyId, table.key] })],
 );
+
+/** Commercial pipeline: a lead, its quote, follow-ups, until won or lost (lighter than a mission). */
+export const deals = pgTable(
+  'deals',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    companyId: uuid('company_id')
+      .notNull()
+      .references(() => companies.id, { onDelete: 'cascade' }),
+    activityId: activityColumn(),
+    /** Null while the prospect is not a client yet; prospectName is then required. */
+    clientId: uuid('client_id').references(() => clients.id, { onDelete: 'restrict' }),
+    prospectName: text('prospect_name'),
+    prospectContact: text('prospect_contact'),
+    title: text('title').notNull(),
+    stage: text('stage', { enum: ['lead', 'quote_sent', 'follow_up', 'won', 'lost'] }).notNull(),
+    amountCents: bigint('amount_cents', { mode: 'number' }),
+    currency: text('currency'),
+    /** One quote belongs to one deal at most. */
+    quoteId: uuid('quote_id')
+      .unique()
+      .references(() => documents.id, { onDelete: 'set null' }),
+    missionId: uuid('mission_id').references(() => missions.id, { onDelete: 'set null' }),
+    nextActionOn: date('next_action_on'),
+    nextAction: text('next_action'),
+    lostReason: text('lost_reason'),
+    closedOn: date('closed_on'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index('deals_company_stage_idx').on(table.companyId, table.stage),
+    index('deals_company_next_idx').on(table.companyId, table.nextActionOn),
+    check('deals_named', sql`${table.clientId} is not null or ${table.prospectName} is not null`),
+  ],
+);
+
+/** History of a deal: stage changes (manual or from its quote), follow-ups done, notes. */
+export const dealEvents = pgTable(
+  'deal_events',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    companyId: uuid('company_id')
+      .notNull()
+      .references(() => companies.id, { onDelete: 'cascade' }),
+    dealId: uuid('deal_id')
+      .notNull()
+      .references(() => deals.id, { onDelete: 'cascade' }),
+    kind: text('kind', { enum: ['stage_changed', 'follow_up_done', 'note'] }).notNull(),
+    fromStage: text('from_stage'),
+    toStage: text('to_stage'),
+    note: text('note'),
+    at: timestamp('at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index('deal_events_deal_idx').on(table.dealId)],
+);
+
+/** Pipeline setting of a company: days between a quote sent and its follow-up. */
+export const pipelineSettings = pgTable('pipeline_settings', {
+  companyId: uuid('company_id')
+    .primaryKey()
+    .references(() => companies.id, { onDelete: 'cascade' }),
+  followUpDays: integer('follow_up_days').notNull().default(7),
+});
 
 /** Raw bytes, for encrypted vault files kept out of every list query. */
 const bytea = customType<{ data: Buffer }>({ dataType: () => 'bytea' });

@@ -164,6 +164,8 @@ export function createApp(deps: AppDeps): Hono<AppEnv> {
     '/api/expenses/*',
     '/api/vault',
     '/api/vault/*',
+    '/api/deals',
+    '/api/deals/*',
     '/api/notifications/*',
     '/api/settings/*',
     '/api/account',
@@ -204,6 +206,8 @@ export function createApp(deps: AppDeps): Hono<AppEnv> {
     '/api/expenses/*',
     '/api/vault',
     '/api/vault/*',
+    '/api/deals',
+    '/api/deals/*',
   ]) {
     app.use(path, readOnly);
   }
@@ -239,11 +243,15 @@ export function createApp(deps: AppDeps): Hono<AppEnv> {
   app.route('/api', profileRoutes(deps.db, deps.packs));
   app.route('/api/clients', clientRoutes(deps.db));
   app.route('/api/missions', missionRoutes(deps.db));
-  const { reserve } = mountAssistant(app, deps);
+  const { reserve, deals } = mountAssistant(app, deps);
   app.route(
     '/api',
-    documentRoutes(deps.db, deps.documents, async (companyId, paymentId) =>
-      reserve.shareOf(companyId, paymentId, await instanceToday(deps.db)),
+    documentRoutes(
+      deps.db,
+      deps.documents,
+      async (companyId, paymentId) => reserve.shareOf(companyId, paymentId, await instanceToday(deps.db)),
+      async (companyId, quoteId, event) =>
+        deals.onQuote(companyId, quoteId, event, await instanceToday(deps.db)),
     ),
   );
   const planning = planningRoutes(deps.db, deps.planning, deps.packs, deps.reminders, reserve);

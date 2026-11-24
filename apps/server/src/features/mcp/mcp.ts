@@ -2,6 +2,9 @@ import {
   type ApiToken,
   apiTokenInputSchema,
   clientInputSchema,
+  DEAL_STAGES,
+  dealFollowUpSchema,
+  dealInputSchema,
   documentDraftSchema,
   idSchema,
   isoDateSchema,
@@ -25,7 +28,7 @@ import { clientRoutes } from '../clients/clients.routes.ts';
 import { listCompanies } from '../companies/companies.ts';
 import { documentRoutes } from '../documents/documents.routes.ts';
 import { linkedRecords } from '../federation/linked.ts';
-import { planningRoutes } from '../planning/planning.routes.ts';
+import { instanceToday, planningRoutes } from '../planning/planning.routes.ts';
 import { readOnlyAfterCessation } from '../profile/situation.routes.ts';
 import { APP_VERSION } from '../system/system.ts';
 
@@ -186,7 +189,10 @@ const DOCUMENT_TYPES: Record<string, string[]> = {
   credit_note: ['credit_note'],
 };
 
-/** Every tool, read-only first; tools with the read_drafts scope never issue, send, delete or change settings. */
+/**
+ * Every tool, read-only first; tools with a writing scope never issue, send, delete or change settings, and the
+ * pipeline tools never mark a quote accepted nor send a follow-up: the person does.
+ */
 const TOOLS = {
   list_companies: tool({
     scope: 'read',
@@ -387,6 +393,18 @@ const TOOLS = {
       );
     },
   }),
+  list_deals: tool({
+    scope: 'read',
+    description:
+      'List the deals of the pipeline (lead, quote_sent, follow_up, won, lost) with the client or prospect name (`name`), amount, linked quote and next action. `late` is true when the next action date is past. `dueOnly` keeps the open deals whose follow-up is due by today.',
+    input: z.object({ company, stage: z.enum(DEAL_STAGES).optional(), dueOnly: z.boolean().optional() }),
+    run: async ({ api, args }) => {
+      const query = new URLSearchParams();
+      if (args.stage) query.set('stage', args.stage);
+      if (args.dueOnly) query.set('dueOnly', 'true');
+      return ((await api(`/api/deals?${query}`)) as { deals: unknown[] }).deals;
+    },
+  }),
   weekly_review: tool({
     scope: 'read',
     description:
@@ -499,6 +517,53 @@ const TOOLS = {
       return api('/api/documents', { method: 'POST', body: args.document });
     },
   }),
+  create_deal: tool({
+    scope: 'read_pipeline',
+    description:
+      'Create a deal in the pipeline: a client (`clientId`) or a prospect (`prospectName`, required without client), a title, a stage (lead by default), an optional amount in cents, a linked quote and a next action date. Returns the deal.',
+    input: z.object({ company, deal: dealInputSchema }),
+    run: async ({ api, args }) => api('/api/deals', { method: 'POST', body: args.deal }),
+  }),
+  update_deal: tool({
+    scope: 'read_pipeline',
+    description:
+      'Change some fields of a deal (stage, next action, amount, linked quote, lost reason…); fields not given stay as they are. A stage change is recorded in its history. It never marks the quote accepted.',
+    input: z.object({
+      company,
+      id: idSchema,
+      changes: z
+        .object({
+          title: z.string().trim().min(1).max(200),
+          stage: z.enum(DEAL_STAGES),
+          clientId: z.uuid().nullable(),
+          prospectName: z.string().trim().max(160).nullable(),
+          prospectContact: z.string().trim().max(300).nullable(),
+          amountCents: z.number().int().min(0).nullable(),
+          currency: z.string().length(3).nullable(),
+          quoteId: z.uuid().nullable(),
+          missionId: z.uuid().nullable(),
+          nextActionOn: z.iso.date().nullable(),
+          nextAction: z.string().trim().max(300).nullable(),
+          lostReason: z.string().trim().max(300).nullable(),
+        })
+        .partial()
+        .strict(),
+    }),
+    run: async ({ api, args }) => {
+      const { deal } = (await api(`/api/deals/${args.id}`)) as { deal: Record<string, unknown> };
+      const keep = Object.keys(dealInputSchema.shape);
+      const current = Object.fromEntries(Object.entries(deal).filter(([key]) => keep.includes(key)));
+      return api(`/api/deals/${args.id}`, { method: 'PUT', body: { ...current, ...args.changes } });
+    },
+  }),
+  log_follow_up: tool({
+    scope: 'read_pipeline',
+    description:
+      'Record a follow-up the person has done on a deal (a note) and set the next action date. It sends nothing: write the message for the person to send.',
+    input: z.object({ company, id: idSchema, followUp: dealFollowUpSchema }),
+    run: async ({ api, args }) =>
+      api(`/api/deals/${args.id}/follow-up`, { method: 'POST', body: args.followUp }),
+  }),
 } satisfies Record<string, Tool<z.ZodObject>>;
 
 /**
@@ -534,8 +599,13 @@ export function mcpRoutes(deps: AppDeps): Hono<AppEnv> {
   internal.use('/api/clients/*', readOnly);
   internal.use('/api/documents/*', readOnly);
   internal.route('/api/clients', clientRoutes(db));
-  const { reserve } = mountAssistant(internal, deps);
-  internal.route('/api', documentRoutes(db, deps.documents));
+  const { reserve, deals } = mountAssistant(internal, deps);
+  internal.route(
+    '/api',
+    documentRoutes(db, deps.documents, undefined, async (companyId, quoteId, event) =>
+      deals.onQuote(companyId, quoteId, event, await instanceToday(db)),
+    ),
+  );
   internal.route('/api', planningRoutes(db, deps.planning, deps.packs, deps.reminders, reserve).api);
 
   const byIp = new RateLimiter(120, 60_000);
@@ -625,7 +695,7 @@ export function mcpRoutes(deps: AppDeps): Hono<AppEnv> {
     const reply = (result: unknown) => ({ jsonrpc: '2.0', id, result });
     const fail = (code: number, text: string) => ({ jsonrpc: '2.0', id, error: { code, message: text } });
     const tools = Object.entries(TOOLS).filter(
-      ([, item]) => item.scope === 'read' || caller.scope === 'read_drafts',
+      ([, item]) => item.scope === 'read' || item.scope === caller.scope,
     );
     if (method === 'initialize') {
       const asked = String(params.protocolVersion ?? '');
@@ -684,7 +754,7 @@ export function mcpRoutes(deps: AppDeps): Hono<AppEnv> {
         return json;
       };
       const result = await entry.run({ api, args: args.data, records: () => linkedRecords(db, company.id) });
-      if (entry.scope === 'read_drafts')
+      if (entry.scope !== 'read')
         await db.insert(auditLog).values({
           userId: caller.user.id,
           action: 'mcp.write',

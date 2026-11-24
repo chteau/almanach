@@ -4,6 +4,7 @@ import type { Config } from '../../config.ts';
 import type { Database } from '../../db/client.ts';
 import { companies, instance, notifications, profiles, userSettings, users } from '../../db/schema.ts';
 import { Mailer } from '../mail/mailer.ts';
+import { DealService } from '../pipeline/deals.ts';
 import { VaultService } from '../vault/vault.ts';
 import type { PlanningService } from './planning.service.ts';
 
@@ -21,6 +22,8 @@ const TEXT: Record<Locale, Record<string, (params: Record<string, string | numbe
     threshold_below: (p) => `${p.label} : chiffre d’affaires repassé sous le seuil`,
     vault_expiring: (p) => `${p.title} expire dans ${p.days} j (${p.date})`,
     vault_expired: (p) => `${p.title} a expiré le ${p.date}`,
+    deal_follow_up: (p) => `Relance à faire aujourd’hui : ${p.title} (${p.name})`,
+    deal_follow_up_late: (p) => `Relance en retard depuis le ${p.date} : ${p.title} (${p.name})`,
   },
   en: {
     deadline_soon: (p) => (p.days === 0 ? `Today: ${p.title}` : `${p.title} in ${p.days} days (${p.date})`),
@@ -31,6 +34,8 @@ const TEXT: Record<Locale, Record<string, (params: Record<string, string | numbe
     threshold_below: (p) => `${p.label}: turnover back under the threshold`,
     vault_expiring: (p) => `${p.title} expires in ${p.days} days (${p.date})`,
     vault_expired: (p) => `${p.title} expired on ${p.date}`,
+    deal_follow_up: (p) => `Follow up today: ${p.title} (${p.name})`,
+    deal_follow_up_late: (p) => `Follow-up late since ${p.date}: ${p.title} (${p.name})`,
   },
   de: {
     deadline_soon: (p) => (p.days === 0 ? `Heute: ${p.title}` : `${p.title} in ${p.days} Tagen (${p.date})`),
@@ -41,6 +46,8 @@ const TEXT: Record<Locale, Record<string, (params: Record<string, string | numbe
     threshold_below: (p) => `${p.label}: Umsatz wieder unter der Schwelle`,
     vault_expiring: (p) => `${p.title} läuft in ${p.days} Tagen ab (${p.date})`,
     vault_expired: (p) => `${p.title} ist am ${p.date} abgelaufen`,
+    deal_follow_up: (p) => `Heute nachfassen: ${p.title} (${p.name})`,
+    deal_follow_up_late: (p) => `Nachfassen überfällig seit ${p.date}: ${p.title} (${p.name})`,
   },
 };
 
@@ -249,6 +256,7 @@ export class ReminderJob {
       });
     }
     rows.push(...(await new VaultService(this.db, this.planning, undefined, 0).reminders(companyId, today)));
+    rows.push(...(await new DealService(this.db).reminders(companyId, today)));
     const outlook = await this.planning.outlook(companyId, today);
     for (const threshold of outlook?.thresholds ?? []) {
       if (threshold.window === 'previous_fiscal_year') continue;

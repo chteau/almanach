@@ -26,6 +26,7 @@ import { api } from '../../lib/api.ts';
 import { formatDate, formatMoney, today } from '../../lib/format.ts';
 import { useResource } from '../../lib/useResource.ts';
 import { ActivitySelect } from '../activities/ActivitySelect.tsx';
+import { useProfile } from '../profile/useProfile.ts';
 import { useAction } from '../settings/useAction.ts';
 import { VaultItemSelect } from '../vault/VaultItemSelect.tsx';
 
@@ -46,6 +47,7 @@ export function ExpensesPage() {
   const { data, error, loading, reload } = useResource<ExpenseList>('/api/expenses');
   const [removing, setRemoving] = useState<ExpenseView | null>(null);
   const currency = data?.currency ?? 'EUR';
+  const country = useProfile()?.country;
   const money = (cents: number) => formatMoney(cents, currency, locale);
   const total = (data?.expenses ?? []).reduce((sum, item) => sum + item.amountCents, 0);
 
@@ -65,6 +67,18 @@ export function ExpensesPage() {
             <Notice tone="info">
               {data.note[locale]}{' '}
               {data.maturity !== 'verified' && <Badge tone="warn">{t('pack.maturity.experimental')}</Badge>}
+            </Notice>
+          )}
+          {country === 'FR' && (
+            <Notice tone="info">
+              {t('expenses.einvoiceReception')}{' '}
+              <a
+                href="https://www.impots.gouv.fr/facturation-electronique-et-plateformes-agreees"
+                target="_blank"
+                rel="noreferrer"
+              >
+                {t('expenses.einvoiceReception.link')}
+              </a>
             </Notice>
           )}
           <ExpenseForm currency={currency} onSaved={reload} />

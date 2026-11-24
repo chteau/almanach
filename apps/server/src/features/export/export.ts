@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import {
   billingSettingsSchema,
+  DEAL_STAGES,
   EXPENSE_CATEGORIES,
   LOGO_MAX_BYTES,
   logoSchema,
@@ -21,6 +22,8 @@ import {
   customDeadlines,
   deadlineMarks,
   deadlineNotices,
+  dealEvents,
+  deals,
   documents,
   expenses,
   externalRevenues,
@@ -28,6 +31,7 @@ import {
   missions,
   numberSequences,
   payments,
+  pipelineSettings,
   profiles,
   reserveSettings,
   situationChanges,
@@ -66,6 +70,9 @@ const TABLES = {
   deadlineNotices,
   vaultItems,
   expenses,
+  deals,
+  dealEvents,
+  pipelineSettings,
 } as const satisfies Record<string, PgTable>;
 
 type TableName = keyof typeof TABLES;
@@ -236,6 +243,18 @@ export function referenceProblem(data: CompanyData): string | null {
       return 'vaultItems.reference';
   for (const row of data.expenses) if (!optional(row.vaultItemId, vaultIds)) return 'expenses.vaultItemId';
   for (const file of data.vaultFiles ?? []) if (!vaultIds.has(file.itemId)) return 'vaultFiles.itemId';
+  const dealIds = ids('deals');
+  for (const deal of data.deals) {
+    if (!DEAL_STAGES.includes(deal.stage as never)) return 'deals.stage';
+    if (!optional(deal.activityId, activityIds)) return 'deals.activityId';
+    if (
+      !optional(deal.clientId, clientIds) ||
+      !optional(deal.quoteId, documentIds) ||
+      !optional(deal.missionId, missionIds)
+    )
+      return 'deals.reference';
+  }
+  for (const event of data.dealEvents) if (!dealIds.has(event.dealId)) return 'dealEvents.dealId';
   for (const row of data.externalRevenues)
     if (!optional(row.clientId, clientIds)) return 'externalRevenues.clientId';
   for (const entry of data.timeEntries) {

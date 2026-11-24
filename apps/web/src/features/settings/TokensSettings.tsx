@@ -159,6 +159,7 @@ export function TokensSettings() {
             >
               <option value="read">{t('tokens.scope.read')}</option>
               <option value="read_drafts">{t('tokens.scope.read_drafts')}</option>
+              <option value="read_pipeline">{t('tokens.scope.read_pipeline')}</option>
             </SelectField>
           </SettingsSection>
         </form>

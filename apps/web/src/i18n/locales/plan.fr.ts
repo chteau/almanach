@@ -812,4 +812,7 @@ export const planFr: Record<keyof typeof planEn, string> = {
     'Établi à partir de vos données Almanach, données de test exclues. Ne constitue pas un conseil fiscal.',
   'notifications.vault_expiring': '{title} expire dans {days} j ({date})',
   'notifications.vault_expired': '{title} a expiré le {date}',
+  'notifications.deal_follow_up': 'Relance à faire aujourd’hui : {title} ({name})',
+  'notifications.deal_follow_up_late': 'Relance en retard depuis le {date} : {title} ({name})',
+  'tokens.scope.read_pipeline': 'Lecture + pipeline',
 };

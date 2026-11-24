@@ -39,12 +39,15 @@ function todayFrom(value: string | undefined): string {
  * @param service {DocumentService} - document rules
  * @param reserveShare {(companyId: string, paymentId: string) => Promise<number | null>} - share of the tax
  * reserve a recorded payment brings, returned with it; none when absent
+ * @param onQuote {(companyId: string, quoteId: string, event: 'sent' | 'accepted' | 'declined') => Promise<void>} -
+ * moves the deal holding a quote when it is sent or answered
  * @returns {Hono<AppEnv>} - the router
  */
 export function documentRoutes(
   db: Database,
   service: DocumentService,
   reserveShare?: (companyId: string, paymentId: string) => Promise<number | null>,
+  onQuote?: (companyId: string, quoteId: string, event: 'sent' | 'accepted' | 'declined') => Promise<void>,
 ): Hono<AppEnv> {
   const router = new Hono<AppEnv>();
 
@@ -268,7 +271,10 @@ export function documentRoutes(
     const existing = await owned(c.var.company.id, c.req.param('id'));
     if (!existing) return c.json({ error: 'not_found' }, 404);
     const result = await service.issue(c.var.company.id, existing.id);
-    if ('ok' in result) return c.body(null, 204);
+    if ('ok' in result) {
+      if (existing.type === 'quote') await onQuote?.(c.var.company.id, existing.id, 'sent');
+      return c.body(null, 204);
+    }
     return c.json(result, result.error === 'missing_fields' ? 422 : 409);
   });
 
@@ -276,6 +282,7 @@ export function documentRoutes(
     const existing = await owned(c.var.company.id, c.req.param('id'));
     if (!existing || existing.state === 'draft') return c.json({ error: 'not_found' }, 404);
     await db.update(documents).set({ sentAt: new Date() }).where(eq(documents.id, existing.id));
+    if (existing.type === 'quote') await onQuote?.(c.var.company.id, existing.id, 'sent');
     return c.body(null, 204);
   });
 
@@ -291,6 +298,7 @@ export function documentRoutes(
       .update(documents)
       .set({ state: data.answer, updatedAt: new Date() })
       .where(eq(documents.id, existing.id));
+    await onQuote?.(c.var.company.id, existing.id, data.answer);
     return c.body(null, 204);
   });
 
@@ -362,6 +370,7 @@ export function documentRoutes(
       .returning({ id: documents.id });
     if (data.as === 'invoice' || data.as === 'deposit') {
       await db.update(documents).set({ state: 'accepted' }).where(eq(documents.id, existing.id));
+      if (existing.type === 'quote') await onQuote?.(c.var.company.id, existing.id, 'accepted');
     }
     return c.json({ id: row?.id }, 201);
   });

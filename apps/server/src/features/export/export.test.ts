@@ -19,6 +19,9 @@ const empty = {
   deadlineNotices: [],
   vaultItems: [],
   expenses: [],
+  deals: [],
+  dealEvents: [],
+  pipelineSettings: [],
 };
 
 describe('import references', () => {

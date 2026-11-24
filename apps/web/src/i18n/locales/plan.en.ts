@@ -789,4 +789,7 @@ export const planEn = {
   'review.disclaimer': 'Built from your Almanach data; test data excluded. Not tax advice.',
   'notifications.vault_expiring': '{title} expires in {days} days ({date})',
   'notifications.vault_expired': '{title} expired on {date}',
+  'notifications.deal_follow_up': 'Follow up today: {title} ({name})',
+  'notifications.deal_follow_up_late': 'Follow-up late since {date}: {title} ({name})',
+  'tokens.scope.read_pipeline': 'Read + pipeline',
 };

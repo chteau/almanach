@@ -3,7 +3,7 @@ import { SQL } from 'bun';
 import { createApp } from '../../app.ts';
 import { loadConfig } from '../../config.ts';
 import { createDatabase, type Database, runMigrations } from '../../db/client.ts';
-import { clients, companies, instance, profiles, users } from '../../db/schema.ts';
+import { clients, companies, instance, missions, notifications, profiles, users } from '../../db/schema.ts';
 import { SessionStore } from '../auth/sessions.ts';
 import { DocumentService } from '../documents/documents.service.ts';
 import { Federation } from '../federation/federation.ts';
@@ -312,6 +312,7 @@ describe.skipIf(!url)('administrative assistant (database)', () => {
         'cash',
         'company',
         'currency',
+        'deals',
         'deadlines',
         'format',
         'notices',
@@ -466,5 +467,182 @@ describe.skipIf(!url)('administrative assistant (database)', () => {
 
     expect((await call('a', `/api/vault/${item.id}`, { method: 'DELETE' })).status).toBe(204);
     expect((await json('a', '/api/vault')).usage.bytes).toBe(0);
+  });
+
+  test('pipeline: prospect to client, quote sent then accepted, follow-ups, reminders, scopes, isolation', async () => {
+    const created = await call('a', '/api/deals', {
+      method: 'POST',
+      body: {
+        title: 'Site vitrine',
+        prospectName: 'Boulangerie Martin',
+        amountCents: 300_000,
+        currency: 'EUR',
+      },
+    });
+    expect(created.status).toBe(201);
+    const deal = ((await created.json()) as Body).deal;
+    expect(deal).toMatchObject({ stage: 'lead', name: 'Boulangerie Martin', clientId: null });
+    expect((await call('a', '/api/deals', { method: 'POST', body: { title: 'Nobody' } })).status).toBe(422);
+
+    const converted = await json('a', `/api/deals/${deal.id}/convert-client`, {
+      method: 'POST',
+      body: {
+        name: 'Boulangerie Martin',
+        address: '1 rue de Brest, 29000 Quimper',
+        kind: 'company',
+        email: null,
+        country: 'FR',
+        currency: 'EUR',
+        language: 'fr',
+        paymentTermsDays: 30,
+        contacts: [],
+      },
+    });
+    expect(converted.deal.clientId).toBe(converted.client.id);
+    expect(
+      (
+        await call('a', `/api/deals/${deal.id}/convert-client`, {
+          method: 'POST',
+          body: { name: 'X', email: null },
+        })
+      ).status,
+    ).toBe(409);
+
+    const quote = await json('a', '/api/documents', {
+      method: 'POST',
+      body: {
+        type: 'quote',
+        clientId: converted.client.id,
+        missionId: null,
+        issueDate: today,
+        validUntil: null,
+        depositIds: [],
+        language: 'fr',
+        currency: 'EUR',
+        lines: [{ description: 'Site', quantity: 1000, unit: 'day', unitPriceCents: 300_000, discountBp: 0 }],
+        discountBp: 0,
+      },
+    });
+    const linked = await json('a', `/api/deals/${deal.id}`);
+    const input = { ...linked.deal, quoteId: quote.id };
+    for (const key of ['id', 'name', 'quoteNumber', 'closedOn', 'createdAt', 'late', 'events'])
+      delete input[key];
+    expect((await call('a', `/api/deals/${deal.id}`, { method: 'PUT', body: input })).status).toBe(200);
+    // One quote, one deal; another account cannot link it at all.
+    expect(
+      (
+        await call('a', '/api/deals', {
+          method: 'POST',
+          body: { title: 'Twice', prospectName: 'P', quoteId: quote.id },
+        })
+      ).status,
+    ).toBe(409);
+    expect(
+      (
+        await call('b', '/api/deals', {
+          method: 'POST',
+          body: { title: 'Steal', prospectName: 'P', quoteId: quote.id },
+        })
+      ).status,
+    ).toBe(422);
+
+    await call('a', '/api/deals/settings', { method: 'PUT', body: { followUpDays: 5 } });
+    const issuedQuote = await call('a', `/api/documents/${quote.id}/issue`, { method: 'POST' });
+    expect([issuedQuote.status, await issuedQuote.text()]).toEqual([204, '']);
+    const sent = (await json('a', `/api/deals/${deal.id}`)).deal;
+    const followUpOn = new Date(Date.parse(`${today}T00:00:00Z`) + 5 * 86_400_000).toISOString().slice(0, 10);
+    expect(sent).toMatchObject({ stage: 'quote_sent', nextActionOn: followUpOn, late: false });
+
+    const after = await json('a', `/api/deals/${deal.id}/follow-up`, {
+      method: 'POST',
+      body: { note: 'Called, answer next week', nextActionOn: '2000-01-03' },
+    });
+    expect(after.deal).toMatchObject({ stage: 'follow_up', late: true });
+    expect(after.deal.events.map((event: Body) => event.kind)).toEqual([
+      'follow_up_done',
+      'stage_changed',
+      'stage_changed',
+    ]);
+
+    // Reminders: late once, never twice; the review lists it.
+    const job = new ReminderJob(
+      db,
+      new PlanningService(db, await PackRegistry.load()),
+      loadConfig({ DATABASE_URL: url as string }),
+    );
+    const keys = async () =>
+      (await db.select({ key: notifications.dedupeKey }).from(notifications))
+        .map((row) => row.key)
+        .filter((key) => key.startsWith('deal:'));
+    await job.collect(people.a.company, today, [7, 1, 0], 'fr');
+    await job.collect(people.a.company, today, [7, 1, 0], 'fr');
+    expect(await keys()).toEqual([`deal:${deal.id}:2000-01-03:late`]);
+    expect(
+      (await json('a', '/api/review/weekly')).review.deals.followUpsLate.map((item: Body) => item.id),
+    ).toEqual([deal.id]);
+
+    expect(
+      (await call('a', `/api/documents/${quote.id}/answer`, { method: 'POST', body: { answer: 'accepted' } }))
+        .status,
+    ).toBe(204);
+    expect((await json('a', `/api/deals/${deal.id}`)).deal).toMatchObject({
+      stage: 'won',
+      closedOn: today,
+      nextActionOn: null,
+    });
+
+    // Other accounts see nothing.
+    expect((await json('b', '/api/deals')).deals).toEqual([]);
+    expect((await call('b', `/api/deals/${deal.id}`)).status).toBe(404);
+    expect((await call('b', `/api/deals/${deal.id}`, { method: 'DELETE' })).status).toBe(404);
+
+    // MCP: reading for any token, writing only with the pipeline scope.
+    expect(
+      (await mcp('a', 'read', 'list_deals', { stage: 'won' })).value.map((item: Body) => item.id),
+    ).toEqual([deal.id]);
+    expect(
+      (await mcp('a', 'read_drafts', 'create_deal', { deal: { title: 'X', prospectName: 'Y' } })).error,
+    ).toBe(true);
+    const made = await mcp('a', 'read_pipeline', 'create_deal', {
+      deal: { title: 'Audit', prospectName: 'Coop' },
+    });
+    expect(made.error).toBe(false);
+    const moved = await mcp('a', 'read_pipeline', 'update_deal', {
+      id: made.value.deal.id,
+      changes: { stage: 'lost', lostReason: 'Budget' },
+    });
+    expect(moved.value.deal).toMatchObject({
+      stage: 'lost',
+      lostReason: 'Budget',
+      prospectName: 'Coop',
+      closedOn: today,
+    });
+    expect(
+      (await mcp('a', 'read_pipeline', 'create_client', { client: { name: 'Z', email: null } })).error,
+    ).toBe(true);
+  });
+
+  test('pipeline: missions still at prospect become deals once, however often the migration runs', async () => {
+    const [mission] = await db
+      .insert(missions)
+      .values({
+        companyId: people.b.company,
+        clientId: people.b.client,
+        name: 'Old prospect',
+        status: 'prospect',
+        billing: 'daily',
+        rateCents: 50_000,
+        currency: 'EUR',
+        startDate: today,
+      })
+      .returning({ id: missions.id });
+    const sql = (await Bun.file(new URL('../../../drizzle/0023_pipeline.sql', import.meta.url)).text())
+      .split('--> statement-breakpoint')
+      .at(-1) as string;
+    await db.$client.unsafe(sql);
+    await db.$client.unsafe(sql);
+    const rows = (await json('b', '/api/deals')).deals.filter((item: Body) => item.missionId === mission?.id);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ stage: 'lead', title: 'Old prospect' });
   });
 });

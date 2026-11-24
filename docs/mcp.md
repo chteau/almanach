@@ -11,6 +11,9 @@ Almanach expose un serveur [MCP](https://modelcontextprotocol.io) sur `/mcp` pou
    - **Lecture** (`read`) : uniquement les outils de lecture ;
    - **Lecture + brouillons** (`read_drafts`) : en plus, créer ou modifier un client et créer un
      brouillon de devis ou de facture.
+   - **Lecture + pipeline** (`read_pipeline`) : en plus des outils de lecture, créer et modifier une piste et
+     noter une relance faite. Portée distincte, jamais accordée par les deux autres ; aucun outil ne marque un
+     devis accepté ni n'envoie de relance.
 
    Le jeton (`alm_…`) n'est affiché qu'une fois ; seule son empreinte SHA-256 est stockée. La liste
    montre sa date de dernière utilisation ; « Révoquer » le supprime aussitôt.
@@ -37,6 +40,7 @@ par défaut la première. Montants en centimes.
 | `list_deadlines` | read | échéances à venir ou en retard |
 | `list_expenses` | read | dépenses simples (montant HT, TVA, catégorie, activité, pièce du coffre) et usage dans le pays |
 | `list_vault_items` | read | pièces du coffre (métadonnées seulement, jamais le contenu) : filtres `expiringWithinDays`, `kind`, `client` |
+| `list_deals` | read | pistes du pipeline (étape, nom du client ou du prospect, montant, devis lié, prochaine action, `late`) : filtres `stage`, `dueOnly` |
 | `weekly_review` | read | point de la semaine (`weeklyReview/1`) : actions triées, échéances, encaissements, factures, devis sans réponse, seuils, réserve ; `allCompanies` pour toutes les entreprises |
 | `prepare_declaration` | read | déclaration préparée d'une échéance (`key`, ou la prochaine non faite) : chiffres par case, montant à payer avec méthode et étapes, lien du portail |
 | `get_thresholds` | read | seuils (y compris à la baisse, `direction: below`), estimations de cotisations et d'impôt, ventilation par activité, simulation, maturité du pack par fonctionnalité (`pack.features` : absente = indisponible) |
@@ -45,6 +49,8 @@ par défaut la première. Montants en centimes.
 | `list_linked_activities` | read | instances liées et sources externes |
 | `create_client`, `update_client` | read_drafts | créer ou modifier un client |
 | `create_draft_document` | read_drafts | créer un **brouillon** de devis ou de facture |
+| `create_deal`, `update_deal` | read_pipeline | créer une piste ou en changer quelques champs (étape journalisée) |
+| `log_follow_up` | read_pipeline | noter une relance faite et la prochaine date ; n'envoie rien |
 
 Aucun outil n'émet, n'envoie, ne numérote, ne supprime ni ne touche aux réglages, liaisons, sources ou
 jetons : l'émission se fait toujours dans Almanach. Les données de test sont exclues par défaut
