@@ -127,6 +127,13 @@
       "when": 1795478342528,
       "tag": "0017_company_name_from_profile",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1795480089267,
+      "tag": "0018_mail_settings",
+      "breakpoints": true
     }
   ]
 }

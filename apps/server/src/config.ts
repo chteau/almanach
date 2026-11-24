@@ -27,6 +27,17 @@ const envSchema = z.object({
     .optional()
     .transform((value) => (value ? value : undefined))
     .pipe(z.string().min(3).max(200).optional()),
+  /** Application (client) ID of a Microsoft Entra public client, for Outlook / Hotmail sending (docs/email.md). */
+  MS_OAUTH_CLIENT_ID: z
+    .string()
+    .optional()
+    .transform((value) => (value ? value : undefined))
+    .pipe(
+      z
+        .string()
+        .regex(/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/)
+        .optional(),
+    ),
   REMINDERS: booleanFromEnv.default(true),
   PACK_PUBLIC_KEYS: z
     .string()
@@ -77,6 +88,8 @@ export interface Config {
   /** SMTP connection URL, e.g. smtps://user:password@mail.example.com:465; e-mail is off when absent. */
   smtpUrl: string | undefined;
   smtpFrom: string | undefined;
+  /** Microsoft public client ID enabling Outlook / Hotmail sending through OAuth2; absent: Outlook unavailable. */
+  msOAuthClientId: string | undefined;
   /** Background reminder job; tests turn it off. */
   reminders: boolean;
   /** Ed25519 public keys (raw, base64url) trusted to sign country pack updates. */
@@ -124,6 +137,7 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     webDist: resolve(value.WEB_DIST),
     smtpUrl: value.SMTP_URL,
     smtpFrom: value.SMTP_FROM,
+    msOAuthClientId: value.MS_OAUTH_CLIENT_ID,
     reminders: value.REMINDERS,
     packPublicKeys: value.PACK_PUBLIC_KEYS,
     packUpdateUrl: value.PACK_UPDATE_URL,

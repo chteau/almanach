@@ -8,6 +8,7 @@ import { Federation } from './features/federation/federation.ts';
 import { DrizzleInstallRepository } from './features/install/install.repository.ts';
 import { InstallService } from './features/install/install.service.ts';
 import { InstallTokenStore } from './features/install/install-token.ts';
+import { Mailer } from './features/mail/mailer.ts';
 import { PackRegistry } from './features/packs/packs.ts';
 import { PackUpdates } from './features/packs/updates.ts';
 import { PlanningService } from './features/planning/planning.service.ts';
@@ -55,7 +56,8 @@ async function main(): Promise<void> {
   await packUpdates.restore();
   const documents = new DocumentService(db, packs);
   const planning = new PlanningService(db, packs, config.federation);
-  const reminders = new ReminderJob(db, planning, config);
+  const mailer = new Mailer(db, config);
+  const reminders = new ReminderJob(db, planning, config, mailer);
   const releases = new ReleaseCheck(db, config.releaseCheckUrl);
   const stripe = new StripeSync(db, config.secretsKey, fetch, config.stripeSync);
   const federation = new Federation(db, planning, config.secretsKey, fetch, config.federation, {
@@ -75,6 +77,7 @@ async function main(): Promise<void> {
     documents,
     planning,
     reminders,
+    mailer,
     packUpdates,
     releases,
     stripe,

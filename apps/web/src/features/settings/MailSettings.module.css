@@ -1,0 +1,22 @@
+.steps {
+  margin: var(--space-2) 0 0;
+  padding-left: var(--space-5);
+}
+
+.device {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-md);
+}
+
+.code {
+  font-family: var(--mono);
+  font-size: var(--text-xl);
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  user-select: all;
+}

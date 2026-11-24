@@ -687,3 +687,27 @@ const sourceTable = <T>(name: string) =>
 
 export const externalClients = sourceTable<LinkedClient>('external_clients');
 export const externalDocuments = sourceTable<LinkedDocument>('external_documents');
+
+/**
+ * Outgoing e-mail set in Settings → Instance (docs/email.md), one row at most; SMTP_URL in the environment wins
+ * over it. Secrets are AES-256-GCM encrypted with SECRETS_KEY and never sent back to the interface.
+ */
+export const mailSettings = pgTable(
+  'mail_settings',
+  {
+    id: integer('id').primaryKey().default(1),
+    provider: text('provider').notNull(),
+    host: text('host').notNull(),
+    port: integer('port').notNull(),
+    security: text('security', { enum: ['tls', 'starttls'] }).notNull(),
+    username: text('username').notNull(),
+    fromAddress: text('from_address').notNull(),
+    /** SMTP password or app password, encrypted. */
+    passwordEnc: text('password_enc'),
+    /** Microsoft refresh token (Outlook), encrypted; replaced by the rotated one at each refresh. */
+    oauthRefreshEnc: text('oauth_refresh_enc'),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedBy: uuid('updated_by').references(() => users.id, { onDelete: 'set null' }),
+  },
+  (table) => [check('mail_settings_singleton', sql`${table.id} = 1`)],
+);
