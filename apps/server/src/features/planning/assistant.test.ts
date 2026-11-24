@@ -12,6 +12,7 @@ import { InstallService } from '../install/install.service.ts';
 import { InstallTokenStore } from '../install/install-token.ts';
 import { PackRegistry } from '../packs/packs.ts';
 import { PackUpdates } from '../packs/updates.ts';
+import { isoWeek } from '../review/review.ts';
 import { StripeSync } from '../stripe/stripe.ts';
 import { ReleaseCheck } from '../system/system.ts';
 import { instanceToday } from './planning.routes.ts';
@@ -291,5 +292,46 @@ describe.skipIf(!url)('administrative assistant (database)', () => {
     expect((await json('b', '/api/deadlines/next-prepared')).deadline.prepared).toBeDefined();
     const tool = await mcp('a', 'read', 'prepare_declaration', { key });
     expect(tool.value.deadline.prepared.lines[0].cents).toBe(1_000_000);
+  });
+
+  test('weekly review: ISO week, stable sections, actions sorted, every company through MCP', async () => {
+    expect(isoWeek('2026-11-24')).toEqual({ start: '2026-11-23', end: '2026-11-29' });
+    expect(isoWeek('2026-11-29')).toEqual({ start: '2026-11-23', end: '2026-11-29' });
+    expect(isoWeek('2027-01-01')).toEqual({ start: '2026-12-28', end: '2027-01-03' });
+    expect((await call('a', '/api/review/weekly?date=2026-13-45')).status).toBe(422);
+    const { review } = await json('a', '/api/review/weekly');
+    expect(Object.keys(review).sort()).toEqual(
+      [
+        'actions',
+        'cash',
+        'company',
+        'currency',
+        'deadlines',
+        'format',
+        'notices',
+        'quotes',
+        'reserve',
+        'testDataExcluded',
+        'thresholds',
+        'week',
+      ].sort(),
+    );
+    expect(review).toMatchObject({
+      format: 'weeklyReview/1',
+      company: { id: people.a.company },
+      testDataExcluded: true,
+    });
+    expect(review.week.start <= today && today <= review.week.end).toBe(true);
+    expect(review.cash.collectedThisWeekCents).toBe(1_000_000);
+    expect(review.reserve.deltaThisWeekCents).toBe(review.reserve.reserveCents);
+    const dues = review.actions.map((action: Body) => action.due ?? '9999');
+    expect(dues).toEqual([...dues].sort());
+    // The month marked done in the previous test is not an action any more.
+    expect(
+      review.actions.some((action: Body) => action.id === `deadline:urssaf_monthly:${today.slice(0, 8)}01`),
+    ).toBe(false);
+    const all = await mcp('a', 'read', 'weekly_review', { allCompanies: true });
+    expect(all.value.map((item: Body) => item.company.id)).toEqual([people.a.company]);
+    expect((await mcp('b', 'read', 'weekly_review')).value.cash.collectedThisWeekCents).toBe(0);
   });
 });

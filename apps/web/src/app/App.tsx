@@ -25,6 +25,7 @@ import { DeadlinePage } from '../features/planning/DeadlinePage.tsx';
 import { MenuPage } from '../features/planning/MenuPage.tsx';
 import { NotificationsPage } from '../features/planning/NotificationsPage.tsx';
 import { ThresholdsPage } from '../features/planning/ThresholdsPage.tsx';
+import { ReviewPage } from '../features/review/ReviewPage.tsx';
 import { SettingsPage } from '../features/settings/SettingsPage.tsx';
 import { ErrorPage, NotFoundPage } from '../features/system/SystemPages.tsx';
 import { TimePage } from '../features/time/TimePage.tsx';
@@ -93,6 +94,7 @@ const router = createBrowserRouter([
           { path: '/documents/new', element: <DocumentPage /> },
           { path: '/documents/:id', element: <DocumentPage /> },
           { path: '/payments', element: <PaymentsPage /> },
+          { path: '/review', element: <ReviewPage /> },
           { path: '/linked/:kind/:linkId/:id', element: <LinkedRecordPage /> },
         ],
       },

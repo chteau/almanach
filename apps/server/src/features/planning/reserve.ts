@@ -77,9 +77,15 @@ export class ReserveService {
    * @param companyId {string} - company
    * @param today {string} - YYYY-MM-DD
    * @param withoutPayment {string | undefined} - payment left out, to measure its share of the reserve
+   * @param until {string | undefined} - only money collected up to this day, to measure the change over a week
    * @returns {Promise<ReserveView | null>} - the reserve, or null when the pack has no reserve rules
    */
-  async compute(companyId: string, today: string, withoutPayment?: string): Promise<ReserveView | null> {
+  async compute(
+    companyId: string,
+    today: string,
+    withoutPayment?: string,
+    until?: string,
+  ): Promise<ReserveView | null> {
     const profile = await this.planning.profile(companyId);
     const pack = profile && this.packs.get(profile.country);
     if (!profile || !pack) return null;
@@ -99,6 +105,7 @@ export class ReserveService {
       ).filter((receipt) => receipt.date <= fiscal.end),
     ];
     if (withoutPayment) receipts = await this.leaveOut(companyId, profile.currency, receipts, withoutPayment);
+    if (until) receipts = receipts.filter((receipt) => receipt.date <= until);
 
     // What was paid this fiscal year at the deadlines that settle the included estimates.
     const yearEstimates = computeEstimates(rules, facts, receipts, reserve.include);

@@ -4,6 +4,7 @@ import { secureHeaders } from 'hono/secure-headers';
 import type { Config } from './config.ts';
 import type { Database } from './db/client.ts';
 import { activityRoutes } from './features/activities/activities.ts';
+import { mountAssistant } from './features/assistant.ts';
 import { accountRoutes } from './features/auth/account.routes.ts';
 import { authRoutes } from './features/auth/auth.routes.ts';
 import { requireUser, type SessionStore } from './features/auth/sessions.ts';
@@ -31,7 +32,6 @@ import type { PackUpdates } from './features/packs/updates.ts';
 import { instanceToday, planningRoutes } from './features/planning/planning.routes.ts';
 import type { PlanningService } from './features/planning/planning.service.ts';
 import type { ReminderJob } from './features/planning/reminders.ts';
-import { ReserveService, reserveRoutes } from './features/planning/reserve.ts';
 import { profileRoutes } from './features/profile/profile.routes.ts';
 import { readOnlyAfterCessation, situationRoutes } from './features/profile/situation.routes.ts';
 import { searchRoutes } from './features/search/search.routes.ts';
@@ -154,6 +154,7 @@ export function createApp(deps: AppDeps): Hono<AppEnv> {
     '/api/dashboard',
     '/api/reserve',
     '/api/reserve/*',
+    '/api/review/*',
     '/api/notifications/*',
     '/api/settings/*',
     '/api/account',
@@ -220,8 +221,7 @@ export function createApp(deps: AppDeps): Hono<AppEnv> {
   app.route('/api', profileRoutes(deps.db, deps.packs));
   app.route('/api/clients', clientRoutes(deps.db));
   app.route('/api/missions', missionRoutes(deps.db));
-  const reserve = new ReserveService(deps.db, deps.planning, deps.packs);
-  app.route('/api/reserve', reserveRoutes(deps.db, reserve));
+  const { reserve } = mountAssistant(app, deps);
   app.route(
     '/api',
     documentRoutes(deps.db, deps.documents, async (companyId, paymentId) =>

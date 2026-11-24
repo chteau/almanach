@@ -20,12 +20,12 @@ import { type ActiveCompany, type AppEnv, requestContext, type SessionUser } fro
 import { sameOrigin } from '../../http/same-origin.ts';
 import { RateLimiter, rateLimit } from '../../security/rate-limit.ts';
 import { randomToken, sha256 } from '../../security/tokens.ts';
+import { mountAssistant } from '../assistant.ts';
 import { clientRoutes } from '../clients/clients.routes.ts';
 import { listCompanies } from '../companies/companies.ts';
 import { documentRoutes } from '../documents/documents.routes.ts';
 import { linkedRecords } from '../federation/linked.ts';
 import { planningRoutes } from '../planning/planning.routes.ts';
-import { ReserveService, reserveRoutes } from '../planning/reserve.ts';
 import { readOnlyAfterCessation } from '../profile/situation.routes.ts';
 import { APP_VERSION } from '../system/system.ts';
 
@@ -144,7 +144,8 @@ interface Tool<S extends z.ZodObject = z.ZodObject> {
 }
 
 /** Calls an existing API route of the company, as the token owner. */
-type Api = (path: string, init?: { method?: string; body?: unknown }) => Promise<Json>;
+/** Calls the API as the token's owner, in the chosen company or in another company of the same account. */
+type Api = (path: string, init?: { method?: string; body?: unknown; company?: string }) => Promise<Json>;
 
 /**
  * Declares a tool with its argument types inferred
@@ -345,6 +346,24 @@ const TOOLS = {
         .slice(0, 500);
     },
   }),
+  weekly_review: tool({
+    scope: 'read',
+    description:
+      'Weekly review (format weeklyReview/1) of the ISO week containing `date` (default today, instance time zone): start with `actions`, sorted by urgency, each self-contained with a link; then overdue and next 14 days deadlines with their prepared amount, cash collected this week and last week, overdue invoices and invoices due this week, quotes awaiting an answer, thresholds at 80 % or more, the tax reserve and its change this week, and notices. A section of a function the instance does not offer is absent. Amounts are in cents; test data is excluded. Present nothing as tax advice. `allCompanies: true` returns an array with one review per company of the account.',
+    input: z.object({
+      company,
+      date: isoDateSchema.optional().describe('Any day of the week, YYYY-MM-DD.'),
+      allCompanies: z.boolean().default(false),
+    }),
+    run: async ({ api, args }) => {
+      const query = args.date ? `?date=${args.date}` : '';
+      if (!args.allCompanies) return (await api(`/api/review/weekly${query}`)).review;
+      const companies = (await api('/api/companies')) as { id: string }[];
+      return Promise.all(
+        companies.map(async (item) => (await api(`/api/review/weekly${query}`, { company: item.id })).review),
+      );
+    },
+  }),
   prepare_declaration: tool({
     scope: 'read',
     description:
@@ -474,8 +493,7 @@ export function mcpRoutes(deps: AppDeps): Hono<AppEnv> {
   internal.use('/api/clients/*', readOnly);
   internal.use('/api/documents/*', readOnly);
   internal.route('/api/clients', clientRoutes(db));
-  const reserve = new ReserveService(db, deps.planning, deps.packs);
-  internal.route('/api/reserve', reserveRoutes(db, reserve));
+  const { reserve } = mountAssistant(internal, deps);
   internal.route('/api', documentRoutes(db, deps.documents));
   internal.route('/api', planningRoutes(db, deps.planning, deps.packs, deps.reminders, reserve).api);
 
@@ -610,7 +628,14 @@ export function mcpRoutes(deps: AppDeps): Hono<AppEnv> {
             headers: { 'content-type': 'application/json' },
             body: init.body === undefined ? undefined : JSON.stringify(init.body),
           },
-          { mcp: scope },
+          {
+            mcp: init.company
+              ? {
+                  user: caller.user,
+                  company: companies.find((item) => item.id === init.company) ?? scope.company,
+                }
+              : scope,
+          },
         );
         const text = await response.text();
         const json = text ? JSON.parse(text) : null;

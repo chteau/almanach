@@ -113,7 +113,11 @@ export function DashboardPage() {
 
   return (
     <>
-      <PageHeader title={t('nav.dashboard')} subtitle={formatDate(data.today, locale)} />
+      <PageHeader title={t('nav.dashboard')} subtitle={formatDate(data.today, locale)}>
+        <ButtonLink to="/review" variant="ghost">
+          {t('review.title')}
+        </ButtonLink>
+      </PageHeader>
       {fresh && (
         <EmptyState title={t('dashboard.empty.title')} body={t('dashboard.empty.body')}>
           <ButtonLink to="/clients/new" variant="primary">
