@@ -7,6 +7,10 @@
   margin-bottom: 24px;
 }
 
+.narrow {
+  max-width: var(--content-narrow);
+}
+
 .text {
   display: flex;
   flex-direction: column;
@@ -16,7 +20,7 @@
 
 .title {
   margin: 0;
-  font-size: clamp(26px, 3.5vw, 34px);
+  font-size: var(--text-display);
   font-weight: 600;
   letter-spacing: -0.03em;
   line-height: 1.1;

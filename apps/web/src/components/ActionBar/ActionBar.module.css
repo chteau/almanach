@@ -1,0 +1,44 @@
+.bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-3);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--line);
+}
+
+.success,
+.error,
+.dirty {
+  font-size: 14px;
+}
+
+.success {
+  color: var(--success-fg);
+}
+
+.error {
+  color: var(--danger);
+  font-weight: 500;
+}
+
+.success:empty,
+.error:empty {
+  display: none;
+}
+
+.dirty {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--muted);
+}
+
+.dirty::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+}

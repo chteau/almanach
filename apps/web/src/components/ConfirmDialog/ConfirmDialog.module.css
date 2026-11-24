@@ -8,7 +8,7 @@
 }
 
 .dialog::backdrop {
-  background: rgb(0 0 0 / 0.45);
+  background: var(--scrim);
 }
 
 .title {
@@ -26,9 +26,4 @@
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 10px;
-}
-
-.danger {
-  background: var(--err-fg);
-  color: var(--surface);
 }

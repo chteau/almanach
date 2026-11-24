@@ -21,3 +21,9 @@
   color: var(--err-fg);
   border-color: transparent;
 }
+
+.success {
+  background: var(--success-bg);
+  color: var(--success-fg);
+  border-color: transparent;
+}

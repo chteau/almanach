@@ -50,7 +50,7 @@ export function ConfirmDialog({
         <Button variant="ghost" onClick={onCancel}>
           {t('common.cancel')}
         </Button>
-        <Button className={danger ? styles.danger : undefined} onClick={onConfirm}>
+        <Button variant={danger ? 'danger' : 'primary'} onClick={onConfirm}>
           {confirmLabel}
         </Button>
       </div>

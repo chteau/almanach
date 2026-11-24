@@ -1,5 +1,6 @@
 import type { Messages } from '../messages.ts';
 import { appDe } from './app.de.ts';
+import { componentsDe } from './components.de.ts';
 import { docsDe } from './docs.de.ts';
 import { planDe } from './plan.de.ts';
 
@@ -119,6 +120,7 @@ export const de: Messages = {
 
   'login.title': 'Anmelden',
   ...appDe,
+  ...componentsDe,
   ...docsDe,
   ...planDe,
 };

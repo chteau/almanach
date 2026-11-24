@@ -1,5 +1,6 @@
 import type { Messages } from '../messages.ts';
 import { appFr } from './app.fr.ts';
+import { componentsFr } from './components.fr.ts';
 import { docsFr } from './docs.fr.ts';
 import { planFr } from './plan.fr.ts';
 
@@ -114,6 +115,7 @@ export const fr: Messages = {
 
   'login.title': 'Connexion',
   ...appFr,
+  ...componentsFr,
   ...docsFr,
   ...planFr,
 };

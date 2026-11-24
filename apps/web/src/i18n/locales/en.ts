@@ -1,4 +1,5 @@
 import { appEn } from './app.en.ts';
+import { componentsEn } from './components.en.ts';
 import { docsEn } from './docs.en.ts';
 import { planEn } from './plan.en.ts';
 
@@ -108,6 +109,7 @@ export const en = {
 
   'login.title': 'Sign in',
   ...appEn,
+  ...componentsEn,
   ...docsEn,
   ...planEn,
 };

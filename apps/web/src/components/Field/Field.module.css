@@ -1,0 +1,62 @@
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.full {
+  width: 100%;
+}
+
+.half {
+  width: calc(50% - var(--space-2));
+}
+
+.auto {
+  align-self: flex-start;
+}
+
+.label {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.hint {
+  font-size: var(--text-sm);
+  color: var(--muted);
+}
+
+.error {
+  font-size: var(--text-sm);
+  color: var(--danger);
+  font-weight: 500;
+}
+
+.checkbox {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 2px var(--space-3);
+}
+
+.checkbox > :first-child {
+  width: 20px;
+  height: 20px;
+  margin: 2px 0 0;
+}
+
+.checkbox > :not(:first-child) {
+  grid-column: 2;
+}
+
+.checkbox .label {
+  font-size: var(--text-md);
+  font-weight: 400;
+}
+
+@media (max-width: 640px) {
+  .half {
+    width: 100%;
+  }
+}

@@ -27,3 +27,19 @@
   gap: 10px;
   margin-top: 8px;
 }
+
+.inline {
+  gap: var(--space-1);
+  margin-bottom: 0;
+  padding: var(--space-5) var(--space-4);
+  border-radius: var(--radius-md);
+  background: transparent;
+}
+
+.inline .title {
+  font-size: var(--text-md);
+}
+
+.inline .body {
+  font-size: 14px;
+}

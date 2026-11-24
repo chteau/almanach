@@ -10,7 +10,7 @@
 }
 
 .dialog::backdrop {
-  background: rgb(0 0 0 / 40%);
+  background: var(--scrim);
 }
 
 .field input {

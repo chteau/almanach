@@ -33,3 +33,28 @@
 .ghost:hover:not(:disabled) {
   background: var(--surface-2);
 }
+
+.danger {
+  background: var(--danger);
+  color: var(--surface);
+}
+
+.danger:hover:not(:disabled) {
+  filter: brightness(0.92);
+}
+
+.subtle {
+  min-height: 44px;
+  padding: 0 var(--space-3);
+  background: transparent;
+  color: var(--ink-2);
+}
+
+.subtle:hover:not(:disabled) {
+  background: var(--surface-2);
+  color: var(--ink);
+}
+
+.button[aria-busy="true"] {
+  cursor: progress;
+}

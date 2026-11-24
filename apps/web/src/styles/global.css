@@ -17,7 +17,32 @@
   --warn-bg: #fbede5;
   --err-fg: #b42318;
   --err-bg: #fbeae8;
-  --radius: 12px;
+  --success-fg: var(--ok-fg);
+  --success-bg: var(--ok-bg);
+  --danger: var(--err-fg);
+  --danger-bg: var(--err-bg);
+  --scrim: rgb(0 0 0 / 45%);
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-7: 32px;
+  --space-8: 48px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 12px;
+  --radius-pill: 999px;
+  --radius: var(--radius-lg);
+  --text-xs: 12px;
+  --text-sm: 13px;
+  --text-md: 15px;
+  --text-lg: 17px;
+  --text-xl: 22px;
+  --text-display: clamp(26px, 3.5vw, 34px);
+  --content-narrow: 720px;
+  --content-wide: 1120px;
   --font: "Geist Variable", system-ui, sans-serif;
   --mono: "Geist Mono Variable", ui-monospace, monospace;
   color-scheme: light;
@@ -41,6 +66,8 @@
     --warn-bg: #3a2216;
     --err-fg: #f4a59c;
     --err-bg: #3b1714;
+    /* --success-* and --danger alias the ok/err tokens above, so they follow this block. */
+    --scrim: rgb(0 0 0 / 60%);
     color-scheme: dark;
   }
 }
@@ -60,7 +87,7 @@ body {
   background: var(--bg);
   color: var(--ink);
   font-family: var(--font);
-  font-size: 15px;
+  font-size: var(--text-md);
   line-height: 1.5;
   font-variant-numeric: tabular-nums;
 }
@@ -78,8 +105,12 @@ a {
   position: absolute;
   width: 1px;
   height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
   overflow: hidden;
   clip: rect(0 0 0 0);
+  clip-path: inset(50%);
   white-space: nowrap;
 }
 
