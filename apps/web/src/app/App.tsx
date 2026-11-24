@@ -11,6 +11,7 @@ import { ClientsPage } from '../features/clients/ClientsPage.tsx';
 import { DocumentPage } from '../features/documents/DocumentPage.tsx';
 import { DocumentsPage } from '../features/documents/DocumentsPage.tsx';
 import { PaymentsPage } from '../features/documents/PaymentsPage.tsx';
+import { ExpensesPage } from '../features/expenses/ExpensesPage.tsx';
 import { InstallPage } from '../features/install/InstallPage.tsx';
 import { useInstallStatus } from '../features/install/useInstallStatus.ts';
 import { LinkedRecordPage } from '../features/linked/LinkedRecordPage.tsx';
@@ -95,6 +96,7 @@ const router = createBrowserRouter([
           { path: '/documents/:id', element: <DocumentPage /> },
           { path: '/payments', element: <PaymentsPage /> },
           { path: '/review', element: <ReviewPage /> },
+          { path: '/expenses', element: <ExpensesPage /> },
           { path: '/linked/:kind/:linkId/:id', element: <LinkedRecordPage /> },
         ],
       },

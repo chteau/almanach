@@ -22,6 +22,11 @@ export interface RuleProfile {
   activities?: string[];
   /** Tax household for French income tax: parts in quarters (4 = one part) and joint taxation; one single part when absent. */
   household?: { partsQuarters: number; joint: boolean };
+  /**
+   * Expenses recorded over the same dates as the receipts, before VAT. They lower the "profit" base; an allowance
+   * that deducts from profit (UK trading allowance) applies instead when it is larger, never on top.
+   */
+  expensesCents?: number;
 }
 
 /** Money received on a date, in the main currency. */
@@ -541,7 +546,11 @@ function activityEstimates(
 ): EstimateResult[] {
   const total = receipts.reduce((sum, receipt) => sum + receipt.cents, 0);
   const allowance = computeAllowance(rules, profile, total);
-  const profit = allowance?.deductsFromProfit ? allowance.taxableCents : total;
+  const expenses = Math.max(0, profile.expensesCents ?? 0);
+  const profit = Math.max(
+    0,
+    allowance?.deductsFromProfit ? total - Math.max(allowance.allowanceCents, expenses) : total - expenses,
+  );
   const results = new Map<string, EstimateResult>();
   const ordered = [...rules.estimates].sort(
     (a, b) => Number(a.formula.kind === 'brackets') - Number(b.formula.kind === 'brackets'),

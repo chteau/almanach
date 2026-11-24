@@ -12,8 +12,17 @@ features:
   # Prepared declaration: experimental — safe harbor and annualized method sourced from Pub. 505 (2026), but
   # married filing separately limit, state taxes and expenses are not handled.
   prepare: experimental
-# Packs using fields added in Almanach 0.1.0 (reserve, fr_income_tax, prepare).
+  # Expenses: experimental — lower the Schedule C profit of the SE tax and income tax estimates; allowability and
+  # Schedule C lines not checked.
+  expenses: experimental
+# Packs using fields added in Almanach 0.1.0 (reserve, fr_income_tax, prepare, expenses).
 minAppVersion: "0.1.0"
+expensesNote:
+  {
+    fr: "Les dépenses saisies réduisent le bénéfice (Schedule C) des estimations de self-employment tax et d'impôt sur le revenu. Almanach ne vérifie pas qu'elles sont déductibles.",
+    en: "Recorded expenses lower the profit (Schedule C) of the self-employment tax and income tax estimates. Almanach does not check that they are deductible.",
+    de: "Erfasste Ausgaben mindern den Gewinn (Schedule C) der Schätzungen von Self-Employment Tax und Einkommensteuer. Almanach prüft nicht, ob sie abzugsfähig sind.",
+  }
 name: { fr: États-Unis, en: United States, de: Vereinigte Staaten }
 currency: USD
 fiscalYearStart: "01-01"

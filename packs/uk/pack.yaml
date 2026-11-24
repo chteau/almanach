@@ -16,8 +16,17 @@ features:
   reserve: verified
   # Prepared declaration: experimental — MTD figures only (no HMRC submission), expenses not split by category.
   prepare: experimental
-# Packs using fields added in Almanach 0.1.0 (reserve, fr_income_tax, prepare).
+  # Expenses: experimental — fill the MTD expenses total and lower the profit (instead of the trading allowance when
+  # larger); HMRC categories not mapped, allowability not checked.
+  expenses: experimental
+# Packs using fields added in Almanach 0.1.0 (reserve, fr_income_tax, prepare, expenses).
 minAppVersion: "0.1.0"
+expensesNote:
+  {
+    fr: "Les dépenses saisies donnent le total des dépenses des mises à jour MTD et réduisent le bénéfice estimé ; quand elles dépassent le trading allowance de 1 000 £, elles le remplacent (on ne peut pas cumuler les deux).",
+    en: "Recorded expenses give the expenses total of the MTD updates and lower the estimated profit; when they exceed the £1,000 trading allowance they replace it (you cannot claim both).",
+    de: "Erfasste Ausgaben ergeben die Ausgabensumme der MTD-Meldungen und mindern den geschätzten Gewinn; übersteigen sie die Trading Allowance von 1.000 £, ersetzen sie diese (beides zugleich ist nicht möglich).",
+  }
 name: { fr: Royaume-Uni, en: United Kingdom, de: Vereinigtes Königreich }
 currency: GBP
 fiscalYearStart: "04-06"

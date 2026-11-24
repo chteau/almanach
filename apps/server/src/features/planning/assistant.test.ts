@@ -334,4 +334,49 @@ describe.skipIf(!url)('administrative assistant (database)', () => {
     expect(all.value.map((item: Body) => item.company.id)).toEqual([people.a.company]);
     expect((await mcp('b', 'read', 'weekly_review')).value.cash.collectedThisWeekCents).toBe(0);
   });
+
+  test('expenses: recorded, edited, isolated, shown for information in France, listed through MCP', async () => {
+    const reserveBefore = (await json('a', '/api/reserve')).reserve.reserveCents;
+    const expense = {
+      date: today,
+      amountCents: 12_000,
+      vatCents: 2_400,
+      category: 'software',
+      description: 'IDE',
+      activityId: null,
+      vaultItemId: null,
+    };
+    const created = await call('a', '/api/expenses', { method: 'POST', body: expense });
+    expect(created.status).toBe(201);
+    const { expense: row } = (await created.json()) as Body;
+    expect(row).toMatchObject({ ...expense, currency: 'EUR' });
+    expect(
+      (await call('a', '/api/expenses', { method: 'POST', body: { ...expense, category: 'yacht' } })).status,
+    ).toBe(422);
+    expect(
+      (
+        await call('a', '/api/expenses', {
+          method: 'POST',
+          body: { ...expense, vaultItemId: crypto.randomUUID() },
+        })
+      ).status,
+    ).toBe(422);
+    const list = await json('a', '/api/expenses');
+    expect(list).toMatchObject({ currency: 'EUR', maturity: 'experimental' });
+    expect(list.note.fr).toContain('pas déductibles');
+    expect((await json('b', '/api/expenses')).expenses).toEqual([]);
+    expect((await call('b', `/api/expenses/${row.id}`, { method: 'DELETE' })).status).toBe(404);
+    expect(
+      (
+        await call('a', `/api/expenses/${row.id}`, {
+          method: 'PUT',
+          body: { ...expense, amountCents: 15_000 },
+        })
+      ).status,
+    ).toBe(200);
+    // A micro-entreprise deducts no actual expense: the reserve does not move.
+    expect((await json('a', '/api/reserve')).reserve.reserveCents).toBe(reserveBefore);
+    const tool = await mcp('a', 'read', 'list_expenses', { from: today });
+    expect(tool.value.expenses.map((item: Body) => item.amountCents)).toEqual([15_000]);
+  });
 });

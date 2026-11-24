@@ -148,6 +148,13 @@
       "when": 1795483699828,
       "tag": "0020_declaration_prepared",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1795484374709,
+      "tag": "0021_expenses",
+      "breakpoints": true
     }
   ]
 }

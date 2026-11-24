@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import {
+  computeEstimates,
   type DeadlineNotice,
   type InvoicedItem,
   type PrepareRule,
@@ -258,5 +259,35 @@ describe('prepared declarations', () => {
       ]);
       expect(result.amount?.cents).toBe(803_826);
     });
+  });
+});
+
+describe('expenses in the estimates', () => {
+  const estimates = (country: string, facts: RuleProfile, cents: number) =>
+    Object.fromEntries(
+      computeEstimates(packs.rules(country, 2026)?.rules as YearRules, facts, [
+        { date: '2026-10-01', cents },
+      ]).map((item) => [item.id, item.cents]),
+    );
+
+  test('United Kingdom: the trading allowance or the expenses, whichever is larger, never both', () => {
+    const trader = profile('sole_trader');
+    // £500 of expenses: the £1,000 allowance stays, profit 39,000 → 26,430 × 20 % and × 6 %.
+    expect(estimates('GB', { ...trader, expensesCents: 50_000 }, 4_000_000)).toMatchObject({
+      income_tax: 528_600,
+      class4_nic: 158_580,
+    });
+    // £5,000 of expenses: profit 35,000 → 22,430 × 20 % = 4,486 and × 6 % = 1,345.80.
+    expect(estimates('GB', { ...trader, expensesCents: 500_000 }, 4_000_000)).toMatchObject({
+      income_tax: 448_600,
+      class4_nic: 134_580,
+    });
+  });
+
+  test('France, micro: expenses change nothing (flat-rate allowance only)', () => {
+    const liberal = profile('micro_bnc', { declarationPeriod: 'monthly' });
+    expect(estimates('FR', { ...liberal, expensesCents: 1_000_000 }, 5_000_000)).toEqual(
+      estimates('FR', liberal, 5_000_000),
+    );
   });
 });

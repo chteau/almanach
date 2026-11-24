@@ -96,7 +96,15 @@ export class ReserveService {
     const rules = found.rules;
     const settings = await this.settings(companyId);
     const household = { partsQuarters: settings.taxPartsQuarters, joint: settings.jointTaxation };
-    const facts = ruleProfile(profile, await this.planning.activities(companyId), household);
+    const facts = {
+      ...ruleProfile(profile, await this.planning.activities(companyId), household),
+      expensesCents: await this.planning.expenseTotal(
+        companyId,
+        profile.currency,
+        fiscal.start,
+        until ?? fiscal.end,
+      ),
+    };
     const local = await this.planning.receipts(companyId, profile.currency, fiscal.start, fiscal.end);
     let receipts: Receipt[] = [
       ...local.receipts,

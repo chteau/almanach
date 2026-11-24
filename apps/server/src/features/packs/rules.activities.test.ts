@@ -57,6 +57,7 @@ describe('maturity per function', () => {
         activities: 'experimental',
         reserve: 'experimental',
         prepare: 'experimental',
+        expenses: 'experimental',
       },
       FR: {
         thresholds: 'verified',
@@ -65,6 +66,7 @@ describe('maturity per function', () => {
         activities: 'verified',
         reserve: 'experimental',
         prepare: 'experimental',
+        expenses: 'experimental',
       },
       GB: {
         thresholds: 'verified',
@@ -72,6 +74,7 @@ describe('maturity per function', () => {
         deadlines: 'verified',
         reserve: 'verified',
         prepare: 'experimental',
+        expenses: 'experimental',
       },
       US: {
         estimates: 'experimental',
@@ -79,6 +82,7 @@ describe('maturity per function', () => {
         activities: 'experimental',
         reserve: 'experimental',
         prepare: 'experimental',
+        expenses: 'experimental',
       },
     });
   });

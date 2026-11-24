@@ -14,8 +14,17 @@ features:
   # Prepared declaration: experimental — the split of revenue per activity category is not confirmed on an
   # official page (F23257, checked 2026-11-24, only says revenue collected and zero declarations are required).
   prepare: experimental
-# Packs using fields added in Almanach 0.1.0 (reserve, fr_income_tax, prepare).
+  # Expenses: experimental — shown for information only: the micro regime deducts a flat-rate allowance, never
+  # actual expenses (art. 50-0 and 102 ter CGI, allowance rules in 2026.yaml).
+  expenses: experimental
+# Packs using fields added in Almanach 0.1.0 (reserve, fr_income_tax, prepare, expenses).
 minAppVersion: "0.1.0"
+expensesNote:
+  {
+    fr: "En micro-entreprise, les dépenses réelles ne sont pas déductibles : l'abattement forfaitaire s'applique à leur place. Elles sont affichées ici à titre indicatif et ne changent aucun calcul.",
+    en: "In a micro-entreprise, actual expenses are not deductible: the flat-rate allowance applies instead. They are shown here for information and change no computation.",
+    de: "In der Micro-Entreprise sind tatsächliche Ausgaben nicht abzugsfähig: Stattdessen gilt der Pauschalabzug. Sie werden hier nur zur Information angezeigt und ändern keine Berechnung.",
+  }
 name: { fr: France, en: France, de: Frankreich }
 currency: EUR
 fiscalYearStart: "01-01"

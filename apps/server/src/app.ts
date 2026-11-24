@@ -155,6 +155,8 @@ export function createApp(deps: AppDeps): Hono<AppEnv> {
     '/api/reserve',
     '/api/reserve/*',
     '/api/review/*',
+    '/api/expenses',
+    '/api/expenses/*',
     '/api/notifications/*',
     '/api/settings/*',
     '/api/account',
@@ -186,7 +188,14 @@ export function createApp(deps: AppDeps): Hono<AppEnv> {
     await next();
   });
   const readOnly = readOnlyAfterCessation(deps.db);
-  for (const path of ['/api/clients/*', '/api/missions/*', '/api/documents/*', '/api/time/*']) {
+  for (const path of [
+    '/api/clients/*',
+    '/api/missions/*',
+    '/api/documents/*',
+    '/api/time/*',
+    '/api/expenses',
+    '/api/expenses/*',
+  ]) {
     app.use(path, readOnly);
   }
   app.route('/api/companies', companyRoutes(deps.db, deps.config.cookieSecure));

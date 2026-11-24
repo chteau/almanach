@@ -5,6 +5,7 @@ import {
   type DeadlineNotice,
   type DeadlineOccurrence,
   type EstimateResult,
+  type ExpenseItem,
   expandDeadlines,
   fiscalYearOf,
   type InvoicedItem,
@@ -31,6 +32,7 @@ import {
   deadlineMarks,
   deadlineNotices,
   documents,
+  expenses,
   externalRevenues,
   federationLinks,
   federationTotals,
@@ -594,7 +596,10 @@ export class PlanningService {
       ).filter((receipt) => receipt.date <= periodEnd);
       revenue = { ...local, receipts: [...local.receipts, ...linked] };
       const rules = this.packs.rules(pack.country, fiscalYearOf(periodStart, pack.fiscalYearStart).year);
-      const facts = ruleProfile(profile, await this.activities(companyId), await this.household(companyId));
+      const facts = {
+        ...ruleProfile(profile, await this.activities(companyId), await this.household(companyId)),
+        expensesCents: await this.expenseTotal(companyId, profile.currency, periodStart, periodEnd),
+      };
       if (rules && occurrence.estimates.length > 0) {
         estimates = computeEstimates(rules.rules, facts, revenue.receipts, occurrence.estimates);
         if (facts.activities?.length)
@@ -751,16 +756,58 @@ export class PlanningService {
   }
 
   /**
-   * Expenses recorded between two dates; null while expenses are not tracked
+   * Expenses recorded between two dates in the main currency; null when the country pack does not use expenses or
+   * none was ever recorded, so a form box shows "to enter" rather than 0
    *
-   * @param _companyId {string} - owner
-   * @param _currency {string} - main currency
-   * @param _from {string} - first day
-   * @param _to {string} - last day
-   * @returns {Promise<null>} - none yet
+   * @param companyId {string} - owner
+   * @param currency {string} - main currency
+   * @param from {string} - first day
+   * @param to {string} - last day
+   * @returns {Promise<ExpenseItem[] | null>} - expenses, or null when not tracked
    */
-  async expenses(_companyId: string, _currency: string, _from: string, _to: string): Promise<null> {
-    return null;
+  async expenses(
+    companyId: string,
+    currency: string,
+    from: string,
+    to: string,
+  ): Promise<ExpenseItem[] | null> {
+    const profile = await this.profile(companyId);
+    const pack = profile && this.packs.get(profile.country);
+    if (!pack || !packFeatures(pack).expenses) return null;
+    const [any] = await this.db
+      .select({ id: expenses.id })
+      .from(expenses)
+      .where(eq(expenses.companyId, companyId))
+      .limit(1);
+    if (!any) return null;
+    const rows = await this.db
+      .select({ date: expenses.date, netCents: expenses.amountCents, vatCents: expenses.vatCents })
+      .from(expenses)
+      .where(
+        and(
+          eq(expenses.companyId, companyId),
+          eq(expenses.currency, currency),
+          gte(expenses.date, from),
+          lte(expenses.date, to),
+        ),
+      );
+    return rows;
+  }
+
+  /**
+   * Total of the expenses between two dates, before VAT, for the "profit" base of the estimates
+   *
+   * @param companyId {string} - owner
+   * @param currency {string} - main currency
+   * @param from {string} - first day
+   * @param to {string} - last day
+   * @returns {Promise<number>} - cents, 0 when expenses are not tracked
+   */
+  async expenseTotal(companyId: string, currency: string, from: string, to: string): Promise<number> {
+    return ((await this.expenses(companyId, currency, from, to)) ?? []).reduce(
+      (sum, item) => sum + item.netCents,
+      0,
+    );
   }
 
   /**
@@ -799,7 +846,12 @@ export class PlanningService {
     const inYear = (receipt: Receipt) => receipt.date >= fiscal.start && receipt.date <= fiscal.end;
     const yearReceipts = receipts.filter(inYear);
     const estimated = [...yearReceipts, ...attachedReceipts(linked).filter(inYear)];
-    const toDate = computeEstimates(found.rules, facts, estimated);
+    // Expenses of the fiscal year lower the profit of the estimates to date; the projection keeps revenue only.
+    const withExpenses = {
+      ...facts,
+      expensesCents: await this.expenseTotal(companyId, profile.currency, fiscal.start, fiscal.end),
+    };
+    const toDate = computeEstimates(found.rules, withExpenses, estimated);
     const elapsed = Math.max(1, Math.round((Date.parse(today) - Date.parse(fiscal.start)) / 86_400_000) + 1);
     const length = Math.round((Date.parse(fiscal.end) - Date.parse(fiscal.start)) / 86_400_000) + 1;
     const collected = yearReceipts.reduce((sum, receipt) => sum + receipt.cents, 0);
@@ -822,7 +874,7 @@ export class PlanningService {
       projectedRevenueCents: projectedRevenue,
       unconverted: set.unconverted,
       thresholds,
-      activities: activityBreakdown(found.rules, facts, estimated),
+      activities: activityBreakdown(found.rules, withExpenses, estimated),
       linked: linked.map(({ receipts: list, id: _id, ...link }) => ({
         ...link,
         cents: list

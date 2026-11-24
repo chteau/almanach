@@ -18,6 +18,7 @@ export const PACK_FEATURES = [
   'activities',
   'reserve',
   'prepare',
+  'expenses',
   'vault_types',
   'einvoicing',
 ] as const;
@@ -57,6 +58,8 @@ export const packMetaSchema = z
       .string()
       .regex(/^\d{1,4}\.\d{1,4}\.\d{1,4}$/)
       .optional(),
+    /** How expenses recorded in Almanach are used in this country (deductible or shown for information). */
+    expensesNote: localized.optional(),
     name: localized,
     currency: currencySchema,
     fiscalYearStart: z.string().regex(/^(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/),

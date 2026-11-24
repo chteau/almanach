@@ -15,6 +15,9 @@ const empty = {
   billingSettings: [],
   situationChanges: [],
   externalRevenues: [],
+  reserveSettings: [],
+  deadlineNotices: [],
+  expenses: [],
 };
 
 describe('import references', () => {

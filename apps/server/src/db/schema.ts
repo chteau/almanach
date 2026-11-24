@@ -375,6 +375,29 @@ export const deadlineMarks = pgTable(
   (table) => [primaryKey({ columns: [table.companyId, table.key] })],
 );
 
+/** Simple expenses: amount before VAT, VAT paid, category and optional receipt from the vault. */
+export const expenses = pgTable(
+  'expenses',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    companyId: uuid('company_id')
+      .notNull()
+      .references(() => companies.id, { onDelete: 'cascade' }),
+    activityId: activityColumn(),
+    date: date('date').notNull(),
+    amountCents: bigint('amount_cents', { mode: 'number' }).notNull(),
+    vatCents: bigint('vat_cents', { mode: 'number' }).notNull().default(0),
+    /** Main currency of the company when entered. */
+    currency: text('currency').notNull(),
+    category: text('category').notNull(),
+    description: text('description').notNull().default(''),
+    vaultItemId: uuid('vault_item_id'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index('expenses_company_date_idx').on(table.companyId, table.date)],
+);
+
 /** Amounts from a notice or entered by the person for a deadline rule and fiscal year (prepared declarations). */
 export const deadlineNotices = pgTable(
   'deadline_notices',

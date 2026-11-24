@@ -1,5 +1,6 @@
 import {
   billingSettingsSchema,
+  EXPENSE_CATEGORIES,
   LOGO_MAX_BYTES,
   logoSchema,
   numberFormatSchema,
@@ -17,13 +18,16 @@ import {
   companyActivities,
   customDeadlines,
   deadlineMarks,
+  deadlineNotices,
   documents,
+  expenses,
   externalRevenues,
   federationLinks,
   missions,
   numberSequences,
   payments,
   profiles,
+  reserveSettings,
   situationChanges,
   timeEntries,
   userSettings,
@@ -52,6 +56,9 @@ const TABLES = {
   billingSettings,
   situationChanges,
   externalRevenues,
+  reserveSettings,
+  deadlineNotices,
+  expenses,
 } as const satisfies Record<string, PgTable>;
 
 type TableName = keyof typeof TABLES;
@@ -166,7 +173,7 @@ export function referenceProblem(data: CompanyData): string | null {
   for (const row of data.companyActivities)
     if (typeof row.status !== 'string' || !/^[a-z0-9_]{1,40}$/.test(row.status) || row.linkId)
       return 'companyActivities.status';
-  for (const name of ['documents', 'payments', 'customDeadlines'] as const)
+  for (const name of ['documents', 'payments', 'customDeadlines', 'expenses'] as const)
     for (const row of data[name]) if (!optional(row.activityId, activityIds)) return `${name}.activityId`;
   for (const mission of data.missions) if (!clientIds.has(mission.clientId)) return 'missions.clientId';
   for (const doc of data.documents) {
@@ -218,6 +225,8 @@ function contentProblem(data: CompanyData): string | null {
         return 'billingSettings.logo';
     }
   }
+  for (const row of data.expenses)
+    if (!EXPENSE_CATEGORIES.includes(row.category as never) || row.vaultItemId) return 'expenses.content';
   const strict = situationSchema.strict();
   for (const row of data.situationChanges) {
     if (!strict.safeParse(row.before).success || !strict.safeParse(row.after).success)

@@ -12,8 +12,17 @@ features:
   # Prepared declaration: experimental — USt 1 A box numbers not cited, Ist-Versteuerung and Dauerfristverlängerung
   # not handled, deposits left out.
   prepare: experimental
-# Packs using fields added in Almanach 0.1.0 (reserve, fr_income_tax, prepare).
+  # Expenses: experimental — lower the profit of the income tax estimate and give the input VAT of the VAT return;
+  # no check of what is deductible (§ 4 Abs. 4 EStG, § 15 UStG), categories not mapped to EÜR lines.
+  expenses: experimental
+# Packs using fields added in Almanach 0.1.0 (reserve, fr_income_tax, prepare, expenses).
 minAppVersion: "0.1.0"
+expensesNote:
+  {
+    fr: "Les dépenses saisies réduisent le bénéfice de l'estimation d'impôt et donnent la TVA déductible de la déclaration de TVA. Almanach ne vérifie pas qu'elles sont déductibles.",
+    en: "Recorded expenses lower the profit of the income tax estimate and give the input VAT of the VAT return. Almanach does not check that they are deductible.",
+    de: "Erfasste Ausgaben mindern den Gewinn der Einkommensteuerschätzung und ergeben die Vorsteuer der Umsatzsteuer-Voranmeldung. Almanach prüft nicht, ob sie abzugsfähig sind.",
+  }
 name: { fr: Allemagne, en: Germany, de: Deutschland }
 currency: EUR
 fiscalYearStart: "01-01"

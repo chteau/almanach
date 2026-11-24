@@ -346,6 +346,21 @@ const TOOLS = {
         .slice(0, 500);
     },
   }),
+  list_expenses: tool({
+    scope: 'read',
+    description:
+      'List the simple expenses recorded: date, amount before VAT and VAT in cents, category, activity, receipt in the vault. `note` says how the country uses them (deductible, or shown for information only as in a French micro-entreprise).',
+    input: z.object({ company, ...period }),
+    run: async ({ api, args }) => {
+      const result = (await api('/api/expenses')) as { expenses: { date: string }[] };
+      return {
+        ...result,
+        expenses: result.expenses.filter(
+          (item) => (!args.from || item.date >= args.from) && (!args.to || item.date <= args.to),
+        ),
+      };
+    },
+  }),
   weekly_review: tool({
     scope: 'read',
     description:
