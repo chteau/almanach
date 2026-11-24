@@ -240,7 +240,9 @@ test('an invoice is drafted from a mission, issued, paid and credited (P12 to P1
   await openSection(page, 'Clients');
   await page.getByRole('link', { name: /Nordwind GmbH/ }).click();
   await page.getByRole('link', { name: 'Edit' }).click();
-  await page.getByLabel(/^Address/).fill('Hafenstraße 12\n20457 Hamburg');
+  await page.getByLabel(/^Street/).fill('Hafenstraße 12');
+  await page.getByLabel('Postal code').fill('20457');
+  await page.getByLabel('City').fill('Hamburg');
   await page.getByRole('button', { name: 'Save' }).click();
   await expect(page.getByRole('heading', { name: 'Nordwind GmbH' })).toBeVisible();
   await page.goto(draftUrl);
