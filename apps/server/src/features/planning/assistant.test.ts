@@ -244,4 +244,52 @@ describe.skipIf(!url)('administrative assistant (database)', () => {
     const tool = await mcp('a', 'read', 'get_reserve');
     expect(tool.value.reserve.reserveCents).toBe(268_000);
   });
+
+  test('prepared declaration: figures of the month, declared figures checked, notice saved, MCP', async () => {
+    const key = `urssaf_monthly:${today.slice(0, 8)}01`;
+    const { deadline } = await json('a', `/api/deadlines/${key}`);
+    expect(deadline.prepared.lines.map((line: Body) => [line.id, line.cents])).toEqual([
+      ['ca_bnc', 1_000_000],
+    ]);
+    expect(deadline.prepared.amount).toMatchObject({ method: 'estimates', cents: 256_000 });
+    const mark = { doneOn: today, note: '', actualCents: 256_000 };
+    expect(
+      (
+        await call('a', `/api/deadlines/${key}/mark`, {
+          method: 'PUT',
+          body: { ...mark, declared: { other: 1 } },
+        })
+      ).status,
+    ).toBe(422);
+    expect(
+      (
+        await call('a', `/api/deadlines/${key}/mark`, {
+          method: 'PUT',
+          body: { ...mark, declared: { ca_bnc: 1_000_000 } },
+        })
+      ).status,
+    ).toBe(204);
+    expect((await json('a', `/api/deadlines/${key}`)).deadline.mark.declared).toEqual({ ca_bnc: 1_000_000 });
+    const notice = {
+      perOccurrenceCents: 10_000,
+      priorYearTaxCents: null,
+      priorYearIncomeCents: null,
+      method: null,
+      note: '',
+    };
+    expect(
+      (await call('a', '/api/deadline-notices/urssaf_monthly/2026', { method: 'PUT', body: notice })).status,
+    ).toBe(204);
+    expect(
+      (
+        await call('a', '/api/deadline-notices/urssaf_monthly/2026', {
+          method: 'PUT',
+          body: { ...notice, method: 'x' },
+        })
+      ).status,
+    ).toBe(422);
+    expect((await json('b', '/api/deadlines/next-prepared')).deadline.prepared).toBeDefined();
+    const tool = await mcp('a', 'read', 'prepare_declaration', { key });
+    expect(tool.value.deadline.prepared.lines[0].cents).toBe(1_000_000);
+  });
 });

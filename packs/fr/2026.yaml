@@ -360,6 +360,42 @@ deadlines:
         income_tax_sales,
       ]
     declaresRevenue: true
+    # Déclaration préparée : CA encaissé de la période, une ligne par activité (le CA est déclaré par catégorie
+    # d'activité, chacune à son taux). Montant = cotisations (et versement libératoire) estimées de la période.
+    prepare:
+      basis: collected
+      span: period
+      lines:
+        - id: ca_bnc
+          label:
+            {
+              fr: "CA des prestations de services BNC",
+              en: "BNC services revenue",
+              de: "Umsatz BNC-Dienstleistungen",
+            }
+          measure: revenue
+          statuses: [micro_bnc]
+        - id: ca_bic_services
+          label:
+            {
+              fr: "CA des prestations de services BIC",
+              en: "BIC services revenue",
+              de: "Umsatz BIC-Dienstleistungen",
+            }
+          measure: revenue
+          statuses: [micro_bic_services]
+        - id: ca_bic_sales
+          label:
+            { fr: "CA des ventes de marchandises", en: "Sales of goods revenue", de: "Umsatz Warenverkauf" }
+          measure: revenue
+          statuses: [micro_bic_sales]
+      amount: { method: estimates }
+      note:
+        fr: "Montants encaissés, arrondis à l'euro sur le portail. Déclarez 0 si rien n'a été encaissé : la déclaration reste obligatoire."
+        en: "Amounts collected, rounded to the euro on the portal. Declare 0 if nothing was collected: the declaration is still required."
+        de: "Vereinnahmte Beträge, im Portal auf Euro gerundet. Bei null Einnahmen 0 melden: die Meldung bleibt Pflicht."
+      source: https://entreprendre.service-public.gouv.fr/vosdroits/F23257
+      verified_on: "2026-11-24"
     link: https://www.autoentrepreneur.urssaf.fr
     source: https://entreprendre.service-public.gouv.fr/vosdroits/F23257
     verified_on: "2026-11-18"
@@ -394,6 +430,42 @@ deadlines:
         income_tax_sales,
       ]
     declaresRevenue: true
+    # Déclaration préparée : CA encaissé de la période, une ligne par activité (le CA est déclaré par catégorie
+    # d'activité, chacune à son taux). Montant = cotisations (et versement libératoire) estimées de la période.
+    prepare:
+      basis: collected
+      span: period
+      lines:
+        - id: ca_bnc
+          label:
+            {
+              fr: "CA des prestations de services BNC",
+              en: "BNC services revenue",
+              de: "Umsatz BNC-Dienstleistungen",
+            }
+          measure: revenue
+          statuses: [micro_bnc]
+        - id: ca_bic_services
+          label:
+            {
+              fr: "CA des prestations de services BIC",
+              en: "BIC services revenue",
+              de: "Umsatz BIC-Dienstleistungen",
+            }
+          measure: revenue
+          statuses: [micro_bic_services]
+        - id: ca_bic_sales
+          label:
+            { fr: "CA des ventes de marchandises", en: "Sales of goods revenue", de: "Umsatz Warenverkauf" }
+          measure: revenue
+          statuses: [micro_bic_sales]
+      amount: { method: estimates }
+      note:
+        fr: "Montants encaissés, arrondis à l'euro sur le portail. Déclarez 0 si rien n'a été encaissé : la déclaration reste obligatoire."
+        en: "Amounts collected, rounded to the euro on the portal. Declare 0 if nothing was collected: the declaration is still required."
+        de: "Vereinnahmte Beträge, im Portal auf Euro gerundet. Bei null Einnahmen 0 melden: die Meldung bleibt Pflicht."
+      source: https://entreprendre.service-public.gouv.fr/vosdroits/F23257
+      verified_on: "2026-11-24"
     link: https://www.autoentrepreneur.urssaf.fr
     source: https://entreprendre.service-public.gouv.fr/vosdroits/F23257
     verified_on: "2026-11-18"

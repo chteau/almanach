@@ -56,6 +56,7 @@ describe('maturity per function', () => {
         deadlines: 'experimental',
         activities: 'experimental',
         reserve: 'experimental',
+        prepare: 'experimental',
       },
       FR: {
         thresholds: 'verified',
@@ -63,13 +64,21 @@ describe('maturity per function', () => {
         deadlines: 'verified',
         activities: 'verified',
         reserve: 'experimental',
+        prepare: 'experimental',
       },
-      GB: { thresholds: 'verified', estimates: 'verified', deadlines: 'verified', reserve: 'verified' },
+      GB: {
+        thresholds: 'verified',
+        estimates: 'verified',
+        deadlines: 'verified',
+        reserve: 'verified',
+        prepare: 'experimental',
+      },
       US: {
         estimates: 'experimental',
         deadlines: 'experimental',
         activities: 'experimental',
         reserve: 'experimental',
+        prepare: 'experimental',
       },
     });
   });

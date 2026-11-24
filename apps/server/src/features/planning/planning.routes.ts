@@ -7,6 +7,7 @@ import {
   LOCALES,
   type Localized,
   optionalText,
+  PREPARE_METHODS,
 } from '@almanach/shared';
 import { and, desc, eq, gte, inArray, isNull, lte, ne, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
@@ -16,6 +17,7 @@ import {
   companies,
   customDeadlines,
   deadlineMarks,
+  deadlineNotices,
   documents,
   instance,
   notifications,
@@ -55,6 +57,22 @@ const markSchema = z
     doneOn: isoDateSchema.nullable(),
     note: optionalText(500),
     actualCents: z.number().int().min(0).max(100_000_000_000).nullable(),
+    /** Figures copied into the form, per prepared line id. */
+    declared: z
+      .record(z.string().regex(/^[a-z0-9_]{1,60}$/), z.number().int().min(0).max(100_000_000_000))
+      .nullable()
+      .optional(),
+  })
+  .strict();
+
+const amount = z.number().int().min(0).max(100_000_000_000).nullable();
+const noticeSchema = z
+  .object({
+    perOccurrenceCents: amount,
+    priorYearTaxCents: amount,
+    priorYearIncomeCents: amount,
+    method: z.enum(PREPARE_METHODS).nullable(),
+    note: optionalText(500),
   })
   .strict();
 
@@ -131,6 +149,41 @@ export function planningRoutes(
     return c.json({ today, items: await planning.calendar(c.var.company.id, from, to, today) });
   });
 
+  /** The next deadline not done yet that has a prepared declaration, overdue ones first. */
+  api.get('/deadlines/next-prepared', async (c) => {
+    const today = await instanceToday(db);
+    const items = await planning.calendar(c.var.company.id, addDays(today, -62), addDays(today, 185), today);
+    for (const item of items) {
+      if (item.done || item.hidden || (item.type !== 'tax' && item.type !== 'social')) continue;
+      const detail = await planning.deadline(c.var.company.id, item.key);
+      if (detail?.prepared) return c.json({ deadline: detail, today });
+    }
+    return c.json({ deadline: null, today });
+  });
+
+  api.put('/deadline-notices/:ruleId/:year', async (c) => {
+    const ruleId = c.req.param('ruleId');
+    const fiscalYear = Number(c.req.param('year'));
+    if (
+      !/^[a-z0-9_]{1,60}$/.test(ruleId) ||
+      !Number.isInteger(fiscalYear) ||
+      fiscalYear < 2000 ||
+      fiscalYear > 2100
+    )
+      return c.json({ error: 'not_found' }, 404);
+    const { data, response } = await parseBody(c, noticeSchema);
+    if (response) return response;
+    const values = { ...data, note: data.note || null };
+    await db
+      .insert(deadlineNotices)
+      .values({ companyId: c.var.company.id, ruleId, fiscalYear, ...values })
+      .onConflictDoUpdate({
+        target: [deadlineNotices.companyId, deadlineNotices.ruleId, deadlineNotices.fiscalYear],
+        set: { ...values, updatedAt: new Date() },
+      });
+    return c.body(null, 204);
+  });
+
   api.get('/deadlines/:key', async (c) => {
     const key = c.req.param('key');
     if (!KEY.test(key) || key.startsWith('custom:')) return c.json({ error: 'not_found' }, 404);
@@ -167,6 +220,20 @@ export function planningRoutes(
     if (!(await ownsKey(c.var.company.id, key))) return c.json({ error: 'not_found' }, 404);
     const { data, response } = await parseBody(c, markSchema);
     if (response) return response;
+    if (data.declared) {
+      const lines = key.startsWith('custom:')
+        ? []
+        : ((await planning.deadline(c.var.company.id, key))?.prepared?.lines.map((line) => line.id) ?? []);
+      const unknown = Object.keys(data.declared).filter((id) => !lines.includes(id));
+      if (unknown.length > 0)
+        return c.json(
+          {
+            error: 'validation_failed',
+            issues: unknown.map((id) => ({ path: `declared.${id}`, message: 'unknown_line' })),
+          },
+          422,
+        );
+    }
     await db
       .insert(deadlineMarks)
       .values({ companyId: c.var.company.id, key, ...data })

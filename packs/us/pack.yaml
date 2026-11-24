@@ -9,7 +9,10 @@ features:
   activities: experimental
   # Reserve: experimental — state taxes not modelled; revenue without expenses.
   reserve: experimental
-# Packs using fields added in Almanach 0.1.0 (reserve, fr_income_tax).
+  # Prepared declaration: experimental — safe harbor and annualized method sourced from Pub. 505 (2026), but
+  # married filing separately limit, state taxes and expenses are not handled.
+  prepare: experimental
+# Packs using fields added in Almanach 0.1.0 (reserve, fr_income_tax, prepare).
 minAppVersion: "0.1.0"
 name: { fr: États-Unis, en: United States, de: Vereinigte Staaten }
 currency: USD

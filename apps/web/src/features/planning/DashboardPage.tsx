@@ -17,6 +17,7 @@ import { linkedPath } from '../linked/activity.ts';
 import { ActivityBreakdown } from './ActivityBreakdown.tsx';
 import { LinkedActivities } from './LinkedActivities.tsx';
 import styles from './Planning.module.css';
+import { NextDeclarationCard } from './Prepared.tsx';
 import { ReserveCard } from './Reserve.tsx';
 import { type CalendarItem, labelOf, type Outlook, TYPE_STYLE } from './types.ts';
 
@@ -170,6 +171,8 @@ export function DashboardPage() {
           </section>
         ))}
       </div>
+
+      <NextDeclarationCard />
 
       <div className={styles.columns}>
         <section className={form.section} aria-labelledby="upcoming-title">

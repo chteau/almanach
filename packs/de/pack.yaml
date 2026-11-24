@@ -9,7 +9,10 @@ features:
   activities: experimental
   # Reserve: experimental — Soli, church tax, trade tax and health insurance are not modelled; revenue without expenses.
   reserve: experimental
-# Packs using fields added in Almanach 0.1.0 (reserve, fr_income_tax).
+  # Prepared declaration: experimental — USt 1 A box numbers not cited, Ist-Versteuerung and Dauerfristverlängerung
+  # not handled, deposits left out.
+  prepare: experimental
+# Packs using fields added in Almanach 0.1.0 (reserve, fr_income_tax, prepare).
 minAppVersion: "0.1.0"
 name: { fr: Allemagne, en: Germany, de: Deutschland }
 currency: EUR

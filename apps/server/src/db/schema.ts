@@ -367,10 +367,32 @@ export const deadlineMarks = pgTable(
     doneOn: date('done_on'),
     note: text('note'),
     actualCents: bigint('actual_cents', { mode: 'number' }),
+    /** Figures copied into the form, per prepared line id. */
+    declared: jsonb('declared').$type<Record<string, number>>(),
     hidden: boolean('hidden').notNull().default(false),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [primaryKey({ columns: [table.companyId, table.key] })],
+);
+
+/** Amounts from a notice or entered by the person for a deadline rule and fiscal year (prepared declarations). */
+export const deadlineNotices = pgTable(
+  'deadline_notices',
+  {
+    companyId: uuid('company_id')
+      .notNull()
+      .references(() => companies.id, { onDelete: 'cascade' }),
+    ruleId: text('rule_id').notNull(),
+    fiscalYear: integer('fiscal_year').notNull(),
+    perOccurrenceCents: bigint('per_occurrence_cents', { mode: 'number' }),
+    priorYearTaxCents: bigint('prior_year_tax_cents', { mode: 'number' }),
+    priorYearIncomeCents: bigint('prior_year_income_cents', { mode: 'number' }),
+    /** Method chosen among those the pack offers; null keeps the pack's default. */
+    method: text('method'),
+    note: text('note'),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [primaryKey({ columns: [table.companyId, table.ruleId, table.fiscalYear] })],
 );
 
 /** Settings of the tax reserve chosen by the person; absent means the pack's margin and no extra. */

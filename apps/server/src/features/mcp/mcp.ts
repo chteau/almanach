@@ -345,6 +345,14 @@ const TOOLS = {
         .slice(0, 500);
     },
   }),
+  prepare_declaration: tool({
+    scope: 'read',
+    description:
+      'Prepare a declaration: for a deadline (`key` from list_deadlines, or by default the next one not done that has a prepared declaration), the figures to copy into each box of the official form (`prepared.lines`, null when Almanach does not track the figure) and the amount to pay (`prepared.amount`, with its method, steps and warning), plus `occurrence.link` to the official portal. Amounts in cents. Almanach never files anything: the person declares and pays on the portal. Not tax advice.',
+    input: z.object({ company, key: z.string().max(120).optional() }),
+    run: async ({ api, args }) =>
+      api(args.key ? `/api/deadlines/${encodeURIComponent(args.key)}` : '/api/deadlines/next-prepared'),
+  }),
   list_deadlines: tool({
     scope: 'read',
     description:

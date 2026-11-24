@@ -35,6 +35,7 @@ par défaut la première. Montants en centimes.
 | `get_document` | read | document détaillé (local ou en lecture seule) |
 | `list_payments` | read | paiements et recettes des instances liées |
 | `list_deadlines` | read | échéances à venir ou en retard |
+| `prepare_declaration` | read | déclaration préparée d'une échéance (`key`, ou la prochaine non faite) : chiffres par case, montant à payer avec méthode et étapes, lien du portail |
 | `get_thresholds` | read | seuils (y compris à la baisse, `direction: below`), estimations de cotisations et d'impôt, ventilation par activité, simulation, maturité du pack par fonctionnalité (`pack.features` : absente = indisponible) |
 | `get_dashboard` | read | résumé du tableau de bord, dont la ventilation par activité et la réserve (`reserve`) |
 | `get_reserve` | read | réserve « à mettre de côté » : estimations de l'exercice à date × (1 + marge) + supplément personnel − déjà payé, avec étapes, sources et maturité |

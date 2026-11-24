@@ -149,6 +149,7 @@ export function createApp(deps: AppDeps): Hono<AppEnv> {
     '/api/calendar',
     '/api/deadlines/*',
     '/api/custom-deadlines/*',
+    '/api/deadline-notices/*',
     '/api/outlook',
     '/api/dashboard',
     '/api/reserve',

@@ -45,8 +45,15 @@ const TEXT: Record<Locale, Record<string, (params: Record<string, string | numbe
  * @returns {string} - message
  */
 export function notificationText(row: Pick<NotificationRow, 'kind' | 'params'>, locale: Locale): string {
-  return TEXT[locale][row.kind]?.(row.params) ?? row.kind;
+  const text = TEXT[locale][row.kind]?.(row.params) ?? row.kind;
+  const { amountCents, currency } = row.params;
+  if (typeof amountCents !== 'number' || typeof currency !== 'string') return text;
+  const amount = new Intl.NumberFormat(locale, { style: 'currency', currency }).format(amountCents / 100);
+  return `${text} · ${AMOUNT[locale]} ${amount}`;
 }
+
+/** Label of the prepared amount added to a deadline reminder. */
+const AMOUNT: Record<Locale, string> = { fr: 'à payer :', en: 'to pay:', de: 'zu zahlen:' };
 
 /**
  * Tells whether a local time falls within quiet hours, which may span midnight (S-240)
@@ -214,7 +221,13 @@ export class ReminderJob {
         companyId,
         kind: 'deadline_soon',
         dedupeKey: `deadline:${item.key}:${offset}`,
-        params: { title, date: item.date, days: left, key: item.key },
+        params: {
+          title,
+          date: item.date,
+          days: left,
+          key: item.key,
+          ...(await this.preparedAmount(companyId, item)),
+        },
         link,
       });
     }
@@ -264,6 +277,23 @@ export class ReminderJob {
       }
     }
     if (rows.length > 0) await this.db.insert(notifications).values(rows).onConflictDoNothing();
+  }
+
+  /**
+   * Amount prepared for a pack deadline, to add to its reminder
+   *
+   * @param companyId {string} - owner
+   * @param item {{ key: string; type: string }} - calendar entry
+   * @returns {Promise<Record<string, string | number>>} - amountCents and currency, empty when none
+   */
+  private async preparedAmount(
+    companyId: string,
+    item: { key: string; type: string },
+  ): Promise<Record<string, string | number>> {
+    if (item.type === 'custom') return {};
+    const detail = await this.planning.deadline(companyId, item.key);
+    const cents = detail?.prepared?.amount?.cents;
+    return typeof cents === 'number' && detail ? { amountCents: cents, currency: detail.currency } : {};
   }
 
   /**

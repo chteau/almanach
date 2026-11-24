@@ -2,15 +2,20 @@ import {
   activityBreakdown,
   addDays,
   computeEstimates,
+  type DeadlineNotice,
   type DeadlineOccurrence,
   type EstimateResult,
   expandDeadlines,
   fiscalYearOf,
+  type InvoicedItem,
   invoiceStatus,
   type Localized,
   measureThresholds,
   type PackMeta,
+  type PreparedDeclaration,
+  type PrepareMethod,
   packFeatures,
+  prepareDeclaration,
   type Receipt,
   type RuleProfile,
   type Situation,
@@ -24,6 +29,7 @@ import {
   companyActivities,
   customDeadlines,
   deadlineMarks,
+  deadlineNotices,
   documents,
   externalRevenues,
   federationLinks,
@@ -595,17 +601,166 @@ export class PlanningService {
           activities = activityBreakdown(rules.rules, facts, revenue.receipts, occurrence.estimates);
       }
     }
+    const prepared = await this.prepared(companyId, occurrence, profile, pack, estimates);
     return {
       occurrence,
+      prepared,
       revenueCents: revenue ? revenue.receipts.reduce((sum, receipt) => sum + receipt.cents, 0) : null,
       unconverted: revenue?.unconverted ?? 0,
       estimates,
       activities,
       currency: profile.currency,
       mark: mark
-        ? { doneOn: mark.doneOn, note: mark.note, actualCents: mark.actualCents, hidden: mark.hidden }
+        ? {
+            doneOn: mark.doneOn,
+            note: mark.note,
+            actualCents: mark.actualCents,
+            declared: mark.declared,
+            hidden: mark.hidden,
+          }
         : null,
     };
+  }
+
+  /**
+   * Notice entered for a deadline rule and fiscal year
+   *
+   * @param companyId {string} - owner
+   * @param ruleId {string} - deadline rule
+   * @param fiscalYear {number} - fiscal year
+   * @returns {Promise<(DeadlineNotice & { note: string | null }) | null>} - the notice, null when none
+   */
+  async notice(
+    companyId: string,
+    ruleId: string,
+    fiscalYear: number,
+  ): Promise<(DeadlineNotice & { note: string | null }) | null> {
+    const [row] = await this.db
+      .select()
+      .from(deadlineNotices)
+      .where(
+        and(
+          eq(deadlineNotices.companyId, companyId),
+          eq(deadlineNotices.ruleId, ruleId),
+          eq(deadlineNotices.fiscalYear, fiscalYear),
+        ),
+      );
+    if (!row) return null;
+    return {
+      perOccurrenceCents: row.perOccurrenceCents,
+      priorYearTaxCents: row.priorYearTaxCents,
+      priorYearIncomeCents: row.priorYearIncomeCents,
+      method: row.method as PrepareMethod | null,
+      note: row.note,
+    };
+  }
+
+  /**
+   * Invoices and credit notes issued between two dates, in the main currency (other currencies are left out)
+   *
+   * @param companyId {string} - owner
+   * @param currency {string} - main currency
+   * @param from {string} - first day
+   * @param to {string} - last day
+   * @returns {Promise<InvoicedItem[]>} - credit notes negative; deposits left out (the final invoice counts)
+   */
+  async invoiced(companyId: string, currency: string, from: string, to: string): Promise<InvoicedItem[]> {
+    const rows = await this.db
+      .select({
+        date: documents.issueDate,
+        type: documents.type,
+        totals: documents.totals,
+        vatMode: documents.vatMode,
+        category: companyActivities.status,
+      })
+      .from(documents)
+      .leftJoin(companyActivities, eq(companyActivities.id, documents.activityId))
+      .where(
+        and(
+          eq(documents.companyId, companyId),
+          ne(documents.state, 'draft'),
+          inArray(documents.type, ['invoice', 'credit_note']),
+          eq(documents.currency, currency),
+          gte(documents.issueDate, from),
+          lte(documents.issueDate, to),
+        ),
+      );
+    return rows.map((row) => {
+      const sign = row.type === 'credit_note' ? -1 : 1;
+      return {
+        date: row.date,
+        netCents: sign * row.totals.netCents,
+        vatRateBp: row.totals.vatRateBp,
+        vatCents: sign * row.totals.vatCents,
+        vatMode: row.vatMode,
+        ...(row.category ? { category: row.category } : {}),
+      };
+    });
+  }
+
+  /**
+   * Prepared declaration of an occurrence whose rule has a prepare block
+   *
+   * @param companyId {string} - owner
+   * @param occurrence {DeadlineOccurrence} - the occurrence
+   * @param profile {ProfileRow} - profile in force for it
+   * @param pack {PackMeta} - country pack
+   * @param estimates {EstimateResult[]} - estimates of its period
+   * @returns {Promise<PreparedDeclaration | null>} - null when the rule prepares nothing
+   */
+  private async prepared(
+    companyId: string,
+    occurrence: DeadlineOccurrence,
+    profile: ProfileRow,
+    pack: PackMeta,
+    estimates: EstimateResult[],
+  ): Promise<PreparedDeclaration | null> {
+    const periodStart = occurrence.periodStart ?? occurrence.due;
+    const periodEnd = occurrence.periodEnd ?? occurrence.due;
+    const fiscal = fiscalYearOf(periodStart, pack.fiscalYearStart);
+    const found = this.packs.rules(pack.country, fiscal.year);
+    const prepare = found?.rules.deadlines.find((rule) => rule.id === occurrence.ruleId)?.prepare;
+    if (!found || !prepare || !packFeatures(pack).prepare) return null;
+    const local = await this.receipts(companyId, profile.currency, fiscal.start, periodEnd);
+    const linked = attachedReceipts(
+      await this.linkedRevenue(companyId, profile.currency, fiscal.start),
+    ).filter((receipt) => receipt.date <= periodEnd);
+    // Earlier occurrences of the same rule this fiscal year, for the annualized method.
+    const marks = await this.marks(companyId);
+    const paidBeforeCents = [...marks.values()]
+      .filter((mark) => {
+        const [rule, anchor = ''] = mark.key.split(':');
+        return rule === occurrence.ruleId && anchor >= fiscal.start && anchor < periodStart;
+      })
+      .reduce((sum, mark) => sum + (mark.actualCents ?? 0), 0);
+    return prepareDeclaration({
+      rules: found.rules,
+      prepare,
+      profile: ruleProfile(profile, await this.activities(companyId), await this.household(companyId)),
+      receipts: [...local.receipts, ...linked],
+      invoiced: await this.invoiced(companyId, profile.currency, fiscal.start, periodEnd),
+      expenses: await this.expenses(companyId, profile.currency, fiscal.start, periodEnd),
+      fiscalStart: fiscal.start,
+      fiscalYear: fiscal.year,
+      periodStart,
+      periodEnd,
+      estimatesCents: estimates.reduce((sum, item) => sum + item.cents, 0),
+      notice: await this.notice(companyId, occurrence.ruleId, fiscal.year),
+      paidBeforeCents,
+    });
+  }
+
+  /**
+   * Expenses recorded between two dates; null while expenses are not tracked
+   *
+   * @param _companyId {string} - owner
+   * @param _currency {string} - main currency
+   * @param _from {string} - first day
+   * @param _to {string} - last day
+   * @returns {Promise<null>} - none yet
+   */
+  async expenses(_companyId: string, _currency: string, _from: string, _to: string): Promise<null> {
+    return null;
   }
 
   /**

@@ -5,6 +5,8 @@ import type {
   DeadlineRule,
   EstimateRule,
   Localized,
+  PrepareMethod,
+  PrepareRule,
   ReserveRule,
   ThresholdRule,
   YearRules,
@@ -884,5 +886,207 @@ export function computeReserve(input: {
     paidCents: components.reduce((sum, item) => sum + item.paidCents, 0),
     revenueCents: revenue,
     components,
+  };
+}
+
+/** An issued invoice or credit note (negative), in the main currency, for invoiced revenue and VAT figures. */
+export interface InvoicedItem {
+  date: string;
+  netCents: number;
+  vatRateBp: number;
+  vatCents: number;
+  vatMode: string;
+  /** Activity status; the main activity when absent. */
+  category?: string;
+}
+
+/** An expense in the main currency: amount before VAT and deductible VAT. */
+export interface ExpenseItem {
+  date: string;
+  netCents: number;
+  vatCents: number;
+}
+
+/** Amounts read from a notice or entered by the person for one deadline rule and fiscal year. */
+export interface DeadlineNotice {
+  perOccurrenceCents: number | null;
+  priorYearTaxCents: number | null;
+  priorYearIncomeCents: number | null;
+  method: PrepareMethod | null;
+}
+
+/** Figures to copy into a form and amount to pay at one deadline occurrence. */
+export interface PreparedDeclaration {
+  fiscalYear: number;
+  basis: PrepareRule['basis'];
+  span: PrepareRule['span'];
+  periodStart: string;
+  periodEnd: string;
+  /** null for a figure Almanach does not track (expenses before any is recorded). */
+  lines: { id: string; label: Localized; measure: string; cents: number | null }[];
+  amount: {
+    method: PrepareMethod;
+    alternatives: PrepareMethod[];
+    cents: number | null;
+    steps: { kind: string; cents: number; rateBp?: number }[];
+    warning: Localized | null;
+    /** Whether the previous year's income matters (higher share above a limit). */
+    asksIncome: boolean;
+  } | null;
+  notice: DeadlineNotice | null;
+  note: Localized | null;
+  source: string;
+  verifiedOn: string;
+}
+
+/**
+ * Prepares a declaration: one figure per box of the form, from receipts, invoices and expenses of the span, and
+ * the amount to pay with the method the pack proposes or the person chose
+ *
+ * @param input {object} - rules, the deadline's prepare block, profile, figures, occurrence and notice
+ * @param input.rules {YearRules} - rules of the fiscal year
+ * @param input.prepare {PrepareRule} - prepare block of the deadline rule
+ * @param input.profile {RuleProfile} - the person's situation
+ * @param input.receipts {Receipt[]} - money collected from the start of the fiscal year to the end of the period
+ * @param input.invoiced {InvoicedItem[]} - invoices and credit notes issued over the same dates
+ * @param input.expenses {ExpenseItem[] | null} - expenses over the same dates; null when none are tracked
+ * @param input.fiscalStart {string} - first day of the fiscal year
+ * @param input.fiscalYear {number} - the fiscal year
+ * @param input.periodStart {string} - first day of the occurrence's period
+ * @param input.periodEnd {string} - last day of the occurrence's period
+ * @param input.estimatesCents {number} - sum of the occurrence's estimates (method "estimates")
+ * @param input.notice {DeadlineNotice | null} - amounts entered for this rule and fiscal year
+ * @param input.paidBeforeCents {number} - paid at earlier occurrences of the rule this fiscal year (annualized)
+ * @returns {PreparedDeclaration} - lines and amount
+ */
+export function prepareDeclaration(input: {
+  rules: YearRules;
+  prepare: PrepareRule;
+  profile: RuleProfile;
+  receipts: Receipt[];
+  invoiced: InvoicedItem[];
+  expenses: ExpenseItem[] | null;
+  fiscalStart: string;
+  fiscalYear: number;
+  periodStart: string;
+  periodEnd: string;
+  estimatesCents: number;
+  notice: DeadlineNotice | null;
+  paidBeforeCents: number;
+}): PreparedDeclaration {
+  const { prepare, notice } = input;
+  const from = prepare.span === 'period' ? input.periodStart : input.fiscalStart;
+  const within = (date: string) => date >= from && date <= input.periodEnd;
+  const statusOf = (category: string | undefined) => category ?? input.profile.status ?? '';
+  const invoiced = input.invoiced.filter((item) => within(item.date));
+  const expenses = input.expenses?.filter((item) => within(item.date)) ?? null;
+  const sum = (values: number[]) => values.reduce((total, value) => total + value, 0);
+
+  const own = activityStatuses(input.profile);
+  const lines = prepare.lines
+    .filter((line) => !line.statuses || line.statuses.some((status) => own.includes(status)))
+    .map((line) => {
+      const statuses = (category: string | undefined) =>
+        !line.statuses || line.statuses.includes(statusOf(category));
+      const standard = invoiced.filter(
+        (item) =>
+          item.vatMode === 'standard' && (line.vatRateBp === undefined || item.vatRateBp === line.vatRateBp),
+      );
+      let cents: number | null;
+      if (line.measure === 'revenue')
+        cents =
+          prepare.basis === 'collected'
+            ? sum(
+                input.receipts
+                  .filter((item) => within(item.date) && statuses(item.category))
+                  .map((item) => item.cents),
+              )
+            : sum(invoiced.filter((item) => statuses(item.category)).map((item) => item.netCents));
+      else if (line.measure === 'vat_base') cents = sum(standard.map((item) => item.netCents));
+      else if (line.measure === 'vat_collected') cents = sum(standard.map((item) => item.vatCents));
+      else if (line.measure === 'vat_mode_base')
+        cents = sum(invoiced.filter((item) => item.vatMode === line.vatMode).map((item) => item.netCents));
+      else if (line.measure === 'expenses') cents = expenses && sum(expenses.map((item) => item.netCents));
+      else cents = expenses && sum(expenses.map((item) => item.vatCents));
+      return { id: line.id, label: line.label, measure: line.measure, cents };
+    });
+
+  let amount: PreparedDeclaration['amount'] = null;
+  if (prepare.amount) {
+    const rule = prepare.amount;
+    const allowed = [rule.method, ...rule.alternatives];
+    const method = notice?.method && allowed.includes(notice.method) ? notice.method : rule.method;
+    const steps: NonNullable<PreparedDeclaration['amount']>['steps'] = [];
+    let cents: number | null = null;
+    if (method === 'estimates') cents = input.estimatesCents;
+    else if (method === 'lines') {
+      const value = (id: string) => lines.find((line) => line.id === id)?.cents ?? 0;
+      for (const id of rule.add) steps.push({ kind: id, cents: value(id) });
+      for (const id of rule.subtract) steps.push({ kind: id, cents: -value(id) });
+      cents = Math.max(0, sum(steps.map((step) => step.cents)));
+    } else if (method === 'user_entered') cents = notice?.perOccurrenceCents ?? null;
+    else if (
+      method === 'prior_year_share' &&
+      notice?.priorYearTaxCents != null &&
+      rule.shareBp !== undefined
+    ) {
+      const higher =
+        rule.higherIncome &&
+        notice.priorYearIncomeCents !== null &&
+        notice.priorYearIncomeCents > rule.higherIncome.aboveCents;
+      const shareBp = higher && rule.higherIncome ? rule.higherIncome.shareBp : rule.shareBp;
+      cents = applyRate(notice.priorYearTaxCents, shareBp);
+      steps.push({
+        kind: higher ? 'prior_year_tax_higher_income' : 'prior_year_tax',
+        cents,
+        rateBp: shareBp,
+      });
+    } else if (method === 'annualized') {
+      const period = rule.periods.find((item) => item.periodEnd === input.periodEnd.slice(5));
+      if (period) {
+        // Income from the start of the year annualized, tax of that income, cumulative share due, earlier
+        // payments deducted.
+        const toDate = input.receipts.filter(
+          (item) => item.date >= input.fiscalStart && item.date <= input.periodEnd,
+        );
+        const annualized = toDate.map((item) => ({ ...item, cents: applyRate(item.cents, period.factorBp) }));
+        const yearly = sum(
+          computeEstimates(input.rules, input.profile, annualized, rule.estimates).map((item) => item.cents),
+        );
+        const due = applyRate(yearly, period.shareBp);
+        steps.push(
+          {
+            kind: 'annualized_income',
+            cents: sum(annualized.map((item) => item.cents)),
+            rateBp: period.factorBp,
+          },
+          { kind: 'annualized_tax', cents: yearly },
+          { kind: 'cumulative_share', cents: due, rateBp: period.shareBp },
+          { kind: 'paid_before', cents: -input.paidBeforeCents },
+        );
+        cents = Math.max(0, due - input.paidBeforeCents);
+      }
+    }
+    amount = {
+      method,
+      alternatives: allowed,
+      cents,
+      steps,
+      warning: rule.warning ?? null,
+      asksIncome: Boolean(rule.higherIncome),
+    };
+  }
+  return {
+    fiscalYear: input.fiscalYear,
+    basis: prepare.basis,
+    span: prepare.span,
+    periodStart: from,
+    periodEnd: input.periodEnd,
+    lines,
+    amount,
+    notice,
+    note: prepare.note ?? null,
+    source: prepare.source,
+    verifiedOn: prepare.verified_on,
   };
 }

@@ -15,6 +15,7 @@ import { centsToInput, formatDate, formatMoney } from '../../lib/format.ts';
 import { useResource } from '../../lib/useResource.ts';
 import { describeError } from '../install/errors.ts';
 import styles from './Planning.module.css';
+import { PreparedAmount, PreparedLines } from './Prepared.tsx';
 import { type DeadlineDetail, labelOf } from './types.ts';
 
 /**
@@ -32,6 +33,7 @@ export function DeadlinePage() {
   const [doneOn, setDoneOn] = useState<string>();
   const [note, setNote] = useState<string>();
   const [actual, setActual] = useState<string>();
+  const [declared, setDeclared] = useState<Record<string, string>>({});
   const [failure, setFailure] = useState<string>();
 
   if (error !== undefined) return <LoadError error={error} onRetry={reload} />;
@@ -41,6 +43,10 @@ export function DeadlinePage() {
   const { occurrence, mark } = deadline;
   const money = (cents: number) => formatMoney(cents, deadline.currency, locale);
   const estimated = deadline.estimates.reduce((sum, item) => sum + item.cents, 0);
+  const lines = deadline.prepared?.lines ?? [];
+  /** Text of a declared figure: typed, saved, or the prepared one. */
+  const declaredText = (id: string, cents: number | null) =>
+    declared[id] ?? centsToInput(mark?.declared?.[id] ?? cents, locale);
 
   /**
    * Saves the "done" record, or clears it
@@ -52,7 +58,11 @@ export function DeadlinePage() {
     event?.preventDefault();
     const typed = (actual ?? '').trim();
     const actualCents = typed ? parseAmount(typed) : null;
-    if (typed && actualCents === null) {
+    const figures = lines
+      .map((line) => [line.id, declaredText(line.id, line.cents).trim()] as const)
+      .filter(([, text]) => text !== '')
+      .map(([id, text]) => [id, parseAmount(text)] as const);
+    if ((typed && actualCents === null) || figures.some(([, cents]) => cents === null || cents < 0)) {
       setFailure(t('errors.amount'));
       return;
     }
@@ -64,6 +74,7 @@ export function DeadlinePage() {
               doneOn: doneOn ?? data?.today ?? null,
               note: note ?? mark?.note ?? '',
               actualCents: actual === undefined ? (mark?.actualCents ?? null) : actualCents,
+              ...(lines.length > 0 && { declared: Object.fromEntries(figures) }),
             }
           : { doneOn: null, note: mark?.note ?? '', actualCents: mark?.actualCents ?? null },
       });
@@ -145,6 +156,23 @@ export function DeadlinePage() {
           )}
         </section>
 
+        {deadline.prepared && (
+          <>
+            <PreparedLines
+              prepared={deadline.prepared}
+              ruleId={occurrence.ruleId}
+              money={money}
+              onSaved={reload}
+            />
+            <PreparedAmount
+              prepared={deadline.prepared}
+              ruleId={occurrence.ruleId}
+              money={money}
+              onSaved={reload}
+            />
+          </>
+        )}
+
         {deadline.estimates.length > 0 && (
           <section className={form.section} aria-labelledby="estimate-title">
             <h2 id="estimate-title" className={styles.sectionTitle}>
@@ -209,6 +237,20 @@ export function DeadlinePage() {
               onChange={(event) => setActual(event.target.value)}
             />
           </div>
+          {lines.length > 0 && (
+            <fieldset className={form.grid}>
+              <legend className={styles.caption}>{t('prepared.declared')}</legend>
+              {lines.map((line) => (
+                <TextField
+                  key={line.id}
+                  label={labelOf(line.label, locale)}
+                  inputMode="decimal"
+                  value={declaredText(line.id, line.cents)}
+                  onChange={(event) => setDeclared({ ...declared, [line.id]: event.target.value })}
+                />
+              ))}
+            </fieldset>
+          )}
           <TextField
             label={`${t('deadline.note')} ${t('common.optional')}`}
             hint={t('deadline.note.hint')}

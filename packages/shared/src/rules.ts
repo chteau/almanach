@@ -230,6 +230,93 @@ const scheduleSchema = z.discriminatedUnion('type', [
 
 export const DEADLINE_KINDS = ['tax', 'social'] as const;
 
+/** Figures the core measures for a prepared declaration; the pack says which ones a form asks for. */
+export const PREPARE_MEASURES = [
+  'revenue',
+  'vat_base',
+  'vat_collected',
+  'vat_mode_base',
+  'expenses',
+  'vat_deductible',
+] as const;
+/** How the amount paid at a deadline is prepared. */
+export const PREPARE_METHODS = [
+  'estimates',
+  'lines',
+  'prior_year_share',
+  'user_entered',
+  'annualized',
+] as const;
+
+/** One box of an official form: the core measure that fills it. */
+const prepareLineSchema = z
+  .object({
+    id: ruleId,
+    label: localized,
+    measure: z.enum(PREPARE_MEASURES),
+    /** Revenue of these activity statuses only (one line per activity on a mixed declaration). */
+    statuses: z.array(z.string().min(1)).optional(),
+    /** vat_base / vat_collected: lines at this rate only. */
+    vatRateBp: basisPoints.optional(),
+    /** vat_mode_base: base of the operations in this mode. */
+    vatMode: z.enum(['reverse_charge', 'export', 'franchise']).optional(),
+  })
+  .strict();
+
+/** What a deadline asks to declare and pay, prepared from Almanach's figures (docs/specs, déclaration préparée). */
+export const prepareSchema = z
+  .object({
+    /** Revenue counted when collected or when invoiced (issue date). */
+    basis: z.enum(['collected', 'invoiced']),
+    /** The period of the occurrence, or the fiscal year up to its end (UK MTD cumulative updates). */
+    span: z.enum(['period', 'fiscal_year_to_period_end']),
+    lines: z.array(prepareLineSchema).default([]),
+    amount: z
+      .object({
+        method: z.enum(PREPARE_METHODS),
+        /** Methods the person may choose instead. */
+        alternatives: z.array(z.enum(PREPARE_METHODS)).default([]),
+        /** lines: lines added and subtracted (VAT collected minus deductible VAT). */
+        add: z.array(ruleId).default([]),
+        subtract: z.array(ruleId).default([]),
+        /** prior_year_share: share of the previous year's tax due at each occurrence. */
+        shareBp: basisPoints.optional(),
+        /** prior_year_share: higher share when the previous year's income was above a limit (US 110 % rule). */
+        higherIncome: z.object({ aboveCents: cents, shareBp: basisPoints }).strict().optional(),
+        /** annualized: estimates whose yearly amount is annualized. */
+        estimates: z.array(ruleId).default([]),
+        /** annualized: per period ending on MM-DD, annualization factor and cumulative share of the year's tax. */
+        periods: z
+          .array(
+            z
+              .object({
+                periodEnd: z.string().regex(/^\d{2}-\d{2}$/),
+                factorBp: z.number().int().min(10_000).max(120_000),
+                shareBp: basisPoints,
+              })
+              .strict(),
+          )
+          .default([]),
+        warning: localized.optional(),
+      })
+      .strict()
+      .optional(),
+    note: localized.optional(),
+    ...sourced,
+  })
+  .strict()
+  .superRefine((value, context) => {
+    const ids = value.lines.map((line) => line.id);
+    if (new Set(ids).size !== ids.length) context.addIssue({ code: 'custom', message: 'duplicate_line' });
+    for (const id of [...(value.amount?.add ?? []), ...(value.amount?.subtract ?? [])])
+      if (!ids.includes(id)) context.addIssue({ code: 'custom', message: `unknown_line:${id}` });
+    const methods = value.amount ? [value.amount.method, ...value.amount.alternatives] : [];
+    if (methods.includes('prior_year_share') && value.amount?.shareBp === undefined)
+      context.addIssue({ code: 'custom', message: 'share_missing' });
+    if (methods.includes('annualized') && !value.amount?.periods.length)
+      context.addIssue({ code: 'custom', message: 'periods_missing' });
+  });
+
 /** A recurring tax or social obligation from the pack (P05, P06). */
 export const deadlineRuleSchema = z
   .object({
@@ -243,6 +330,8 @@ export const deadlineRuleSchema = z
     estimates: z.array(ruleId).default([]),
     /** Whether the revenue of the period has to be declared (prefilled from payments, S-080). */
     declaresRevenue: z.boolean().default(false),
+    /** Figures to copy into the form and amount to pay, prepared from Almanach's data. */
+    prepare: prepareSchema.optional(),
     link: z.url({ protocol: /^https$/ }),
     ...sourced,
   })
@@ -300,3 +389,5 @@ export type AllowanceRule = z.infer<typeof allowanceSchema>;
 export type DeadlineRule = z.infer<typeof deadlineRuleSchema>;
 export type Localized = z.infer<typeof localized>;
 export type ReserveRule = z.infer<typeof reserveSchema>;
+export type PrepareRule = z.infer<typeof prepareSchema>;
+export type PrepareMethod = (typeof PREPARE_METHODS)[number];
