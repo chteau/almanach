@@ -1,6 +1,9 @@
 import { defineConfig, devices } from '@playwright/test';
 
-/** Each project gets its own server and empty database, so the install flow runs once per browser. */
+/**
+ * Each browser gets its own server and empty database. Its `install` project runs the install flow first, in
+ * order; the other specs sign in with the account it creates and only start once it has passed.
+ */
 const targets = [
   { name: 'chromium', device: devices['Desktop Chrome'], port: 4101 },
   { name: 'firefox', device: devices['Desktop Firefox'], port: 4102 },
@@ -21,10 +24,13 @@ export default defineConfig({
   retries: 0,
   reporter: process.env.CI ? [['github'], ['html', { open: 'never' }]] : 'list',
   use: { trace: 'retain-on-failure' },
-  projects: selected.map((target) => ({
-    name: target.name,
-    use: { ...target.device, baseURL: `http://127.0.0.1:${target.port}`, locale: 'en-US' },
-  })),
+  projects: selected.flatMap((target) => {
+    const use = { ...target.device, baseURL: `http://127.0.0.1:${target.port}`, locale: 'en-US' };
+    return [
+      { name: `${target.name}-install`, testMatch: 'install.e2e.ts', use },
+      { name: target.name, testIgnore: 'install.e2e.ts', dependencies: [`${target.name}-install`], use },
+    ];
+  }),
   webServer: selected.map((target) => ({
     command: `bun e2e/serve.ts almanach_e2e_${target.name} ${target.port}`,
     url: `http://127.0.0.1:${target.port}/api/health`,
