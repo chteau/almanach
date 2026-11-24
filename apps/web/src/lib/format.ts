@@ -1,18 +1,54 @@
-import { formatMoney } from '@almanach/shared';
+import { formatMoney, regionalLocale } from '@almanach/shared';
 
 export { formatMoney };
 
+const REGION_KEY = 'almanach.region';
+
+/** Country of the pack in use, remembered so dates keep their regional format from the first screen on. */
+let region: string | null = readRegion();
+
 /**
- * Formats a YYYY-MM-DD date for display without shifting it across time zones
+ * Reads the remembered pack country, if any
+ *
+ * @returns {string | null} - ISO code, or null when absent or storage is blocked
+ */
+function readRegion(): string | null {
+  try {
+    return globalThis.localStorage?.getItem(REGION_KEY) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Sets the country of the pack in use, so English dates follow it (en-GB for the UK, en-US for the US)
+ *
+ * @param country {string | null} - ISO code of the active company's pack
+ * @returns {void} - nothing
+ */
+export function setDateRegion(country: string | null): void {
+  if (country === region) return;
+  region = country;
+  try {
+    if (country) globalThis.localStorage?.setItem(REGION_KEY, country);
+    else globalThis.localStorage?.removeItem(REGION_KEY);
+  } catch {
+    // Storage blocked: the region still applies until the page is reloaded.
+  }
+}
+
+/**
+ * Formats a YYYY-MM-DD date for display without shifting it across time zones; English follows the pack country
  *
  * @param isoDate {string} - calendar date
- * @param locale {string} - BCP 47 locale
- * @returns {string} - localized date, e.g. "18 nov. 2026"
+ * @param locale {string} - interface language or BCP 47 locale
+ * @returns {string} - localized date, e.g. "18 nov. 2026", "24 Nov 2026" (GB), "Nov 24, 2026" (US)
  */
 export function formatDate(isoDate: string, locale: string): string {
-  return new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeZone: 'UTC' }).format(
-    new Date(`${isoDate}T00:00:00Z`),
-  );
+  return new Intl.DateTimeFormat(regionalLocale(locale, region), {
+    dateStyle: 'medium',
+    timeZone: 'UTC',
+  }).format(new Date(`${isoDate}T00:00:00Z`));
 }
 
 /**

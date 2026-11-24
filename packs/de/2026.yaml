@@ -1,5 +1,10 @@
 # Deutschland — Steuerjahr 2026. Werte aus UStG, EStG, AO, GewStG (gesetze-im-internet.de) und BMF-Schreiben.
 # Gewerbesteuer wird nicht geschätzt: der Hebesatz hängt von der Gemeinde ab.
+# Mehrere Tätigkeiten (Freiberufler + Gewerbe): „Das Unternehmen umfasst die gesamte gewerbliche oder berufliche
+# Tätigkeit des Unternehmers" (§ 2 Abs. 1 UStG, https://www.gesetze-im-internet.de/ustg_1980/__2.html), die
+# Kleinunternehmergrenzen zählen also jede Tätigkeit. Gewerbesteuer betrifft nur den Gewerbebetrieb im Sinne des
+# EStG (§ 2 Abs. 1 GewStG, https://www.gesetze-im-internet.de/gewstg/__2.html), daher gilt die Vorauszahlungsfrist
+# nur mit einer Gewerbe-Tätigkeit. Geprüft am 2026-11-24.
 year: 2026
 # § 108 Abs. 3 AO: Fällt das Ende einer Frist auf einen Sonntag, Feiertag oder Sonnabend, endet sie mit dem nächsten Werktag.
 shift: next_business_day
@@ -61,6 +66,10 @@ estimates:
         de: "Einkommensteuer (Tarif § 32a EStG)",
       }
     base: profit
+    # Freiberufler and Gewerbe activities of one person: Einkünfte aus Gewerbebetrieb and aus selbständiger Arbeit
+    # are added up (§ 2 Abs. 1 Nr. 2 und 3, Abs. 3 EStG, https://www.gesetze-im-internet.de/estg/__2.html, checked
+    # 2026-11-24) before the tariff applies, so it is computed once on the total.
+    scope: person
     formula:
       kind: de_income_tax
       zones: [12348, 17799, 69878, 277825]

@@ -10,6 +10,7 @@ import {
   type Localized,
   measureThresholds,
   type PackMeta,
+  packFeatures,
   type Receipt,
   type RuleProfile,
   type Situation,
@@ -638,6 +639,8 @@ export class PlanningService {
       fiscalYear: fiscal,
       rulesYear: found.rules.year,
       fallback: found.fallback,
+      // Maturity of the country and of each function; a function absent from `features` is unavailable.
+      pack: { country: pack.country, maturity: pack.maturity, features: packFeatures(pack) },
       currency: profile.currency,
       collectedCents: collected,
       projectedRevenueCents: projectedRevenue,

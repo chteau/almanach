@@ -1,22 +1,27 @@
-import type { ActivityBreakdown as Breakdown } from '@almanach/shared';
+import type { ActivityBreakdown as Breakdown, PackMaturity } from '@almanach/shared';
+import { Badge } from '../../components/Badge/Badge.tsx';
 import { TableScroll } from '../../components/TableScroll/TableScroll.tsx';
 import { useI18n } from '../../i18n/I18nProvider.tsx';
 import { statusLabel, useActivities } from '../activities/useActivities.ts';
 import styles from './Planning.module.css';
+import { labelOf } from './types.ts';
 
 /**
  * Revenue, amounts to set aside and taxable income per activity of a mixed business, each at its own rates;
  * nothing while there is a single activity
  *
- * @param props {{ activities: Breakdown[]; money: (cents: number) => string }} - breakdown and money formatter
+ * @param props {{ activities: Breakdown[]; money: (cents: number) => string; maturity?: PackMaturity }} - breakdown,
+ * money formatter and, to flag it as experimental, the maturity of the pack's activities function
  * @returns {JSX.Element | null} - the table
  */
 export function ActivityBreakdown({
   activities,
   money,
+  maturity,
 }: {
   activities: Breakdown[];
   money: (cents: number) => string;
+  maturity?: PackMaturity;
 }) {
   const { t, locale } = useI18n();
   const { data } = useActivities();
@@ -25,7 +30,12 @@ export function ActivityBreakdown({
   return (
     <TableScroll>
       <table className={styles.table}>
-        <caption>{t('activities.breakdown')}</caption>
+        <caption>
+          {t('activities.breakdown')}{' '}
+          {maturity && maturity !== 'verified' && (
+            <Badge tone="warn">{t('pack.maturity.experimental')}</Badge>
+          )}
+        </caption>
         <thead>
           <tr>
             <th scope="col">{t('activities.field')}</th>
@@ -60,7 +70,10 @@ export function ActivityBreakdown({
                   <>
                     {money(activity.allowance.taxableCents)}
                     <span className={styles.step}>
-                      {t('activities.allowance', { rate: rate(activity.allowance.rateBp) })} ·{' '}
+                      {activity.allowance.rateBp === 0
+                        ? labelOf(activity.allowance.label, locale)
+                        : t('activities.allowance', { rate: rate(activity.allowance.rateBp) })}{' '}
+                      ·{' '}
                       <a href={activity.allowance.source} target="_blank" rel="noreferrer">
                         {t('deadline.source')}
                       </a>

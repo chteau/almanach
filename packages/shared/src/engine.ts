@@ -396,13 +396,15 @@ function deIncomeTax(rule: EstimateRule, baseCents: number): EstimateResult {
 }
 
 /**
- * Computes the estimates of one activity. Revenue-based estimates use the receipts given; profit-based ones
- * use their total, as Almanach does not track expenses yet.
+ * Computes the estimates of one activity, or of the whole person. Revenue-based estimates use the receipts given;
+ * profit-based ones use their total, as Almanach does not track expenses yet, less an allowance the pack deducts
+ * from profit first (UK trading allowance).
  *
  * @param rules {YearRules} - rules of the year
- * @param profile {RuleProfile} - situation with the status of that activity only
- * @param receipts {Receipt[]} - money collected by that activity in the period of interest
+ * @param profile {RuleProfile} - situation with the status of that activity only, or every activity
+ * @param receipts {Receipt[]} - money collected by that activity (or all of them) in the period of interest
  * @param only {string[] | undefined} - restrict to these estimate ids
+ * @param scope {EstimateRule['scope'] | undefined} - restrict to the estimates of that scope; all when absent
  * @returns {EstimateResult[]} - results in rule order
  */
 function activityEstimates(
@@ -410,15 +412,19 @@ function activityEstimates(
   profile: RuleProfile,
   receipts: Receipt[],
   only?: string[],
+  scope?: EstimateRule['scope'],
 ): EstimateResult[] {
   const total = receipts.reduce((sum, receipt) => sum + receipt.cents, 0);
+  const allowance = computeAllowance(rules, profile, total);
+  const profit = allowance?.deductsFromProfit ? allowance.taxableCents : total;
   const results = new Map<string, EstimateResult>();
   const ordered = [...rules.estimates].sort(
     (a, b) => Number(a.formula.kind === 'brackets') - Number(b.formula.kind === 'brackets'),
   );
   for (const rule of ordered) {
-    if (!applies(rule.appliesTo, profile)) continue;
+    if (!applies(rule.appliesTo, profile) || (scope && rule.scope !== scope)) continue;
     const formula = rule.formula;
+    const base = rule.base === 'profit' ? profit : total;
     let result: EstimateResult;
     if (formula.kind === 'flat') result = flat(rule, receipts, profile);
     else if (formula.kind === 'brackets') {
@@ -426,10 +432,10 @@ function activityEstimates(
         (sum, id) => sum + Math.round((results.get(id)?.cents ?? 0) / 2),
         0,
       );
-      result = brackets(rule, total, deductions);
-    } else if (formula.kind === 'profit_bands') result = profitBands(rule, total);
-    else if (formula.kind === 'us_self_employment') result = usSelfEmployment(rule, total);
-    else result = deIncomeTax(rule, total);
+      result = brackets(rule, base, deductions);
+    } else if (formula.kind === 'profit_bands') result = profitBands(rule, base);
+    else if (formula.kind === 'us_self_employment') result = usSelfEmployment(rule, base);
+    else result = deIncomeTax(rule, base);
     results.set(rule.id, result);
   }
   return rules.estimates
@@ -446,6 +452,8 @@ export interface AllowanceResult {
   rateBp: number;
   allowanceCents: number;
   taxableCents: number;
+  /** Deducted from profit before the profit-based estimates (UK trading allowance). */
+  deductsFromProfit: boolean;
   source: string;
   verifiedOn: string;
 }
@@ -458,6 +466,7 @@ export interface ActivityBreakdown {
   revenueCents: number;
   /** Part of revenueCents received from linked instances attached to this activity. */
   linkedCents: number;
+  /** With several activities, only the estimates computed per activity; those of the whole person are not split. */
   estimates: EstimateResult[];
   estimateCents: number;
   allowance: AllowanceResult | null;
@@ -487,6 +496,7 @@ export function computeAllowance(
     rateBp: rule.rateBp,
     allowanceCents: allowance,
     taxableCents: base - allowance,
+    deductsFromProfit: rule.deductsFromProfit,
     source: rule.source,
     verifiedOn: rule.verified_on,
   };
@@ -515,7 +525,13 @@ export function activityBreakdown(
         ? receipts
         : receipts.filter((receipt) => (receipt.category ?? profile.status ?? '') === status);
     const single = { ...profile, status: status || null, activities: [] };
-    const estimates = activityEstimates(rules, single, own, only);
+    const estimates = activityEstimates(
+      rules,
+      single,
+      own,
+      only,
+      statuses.length > 1 ? 'activity' : undefined,
+    );
     const revenue = own.reduce((sum, receipt) => sum + receipt.cents, 0);
     return {
       status,
@@ -531,7 +547,8 @@ export function activityBreakdown(
 
 /**
  * Computes every estimate of the year that concerns a profile. With secondary activities, each activity's
- * estimates use its own receipts and rates, and the results of a rule shared by several activities are added.
+ * estimates use its own receipts and rates, and the results of a rule shared by several activities are added;
+ * estimates of the whole person (income tax, UK Class 4, US self-employment tax) are computed once on the total.
  *
  * @param rules {YearRules} - rules of the year
  * @param profile {RuleProfile} - the person's situation
@@ -556,6 +573,8 @@ export function computeEstimates(
         : result,
     );
   }
+  for (const result of activityEstimates(rules, profile, receipts, only, 'person'))
+    merged.set(result.id, result);
   return rules.estimates
     .map((rule) => merged.get(rule.id))
     .filter((result): result is EstimateResult => result !== undefined);
@@ -567,6 +586,8 @@ export interface ThresholdProgress {
   label: Localized;
   consequence: Localized;
   window: ThresholdRule['window'];
+  /** "below" for a limit to fall under (UK VAT deregistration). */
+  direction: ThresholdRule['direction'];
   windowStart: string;
   windowEnd: string;
   limitCents: number;
@@ -579,10 +600,12 @@ export interface ThresholdProgress {
   remainingCents: number;
   /** Date the limit would be crossed at the current pace, if within the window. */
   projectedDate: string | null;
-  /** Above the base limit. */
+  /** Above the base limit of an "above" threshold. */
   exceeded: boolean;
   /** Above the higher tolerance limit, when the country has one: consequences apply at once. */
   toleranceExceeded: boolean;
+  /** Under the limit of a "below" threshold: the consequence (e.g. deregistration) becomes possible. */
+  fellBelow: boolean;
   source: string;
   verifiedOn: string;
 }
@@ -639,7 +662,8 @@ export function measureThresholds(
         reached = priorYearCents + linked;
       }
       let projected: string | null = null;
-      if (rule.window === 'fiscal_year' && reached > 0 && reached < rule.limitCents) {
+      const below = rule.direction === 'below';
+      if (!below && rule.window === 'fiscal_year' && reached > 0 && reached < rule.limitCents) {
         const elapsed = Math.max(1, daysBetween(start, today) + 1);
         const date = addDays(start, Math.ceil((rule.limitCents * elapsed) / reached) - 1);
         if (date <= end) projected = date;
@@ -649,6 +673,7 @@ export function measureThresholds(
         label: rule.label,
         consequence: rule.consequence,
         window: rule.window,
+        direction: rule.direction,
         windowStart: start,
         windowEnd: end,
         limitCents: rule.limitCents,
@@ -656,10 +681,11 @@ export function measureThresholds(
         reachedCents: reached,
         linkedCents: linked,
         reachedBp: rule.limitCents === 0 ? 0 : Math.round((reached * 10_000) / rule.limitCents),
-        remainingCents: Math.max(0, rule.limitCents - reached),
+        remainingCents: below ? 0 : Math.max(0, rule.limitCents - reached),
         projectedDate: projected,
-        exceeded: reached > rule.limitCents,
+        exceeded: !below && reached > rule.limitCents,
         toleranceExceeded: rule.toleranceCents !== undefined && reached > rule.toleranceCents,
+        fellBelow: below && reached < rule.limitCents,
         source: rule.source,
         verifiedOn: rule.verified_on,
       };

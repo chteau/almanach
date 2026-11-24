@@ -1,6 +1,10 @@
 # United States (federal only) — tax year 2026.
 # Figures from IRS Rev. Proc. 2025-32 (2026 inflation adjustments, including the 2025 One Big Beautiful Bill Act),
 # Form 1040-ES (2026) and the Internal Revenue Code. State taxes are not covered.
+# Several businesses of one person: one Schedule C per business ("If you owned more than one business, complete a
+# separate Schedule C for each business", https://www.irs.gov/instructions/i1040sc), but self-employment tax is
+# due on "the combined net earnings from all of your businesses" (https://www.irs.gov/instructions/i1040sse) and
+# income tax on the total income, so both are computed once on the total (scope: person). Checked 2026-11-24.
 year: 2026
 # 26 USC 7503: a deadline on a Saturday, Sunday or legal holiday moves to the next business day.
 shift: next_business_day
@@ -30,6 +34,7 @@ estimates:
         de: "Self-Employment Tax (Sozialversicherung)",
       }
     base: profit
+    scope: person
     formula:
       kind: us_self_employment
       netEarningsShareBp: 9235
@@ -48,6 +53,7 @@ estimates:
       }
     appliesTo: { withoutOptions: [married_joint] }
     base: profit
+    scope: person
     formula:
       kind: brackets
       allowanceCents: 1610000
@@ -72,6 +78,7 @@ estimates:
       }
     appliesTo: { options: [married_joint] }
     base: profit
+    scope: person
     formula:
       kind: brackets
       allowanceCents: 3220000

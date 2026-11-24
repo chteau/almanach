@@ -1,6 +1,13 @@
 # Pack France — metadata used by onboarding. Yearly rules live in <year>.yaml.
 country: FR
 maturity: verified
+# Maturity per function (verified = sourced and covered by tests); a function not listed is unavailable.
+features:
+  thresholds: verified
+  estimates: verified
+  deadlines: verified
+  # Mixed activity (BNC, BIC services, BIC sales): ceilings on the total, rates per activity (rules.test.ts).
+  activities: verified
 name: { fr: France, en: France, de: Frankreich }
 currency: EUR
 fiscalYearStart: "01-01"

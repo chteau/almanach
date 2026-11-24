@@ -368,7 +368,7 @@ const TOOLS = {
   get_thresholds: tool({
     scope: 'read',
     description:
-      'Get revenue thresholds (micro-enterprise ceilings, VAT exemption, counted on every activity of the business), how far the company is from them, and the estimated social contributions and income tax. `activities` breaks revenue, estimates and the flat-rate tax allowance down per activity, each at its own rates. `simulateCents` adds a hypothetical amount ("what if I invoice X").',
+      'Get revenue thresholds (micro-enterprise ceilings, VAT exemption, counted on every activity of the business), how far the company is from them, and the estimated social contributions and income tax. `activities` breaks revenue, estimates and the flat-rate tax allowance down per activity, each at its own rates (income tax and other estimates of the whole person are computed once on the total). A threshold with `direction: "below"` warns when revenue falls under it (`fellBelow`, e.g. UK VAT deregistration). `pack` gives the country maturity and `features`, the maturity of each function: absent means unavailable, anything but "verified" is experimental. `simulateCents` adds a hypothetical amount ("what if I invoice X").',
     input: z.object({ company, simulateCents: z.number().int().min(0).max(100_000_000_000).default(0) }),
     run: async ({ api, args }) => api(`/api/outlook?simulate=${args.simulateCents}`),
   }),

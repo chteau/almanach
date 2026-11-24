@@ -1,5 +1,11 @@
 import { describe, expect, test } from 'bun:test';
-import { computeEstimates, expandDeadlines, measureThresholds, type RuleProfile } from '@almanach/shared';
+import {
+  activityBreakdown,
+  computeEstimates,
+  expandDeadlines,
+  measureThresholds,
+  type RuleProfile,
+} from '@almanach/shared';
 import { PackRegistry } from './packs.ts';
 
 // United Kingdom pack, checked on gov.uk on 2026-11-24. Expected amounts are worked out by hand in the comments.
@@ -24,15 +30,16 @@ function rulesOf(year: number) {
 }
 
 /**
- * 2026-27 estimates in pence for a yearly profit received in one payment
+ * 2026-27 estimates in pence for a yearly profit after the £1,000 trading allowance: the takings are the profit
+ * plus £1,000, received in one payment
  *
  * @param options {string[]} - pack options of the profile
- * @param pence {number} - yearly profit
+ * @param pence {number} - yearly profit, trading allowance deducted
  * @returns {Record<string, number>} - estimate id → pence
  */
 function yearly(options: string[], pence: number): Record<string, number> {
   const results = computeEstimates(rulesOf(2026), { ...soleTrader, options }, [
-    { date: '2026-06-30', cents: pence },
+    { date: '2026-06-30', cents: pence + 100_000 },
   ]);
   return Object.fromEntries(results.map((result) => [result.id, result.cents]));
 }
@@ -177,7 +184,9 @@ describe('United Kingdom VAT registration threshold', () => {
   });
 
   test('is not watched once registered, and explains the 30-day rules and £88,000 deregistration', () => {
-    expect(measure(['vat_registered'], [{ date: '2026-05-01', cents: 9_500_000 }])).toEqual([]);
+    expect(
+      measure(['vat_registered'], [{ date: '2026-05-01', cents: 9_500_000 }]).map((item) => item.id),
+    ).toEqual(['vat_deregistration']);
     const text = rulesOf(2026).thresholds[0]?.consequence.en ?? '';
     expect(text).toContain('within 30 days of the end of the month');
     expect(text).toContain('next 30 days');
@@ -224,5 +233,77 @@ describe('United Kingdom deadlines', () => {
       ['2026-04-06', '2027-04-05', '2027-05-07', null],
     ]);
     expect(dues(2026, []).mtd_quarterly_update).toBeUndefined();
+  });
+});
+
+describe('United Kingdom trading allowance', () => {
+  const estimates = (pence: number) =>
+    Object.fromEntries(
+      computeEstimates(rulesOf(2026), soleTrader, [{ date: '2026-06-30', cents: pence }]).map((result) => [
+        result.id,
+        result.cents,
+      ]),
+    );
+
+  test('takings up to £1,000 leave nothing to tax', () => {
+    expect(estimates(80_000)).toEqual({ income_tax: 0, class4_nic: 0 });
+    const [activity] = activityBreakdown(rulesOf(2026), soleTrader, [{ date: '2026-06-30', cents: 80_000 }]);
+    expect(activity?.allowance).toMatchObject({
+      allowanceCents: 80_000,
+      taxableCents: 0,
+      deductsFromProfit: true,
+    });
+  });
+
+  test('£20,000 of takings: £1,000 off before income tax and Class 4', () => {
+    // Profit 19,000 − 12,570 = 6,430: income tax × 20 % = 1,286.00, Class 4 × 6 % = 385.80.
+    expect(estimates(2_000_000)).toEqual({ income_tax: 128_600, class4_nic: 38_580 });
+  });
+
+  test('one allowance per person: a second trade does not deduct it again', () => {
+    const twoTrades = { ...soleTrader, activities: ['sole_trader'] };
+    const receipts = [
+      { date: '2026-05-01', cents: 1_200_000 },
+      { date: '2026-09-01', cents: 800_000, category: 'sole_trader' },
+    ];
+    const results = computeEstimates(rulesOf(2026), twoTrades, receipts);
+    expect(Object.fromEntries(results.map((result) => [result.id, result.cents]))).toEqual(
+      estimates(2_000_000),
+    );
+  });
+});
+
+describe('United Kingdom VAT deregistration threshold', () => {
+  const measure = (pence: number) =>
+    measureThresholds(
+      rulesOf(2026),
+      { ...soleTrader, options: ['vat_registered'] },
+      [{ date: '2026-05-01', cents: pence }],
+      { start: '2026-04-06', end: '2027-04-05' },
+      '2026-11-24',
+      null,
+    );
+
+  test('warns once taxable turnover of the last 12 months falls below £88,000', () => {
+    expect(measure(8_799_999)[0]).toMatchObject({
+      id: 'vat_deregistration',
+      direction: 'below',
+      limitCents: 8_800_000,
+      fellBelow: true,
+      exceeded: false,
+      remainingCents: 0,
+      projectedDate: null,
+    });
+  });
+
+  test('stays quiet at £88,000 and above, never reported as exceeded', () => {
+    expect(measure(8_800_000)[0]).toMatchObject({ fellBelow: false, exceeded: false });
+    expect(measure(9_500_000)[0]).toMatchObject({ fellBelow: false, exceeded: false });
+  });
+
+  test('cites gov.uk', () => {
+    expect(rulesOf(2026).thresholds.find((rule) => rule.id === 'vat_deregistration')?.source).toBe(
+      'https://www.gov.uk/register-for-vat/cancel-your-registration',
+    );
   });
 });

@@ -1,5 +1,12 @@
 country: DE
 maturity: experimental
+# Maturity per function (verified = sourced and covered by tests); a function not listed is unavailable.
+# Activities: Kleinunternehmer limits on the total, income tax once on the total; Gewerbesteuer is not estimated.
+features:
+  thresholds: experimental
+  estimates: experimental
+  deadlines: experimental
+  activities: experimental
 name: { fr: Allemagne, en: Germany, de: Deutschland }
 currency: EUR
 fiscalYearStart: "01-01"

@@ -3,6 +3,8 @@ import type {
   DeadlineOccurrence,
   EstimateResult,
   Localized,
+  PackFeatures,
+  PackMaturity,
   ThresholdProgress,
 } from '@almanach/shared';
 
@@ -25,6 +27,8 @@ export interface Outlook {
   fiscalYear: { start: string; end: string };
   rulesYear: number;
   fallback: boolean;
+  /** Maturity of the country and of each function; a function absent from `features` is unavailable. */
+  pack: { country: string; maturity: PackMaturity; features: PackFeatures };
   currency: string;
   collectedCents: number;
   projectedRevenueCents: number;

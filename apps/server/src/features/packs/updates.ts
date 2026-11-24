@@ -2,14 +2,16 @@ import { and, desc, eq } from 'drizzle-orm';
 import type { Database } from '../../db/client.ts';
 import { auditLog, instance, packBundles } from '../../db/schema.ts';
 import { diffRules, type RuleChange } from './diff.ts';
-import { type PackRegistry, parseCountryFiles } from './packs.ts';
+import { type PackRegistry, PackTooNewError, parseCountryFiles } from './packs.ts';
 import { type BundlePayload, type SignedBundle, signedBundleSchema, verifyBundle } from './signing.ts';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const MAX_DOWNLOAD = 2_500_000;
 
-/** Outcome of an import attempt. */
-export type ImportResult = { id: string; country: string; sequence: number } | { error: string };
+/** Outcome of an import attempt; `app_too_old` comes with the version the bundle needs and a readable message. */
+export type ImportResult =
+  | { id: string; country: string; sequence: number }
+  | { error: string; minAppVersion?: string; message?: string };
 
 /**
  * Installs, rolls back and periodically fetches signed country pack updates (S-300 to S-304).
@@ -23,12 +25,14 @@ export class PackUpdates {
    * @param packs {PackRegistry} - registry updated in place
    * @param trustedKeys {string[]} - Ed25519 public keys allowed to sign packs
    * @param updateUrl {string | undefined} - HTTPS folder to fetch bundles from, if any
+   * @param appVersion {string | undefined} - version compared with a bundle's minAppVersion; this server's by default
    */
   constructor(
     private readonly db: Database,
     private readonly packs: PackRegistry,
     private readonly trustedKeys: string[],
     private readonly updateUrl: string | undefined,
+    private readonly appVersion?: string,
   ) {}
 
   /** True when at least one signing key is trusted, so imports are possible. */
@@ -51,7 +55,8 @@ export class PackUpdates {
     for (const row of rows) {
       const parsed = this.parse({ payload: row.payload, signature: row.signature, keyId: row.keyId });
       if ('error' in parsed) {
-        console.warn(`Pack update ${row.country} #${row.sequence} ignored: ${parsed.error}`);
+        const reason = parsed.message ?? parsed.error;
+        console.warn(`Pack update ${row.country} #${row.sequence} ignored, shipped pack kept: ${reason}`);
         continue;
       }
       this.packs.apply(parsed.meta, parsed.years);
@@ -89,15 +94,21 @@ export class PackUpdates {
    * @param bundle {SignedBundle} - signed bundle
    * @returns {{ payload: BundlePayload; meta: ReturnType<typeof parseCountryFiles>['meta']; years: ReturnType<typeof parseCountryFiles>['years'] } | { error: string }} - parsed content or error
    */
-  private parse(bundle: SignedBundle) {
+  private parse(
+    bundle: SignedBundle,
+  ):
+    | ({ payload: BundlePayload } & ReturnType<typeof parseCountryFiles>)
+    | { error: string; minAppVersion?: string; message?: string } {
     const verified = verifyBundle(bundle, this.trustedKeys);
     if ('error' in verified) return verified;
     try {
-      const parsed = parseCountryFiles(verified.payload.country, verified.payload.files);
-      if (parsed.meta.country !== verified.payload.country) return { error: 'country_mismatch' as const };
+      const parsed = parseCountryFiles(verified.payload.country, verified.payload.files, this.appVersion);
+      if (parsed.meta.country !== verified.payload.country) return { error: 'country_mismatch' };
       return { payload: verified.payload, ...parsed };
-    } catch {
-      return { error: 'invalid_rules' as const };
+    } catch (error) {
+      if (error instanceof PackTooNewError)
+        return { error: 'app_too_old', minAppVersion: error.required, message: error.message };
+      return { error: 'invalid_rules' };
     }
   }
 
@@ -186,9 +197,12 @@ export class PackUpdates {
     return rows.map((row) => {
       const payload = JSON.parse(Buffer.from(row.payload, 'base64url').toString('utf8')) as BundlePayload;
       let changes: RuleChange[] | null = null;
+      // Why a stored bundle cannot be applied on this instance, e.g. "app_too_old".
+      let refused: string | null = null;
       if (!row.appliedAt) {
         const parsed = this.parse({ payload: row.payload, signature: row.signature, keyId: row.keyId });
-        changes = 'error' in parsed ? null : diffRules(this.packs.yearsOf(row.country), parsed.years);
+        if ('error' in parsed) refused = parsed.error;
+        else changes = diffRules(this.packs.yearsOf(row.country), parsed.years);
       }
       return {
         id: row.id,
@@ -198,6 +212,7 @@ export class PackUpdates {
         active: row.active,
         pending: row.appliedAt === null,
         changes,
+        refused,
         installedAt: row.installedAt.toISOString(),
         appliedAt: row.appliedAt?.toISOString() ?? null,
         notes: payload.notes ?? null,

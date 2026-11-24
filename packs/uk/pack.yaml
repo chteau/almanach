@@ -4,6 +4,14 @@
 # while the Welsh rates equal them) or Scotland (option `scotland`).
 country: GB
 maturity: verified
+# Maturity per function (verified = sourced and covered by tests); a function not listed is unavailable.
+# `activities` is not offered: the pack has a single status, so several trades are kept in one company. That is
+# what the tax needs (income tax, Class 4, the trading allowance and the VAT threshold all apply to the total of
+# the person's trades), but quarterly MTD updates are due for each business and are not split per trade.
+features:
+  thresholds: verified
+  estimates: verified
+  deadlines: verified
 name: { fr: Royaume-Uni, en: United Kingdom, de: Vereinigtes Königreich }
 currency: GBP
 fiscalYearStart: "04-06"

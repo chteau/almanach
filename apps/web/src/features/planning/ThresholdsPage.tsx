@@ -1,5 +1,6 @@
-import { parseAmount } from '@almanach/shared';
+import { type PackFeature, parseAmount } from '@almanach/shared';
 import { useEffect, useState } from 'react';
+import { Badge } from '../../components/Badge/Badge.tsx';
 import form from '../../components/FormPage/FormPage.module.css';
 import { Gauge } from '../../components/Gauge/Gauge.tsx';
 import { LoadError } from '../../components/LoadError/LoadError.tsx';
@@ -9,7 +10,7 @@ import { Skeleton } from '../../components/Skeleton/Skeleton.tsx';
 import { TableScroll } from '../../components/TableScroll/TableScroll.tsx';
 import { TextField } from '../../components/TextField/TextField.tsx';
 import { useI18n } from '../../i18n/I18nProvider.tsx';
-import { formatDate, formatMoney } from '../../lib/format.ts';
+import { formatDate, formatMoney, setDateRegion } from '../../lib/format.ts';
 import { useResource } from '../../lib/useResource.ts';
 import { ActivityBreakdown } from './ActivityBreakdown.tsx';
 import { LinkedActivities } from './LinkedActivities.tsx';
@@ -37,7 +38,13 @@ export function ThresholdsPage() {
     `/api/outlook?simulate=${simulated}`,
   );
   const outlook = data?.outlook;
+  if (outlook) setDateRegion(outlook.pack.country);
   const money = (value: number) => formatMoney(value, outlook?.currency ?? 'EUR', locale);
+  /** Badge next to a block whose function the pack offers without having it verified. */
+  const experimental = (feature: PackFeature) =>
+    outlook?.pack.features[feature] !== 'verified' && (
+      <Badge tone="warn">{t('pack.maturity.experimental')}</Badge>
+    );
 
   return (
     <>
@@ -86,7 +93,7 @@ export function ThresholdsPage() {
 
           <section className={form.section} aria-labelledby="gauges-title">
             <h2 id="gauges-title" className={styles.sectionTitle}>
-              {t('outlook.thresholds')}
+              {t('outlook.thresholds')} {experimental('thresholds')}
             </h2>
             {outlook.thresholds.length === 0 && <p className={styles.caption}>{t('outlook.noThresholds')}</p>}
             {outlook.thresholds.map((threshold) => (
@@ -115,10 +122,12 @@ export function ThresholdsPage() {
                   {threshold.toleranceCents !== null &&
                     ` · ${t('outlook.tolerance', { amount: money(threshold.toleranceCents) })}`}
                   {!threshold.exceeded &&
+                    threshold.direction === 'above' &&
                     ` · ${t('outlook.remaining', { amount: money(threshold.remainingCents) })}`}
                   {threshold.projectedDate &&
                     ` · ${t('outlook.projected', { date: formatDate(threshold.projectedDate, locale) })}`}
                 </p>
+                {threshold.fellBelow && <Notice tone="info">{labelOf(threshold.consequence, locale)}</Notice>}
                 {(threshold.exceeded || threshold.projectedDate) && (
                   <Notice
                     tone={
@@ -142,7 +151,7 @@ export function ThresholdsPage() {
 
           <section className={form.section} aria-labelledby="estimates-title">
             <h2 id="estimates-title" className={styles.sectionTitle}>
-              {t('outlook.estimates')}
+              {t('outlook.estimates')} {experimental('estimates')}
             </h2>
             <dl className={form.facts}>
               <div>
@@ -155,7 +164,22 @@ export function ThresholdsPage() {
               </div>
             </dl>
             <LinkedActivities outlook={outlook} money={money} />
-            <ActivityBreakdown activities={outlook.activities} money={money} />
+            <ActivityBreakdown
+              activities={outlook.activities}
+              money={money}
+              maturity={outlook.pack.features.activities}
+            />
+            {outlook.activities
+              .flatMap((activity) => (activity.allowance?.deductsFromProfit ? [activity.allowance] : []))
+              .filter((allowance) => allowance.allowanceCents > 0)
+              .map((allowance) => (
+                <p key={allowance.id} className={styles.caption}>
+                  {labelOf(allowance.label, locale)} : −{money(allowance.allowanceCents)} ·{' '}
+                  <a href={allowance.source} target="_blank" rel="noreferrer">
+                    {t('deadline.source')}
+                  </a>
+                </p>
+              ))}
             <TableScroll>
               <table className={styles.table}>
                 <caption className="visually-hidden">{t('outlook.estimates')}</caption>

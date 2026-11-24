@@ -57,8 +57,9 @@ Convention : **[vérifié AAAA-MM-JJ]** = lu sur la source officielle citée à 
   paie sur le portail officiel (`link` de l'échéance).
 - **Compatibilité des packs.** Les schémas étant `.strict()`, un pack qui contient les nouveaux champs sera
   refusé par une instance plus ancienne. Chaque lot qui étend le schéma doit : rendre les champs optionnels,
-  et faire publier par le canal de mise à jour des bundles qui déclarent la version minimale d'Almanach
-  **[à vérifier : le format de `packBundles` / `updates.ts` porte-t-il déjà une version minimale ?]**.
+  et faire publier par le canal de mise à jour des bundles qui déclarent la version minimale d'Almanach :
+  `minAppVersion: "x.y.z"` dans `pack.yaml`, lu avant la validation du schéma ; une instance plus ancienne refuse
+  le pack (`app_too_old`, message explicite) et garde celui en place.
 - **Activités multiples.** Toute agrégation se fait par activité (`activityBreakdown`) puis se somme, comme le
   moteur le fait déjà ; une ligne sans `activity_id` appartient à l'activité principale.
 - **UI hors Réglages.** Aucune fonction ne dépend de la refonte des Réglages : chaque réglage propre à une
@@ -840,7 +841,7 @@ tests, documentation `docs/mcp.md`).
    est un objectif avant septembre 2027.
 8. **Formats** : se limiter à Factur-X EN16931 (FR, DE via ZUGFeRD) dans un premier temps, ou livrer aussi
    XRechnung UBL pour les clients publics allemands.
-9. **Version minimale des packs** : mécanisme à ajouter si le canal de mise à jour ne l'a pas.
+9. **Version minimale des packs** : fait (`minAppVersion` dans `pack.yaml`, vérifié au chargement et à l'import signé).
 
 ---
 

@@ -1,4 +1,4 @@
-import { activityInputSchema, type CompanyActivity, idSchema } from '@almanach/shared';
+import { activityInputSchema, type CompanyActivity, idSchema, packFeatures } from '@almanach/shared';
 import { and, asc, eq } from 'drizzle-orm';
 import { Hono } from 'hono';
 import type { Database } from '../../db/client.ts';
@@ -126,7 +126,10 @@ export function activityRoutes(db: Database, packs: PackRegistry): Hono<AppEnv> 
     const companyId = c.var.company.id;
     const [profile] = await db.select().from(profiles).where(eq(profiles.companyId, companyId));
     if (!profile) return c.json({ error: 'no_profile' }, 409);
-    if (!packs.get(profile.country)?.statuses.some((status) => status.id === data.status))
+    const pack = packs.get(profile.country);
+    // Countries whose pack cannot model several activities (e.g. the UK, one status for every trade) refuse them.
+    if (pack && !packFeatures(pack).activities) return c.json({ error: 'feature_unavailable' }, 409);
+    if (!pack?.statuses.some((status) => status.id === data.status))
       return c.json({ error: 'validation_failed', issues: [{ path: 'status', message: 'unknown' }] }, 422);
     if (data.status === profile.status) return c.json({ error: 'activity_exists' }, 409);
     const [row] = await db

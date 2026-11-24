@@ -85,18 +85,19 @@ describe('every rule file', () => {
 });
 
 describe('United Kingdom 2026-27', () => {
+  // Takings are £1,000 above the profit: the £1,000 trading allowance is deducted first.
   test('£30,000 profit in England: income tax and Class 4', () => {
-    expect(yearly('GB', {}, 3_000_000)).toEqual({ income_tax: 348_600, class4_nic: 104_580 });
+    expect(yearly('GB', {}, 3_100_000)).toEqual({ income_tax: 348_600, class4_nic: 104_580 });
   });
 
   test('personal allowance tapers above £100,000', () => {
     // Allowance 12,570 − 5,000 = 7,570; taxable 102,430 = 37,700 × 20 % + 64,730 × 40 %.
-    expect(yearly('GB', {}, 11_000_000).income_tax).toBe(3_343_200);
+    expect(yearly('GB', {}, 11_100_000).income_tax).toBe(3_343_200);
   });
 
   test('Scottish taxpayers use the Scottish bands', () => {
     // 3,967 × 19 % + 12,989 × 20 % + 474 × 21 % on 30,000 − 12,570 = 17,430 taxable.
-    expect(yearly('GB', { options: ['scotland'] }, 3_000_000).income_tax_scotland).toBe(
+    expect(yearly('GB', { options: ['scotland'] }, 3_100_000).income_tax_scotland).toBe(
       75_373 + 259_780 + 9_954,
     );
   });

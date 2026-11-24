@@ -1,7 +1,12 @@
 # United Kingdom — tax year 2026-27 (6 April 2026 to 5 April 2027).
 # Every figure was checked on gov.uk on the date given in verified_on.
-# Estimates treat all takings as profit (Almanach does not track expenses), so they ignore allowable expenses
-# and the £1,000 trading allowance (https://www.gov.uk/guidance/tax-free-allowances-on-property-and-trading-income).
+# Estimates treat all takings as profit (Almanach does not track expenses), less the £1,000 trading allowance
+# that can be claimed instead of expenses (see `allowances`).
+# Several trades of one sole trader: income tax and Class 4 are computed once on the total (scope: person):
+# Class 4 is due on profits "derived from the carrying on or exercise of one or more trades, professions or
+# vocations" (https://www.legislation.gov.uk/ukpga/1992/4/section/15, checked 2026-11-24); VAT registration
+# looks at "the value of his taxable supplies", every business of the person together
+# (https://www.legislation.gov.uk/ukpga/1994/23/schedule/1, checked 2026-11-24).
 # Class 2 National Insurance is treated as paid and only voluntary (£3.65 a week below £7,105 of profits):
 # https://www.gov.uk/self-employed-national-insurance-rates. Not modelled: VAT flat rate scheme, partnerships,
 # limited companies.
@@ -44,12 +49,32 @@ thresholds:
       de: "Über 90.000 £ steuerpflichtigem Umsatz in den letzten 12 Monaten müssen Sie sich innerhalb von 30 Tagen nach Ende des Überschreitungsmonats für die Umsatzsteuer registrieren; die Registrierung gilt ab dem ersten Tag des übernächsten Monats. Erwarten Sie, allein in den nächsten 30 Tagen 90.000 £ zu überschreiten, registrieren Sie sich bis zum Ende dieser 30 Tage: Die Registrierung gilt ab dem Tag, an dem Sie es wussten. Nach der Registrierung können Sie die Löschung beantragen, wenn der steuerpflichtige Umsatz unter 88.000 £ fällt."
     source: https://www.gov.uk/register-for-vat
     verified_on: "2026-11-24"
+  # Watched over the last 12 months as an indication: gov.uk lets you ask to cancel when taxable turnover falls
+  # below £88,000.
+  - id: vat_deregistration
+    label:
+      {
+        fr: "Seuil de radiation de la TVA",
+        en: VAT deregistration threshold,
+        de: Umsatzsteuer-Löschungsschwelle,
+      }
+    appliesTo: { options: [vat_registered] }
+    window: rolling_12_months
+    direction: below
+    limitCents: 8800000
+    consequence:
+      fr: "Votre chiffre d'affaires imposable des 12 derniers mois est passé sous 88 000 £ : vous pouvez demander à HMRC de radier votre immatriculation à la TVA (ce n'est pas obligatoire). Rien n'est fait automatiquement."
+      en: "Your VAT taxable turnover over the last 12 months is below £88,000: you can ask HMRC to cancel your VAT registration (you do not have to). Nothing is done automatically."
+      de: "Ihr steuerpflichtiger Umsatz der letzten 12 Monate liegt unter 88.000 £: Sie können bei HMRC die Löschung Ihrer Umsatzsteuerregistrierung beantragen (keine Pflicht). Nichts geschieht automatisch."
+    source: https://www.gov.uk/register-for-vat/cancel-your-registration
+    verified_on: "2026-11-24"
 
 estimates:
   - id: income_tax
     label: { fr: Impôt sur le revenu, en: Income Tax, de: Einkommensteuer }
     appliesTo: { withoutOptions: [scotland] }
     base: profit
+    scope: person
     formula:
       kind: brackets
       allowanceCents: 1257000
@@ -64,6 +89,7 @@ estimates:
     label: { fr: "Impôt sur le revenu (Écosse)", en: Scottish Income Tax, de: Einkommensteuer (Schottland) }
     appliesTo: { options: [scotland] }
     base: profit
+    scope: person
     formula:
       kind: brackets
       allowanceCents: 1257000
@@ -85,12 +111,31 @@ estimates:
         de: National Insurance Klasse 4,
       }
     base: profit
+    scope: person
     formula:
       kind: profit_bands
       bands:
         - { fromCents: 1257000, rateBp: 600 }
         - { fromCents: 5027000, rateBp: 200 }
     source: https://www.gov.uk/self-employed-national-insurance-rates
+    verified_on: "2026-11-24"
+
+# Up to £1,000 of trading income a year is tax-free; above it the allowance can be deducted instead of expenses.
+# It is one allowance per individual, whatever the number of trades, and cannot be used with trade income from a
+# company or partnership you or a connected person control, or from your (or your spouse's) employer.
+# min(takings, £1,000) is deducted from the profit before income tax and Class 4.
+allowances:
+  - id: trading_allowance
+    label:
+      {
+        fr: "Trading allowance (1 000 £)",
+        en: "Trading allowance (£1,000)",
+        de: "Trading Allowance (1.000 £)",
+      }
+    rateBp: 0
+    minimumCents: 100000
+    deductsFromProfit: true
+    source: https://www.gov.uk/guidance/tax-free-allowances-on-property-and-trading-income
     verified_on: "2026-11-24"
 
 deadlines:
@@ -121,9 +166,9 @@ deadlines:
         de: MTD-Quartalsmeldung,
       }
     description:
-      fr: "Envoyer à HMRC, avec un logiciel compatible, le cumul des recettes et dépenses depuis le 6 avril. Pour l'année 2026-27, HMRC n'attribue pas de point de pénalité aux mises à jour en retard ; ensuite, chaque retard ajoute un point et 4 points entraînent une amende de 200 £."
-      en: "Send HMRC your income and expenses since 6 April with compatible software. HMRC will not apply penalty points for late quarterly updates in the 2026-27 tax year; after that, each late update earns a point and 4 points lead to a £200 penalty."
-      de: "Einnahmen und Ausgaben seit dem 6. April mit kompatibler Software an HMRC melden. Im Steuerjahr 2026-27 vergibt HMRC für verspätete Quartalsmeldungen keine Strafpunkte; danach bringt jede Verspätung einen Punkt, und 4 Punkte führen zu 200 £ Strafe."
+      fr: "Envoyer à HMRC, avec un logiciel compatible, le cumul des recettes et dépenses depuis le 6 avril, une mise à jour par activité indépendante (self-employment business). Pour l'année 2026-27, HMRC n'attribue pas de point de pénalité aux mises à jour en retard ; ensuite, chaque retard ajoute un point et 4 points entraînent une amende de 200 £."
+      en: "Send HMRC your income and expenses since 6 April with compatible software, one update for each self-employment business. HMRC will not apply penalty points for late quarterly updates in the 2026-27 tax year; after that, each late update earns a point and 4 points lead to a £200 penalty."
+      de: "Einnahmen und Ausgaben seit dem 6. April mit kompatibler Software an HMRC melden, eine Meldung je selbständigem Betrieb (self-employment business). Im Steuerjahr 2026-27 vergibt HMRC für verspätete Quartalsmeldungen keine Strafpunkte; danach bringt jede Verspätung einen Punkt, und 4 Punkte führen zu 200 £ Strafe."
     appliesTo: { options: [mtd_itsa] }
     schedule:
       type: dates

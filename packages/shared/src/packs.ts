@@ -10,6 +10,17 @@ const choice = z
 export const PACK_MATURITIES = ['experimental', 'community', 'verified'] as const;
 export const DECLARATION_PERIODS = ['monthly', 'quarterly', 'yearly'] as const;
 export const BANK_FORMATS = ['iban', 'uk', 'us'] as const;
+/** Functions a pack may support, each with its own maturity; a function the pack does not list is unavailable. */
+export const PACK_FEATURES = [
+  'thresholds',
+  'estimates',
+  'deadlines',
+  'activities',
+  'reserve',
+  'prepare',
+  'vault_types',
+  'einvoicing',
+] as const;
 
 const invoiceRules = z
   .object({
@@ -39,6 +50,13 @@ export const packMetaSchema = z
   .object({
     country: z.string().regex(/^[A-Z]{2}$/),
     maturity: z.enum(PACK_MATURITIES),
+    /** Maturity per function; the country keeps its overall `maturity`. Absent in packs made before it existed. */
+    features: z.partialRecord(z.enum(PACK_FEATURES), z.enum(PACK_MATURITIES)).optional(),
+    /** Oldest Almanach version able to read this pack ("x.y.z"); older instances refuse it and keep theirs. */
+    minAppVersion: z
+      .string()
+      .regex(/^\d{1,4}\.\d{1,4}\.\d{1,4}$/)
+      .optional(),
     name: localized,
     currency: currencySchema,
     fiscalYearStart: z.string().regex(/^(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/),
@@ -66,4 +84,20 @@ export const packMetaSchema = z
 
 export type PackMeta = z.infer<typeof packMetaSchema>;
 export type PackMaturity = (typeof PACK_MATURITIES)[number];
+export type PackFeature = (typeof PACK_FEATURES)[number];
+export type PackFeatures = Partial<Record<PackFeature, PackMaturity>>;
+
+/**
+ * Maturity of each function of a pack. A pack written before per-function maturity existed keeps what it already
+ * offered (thresholds, estimates, deadlines, activities) at its overall maturity.
+ *
+ * @param pack {Pick<PackMeta, 'maturity' | 'features'>} - pack metadata
+ * @returns {PackFeatures} - available functions and their maturity
+ */
+export function packFeatures(pack: Pick<PackMeta, 'maturity' | 'features'>): PackFeatures {
+  if (pack.features) return pack.features;
+  const { maturity } = pack;
+  return { thresholds: maturity, estimates: maturity, deadlines: maturity, activities: maturity };
+}
+
 export type DeclarationPeriod = (typeof DECLARATION_PERIODS)[number];

@@ -45,6 +45,11 @@ export const thresholdSchema = z
      * instances); every activity counts when absent.
      */
     counts: z.array(z.string()).min(1).optional(),
+    /**
+     * "above" warns when revenue goes over the limit (registration, ceiling); "below" when it falls under it, e.g.
+     * the UK VAT deregistration threshold.
+     */
+    direction: z.enum(['above', 'below']).default('above'),
     consequence: localized,
     ...sourced,
   })
@@ -133,6 +138,12 @@ export const estimateSchema = z
     appliesTo: appliesToSchema.default({}),
     /** What the computation starts from. Revenue is what was collected; profit is revenue minus nothing yet. */
     base: z.enum(['revenue', 'profit']),
+    /**
+     * "activity": each activity computes it on its own revenue at its own rates (French micro contributions).
+     * "person": computed once on the total of every activity, as progressive income tax, UK Class 4 or US
+     * self-employment tax are. `deductHalfOf` may only name estimates of the same scope.
+     */
+    scope: z.enum(['activity', 'person']).default('activity'),
     formula: z.discriminatedUnion('kind', [
       flatEstimate,
       bracketEstimate,
@@ -155,6 +166,11 @@ export const allowanceSchema = z
     appliesTo: appliesToSchema.default({}),
     rateBp: basisPoints,
     minimumCents: cents,
+    /**
+     * Deducted from the profit before the profit-based estimates are computed (UK trading allowance); otherwise
+     * only shown as the taxable income left (French micro allowances).
+     */
+    deductsFromProfit: z.boolean().default(false),
     ...sourced,
   })
   .strict();

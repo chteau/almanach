@@ -1,4 +1,4 @@
-import { idSchema } from '@almanach/shared';
+import { idSchema, packFeatures } from '@almanach/shared';
 import { Hono } from 'hono';
 import type { AppEnv } from '../../http/request.ts';
 import type { PackRegistry } from './packs.ts';
@@ -30,6 +30,8 @@ export function packAdminRoutes(packs: PackRegistry, updates: PackUpdates): Hono
         country: pack.country,
         name: pack.name,
         maturity: pack.maturity,
+        features: packFeatures(pack),
+        minAppVersion: pack.minAppVersion ?? null,
         years: packs.publishedYears(pack.country),
         activeSequence:
           bundles.find((bundle) => bundle.country === pack.country && bundle.active)?.sequence ?? null,

@@ -4,13 +4,31 @@ import {
   isLuhnValid,
   type PackMeta,
   type ProfileInput,
+  packFeatures,
   packMetaSchema,
   type YearRules,
   yearRulesSchema,
 } from '@almanach/shared';
+import { APP_VERSION, compareVersions } from '../system/system.ts';
 
 /** Default location of the bundled country packs. */
 export const PACKS_DIR = resolve(import.meta.dir, '../../../../../packs');
+
+/** A pack that needs a newer Almanach than this instance: refused, the pack in place is kept. */
+export class PackTooNewError extends Error {
+  /**
+   * @param label {string} - pack name used in the message
+   * @param required {string} - minAppVersion the pack declares
+   * @param current {string} - version of this instance
+   */
+  constructor(
+    label: string,
+    readonly required: string,
+    readonly current: string,
+  ) {
+    super(`Country pack ${label} requires Almanach ${required} or later; this instance runs ${current}`);
+  }
+}
 
 /** Read-only registry of the country packs available on this instance. */
 export class PackRegistry {
@@ -44,7 +62,15 @@ export class PackRegistry {
           files[name] = await Bun.file(resolve(dir, entry.name, name)).text();
       }
       if (!files['pack.yaml']) continue;
-      const parsed = parseCountryFiles(entry.name, files);
+      let parsed: ReturnType<typeof parseCountryFiles>;
+      try {
+        parsed = parseCountryFiles(entry.name, files);
+      } catch (error) {
+        // A pack meant for a newer version is skipped with a clear message; a malformed one still stops start-up.
+        if (!(error instanceof PackTooNewError)) throw error;
+        console.warn(`${error.message}: skipped`);
+        continue;
+      }
       registry.apply(parsed.meta, parsed.years);
       registry.builtin.set(parsed.meta.country, parsed);
     }
@@ -92,7 +118,8 @@ export class PackRegistry {
 
   /**
    * Rules of a fiscal year; when that year is not published yet, the closest earlier year is used and
-   * flagged so the interface can say so (S-049, S-324)
+   * flagged so the interface can say so (S-049, S-324). Thresholds, estimates and deadlines are left out when
+   * the pack does not offer that function.
    *
    * @param country {string} - ISO country code
    * @param year {number} - fiscal year (calendar year it starts in)
@@ -102,11 +129,31 @@ export class PackRegistry {
     const years = this.yearRules.get(country);
     if (!years || years.size === 0) return undefined;
     const exact = years.get(year);
-    if (exact) return { rules: exact, fallback: false };
+    if (exact) return { rules: this.available(country, exact), fallback: false };
     const known = [...years.keys()].sort((a, b) => a - b);
     const closest = [...known].reverse().find((candidate) => candidate < year) ?? known[0];
     const rules = closest === undefined ? undefined : years.get(closest);
-    return rules ? { rules, fallback: true } : undefined;
+    return rules ? { rules: this.available(country, rules), fallback: true } : undefined;
+  }
+
+  /**
+   * Removes the rules of the functions a pack does not offer
+   *
+   * @param country {string} - ISO country code
+   * @param rules {YearRules} - rules as published
+   * @returns {YearRules} - rules of the available functions only
+   */
+  private available(country: string, rules: YearRules): YearRules {
+    const pack = this.packs.get(country);
+    if (!pack) return rules;
+    const features = packFeatures(pack);
+    return {
+      ...rules,
+      thresholds: features.thresholds ? rules.thresholds : [],
+      estimates: features.estimates ? rules.estimates : [],
+      allowances: features.estimates ? rules.allowances : [],
+      deadlines: features.deadlines ? rules.deadlines : [],
+    };
   }
 
   /**
@@ -149,13 +196,21 @@ export class PackRegistry {
  *
  * @param label {string} - name used in error messages
  * @param files {Record<string, string>} - file name to YAML text
+ * @param appVersion {string} - version of this instance, compared with the pack's minAppVersion
  * @returns {{ meta: PackMeta; years: Map<number, YearRules> }} - parsed pack
+ * @throws {PackTooNewError} - when the pack needs a newer Almanach
  */
 export function parseCountryFiles(
   label: string,
   files: Record<string, string>,
+  appVersion: string = APP_VERSION,
 ): { meta: PackMeta; years: Map<number, YearRules> } {
-  const parsed = packMetaSchema.safeParse(Bun.YAML.parse(files['pack.yaml'] ?? ''));
+  const raw = Bun.YAML.parse(files['pack.yaml'] ?? '') as { minAppVersion?: unknown } | null;
+  // Checked before validation: a newer pack may carry fields this version's schema does not know yet.
+  const required = raw?.minAppVersion;
+  if (typeof required === 'string' && compareVersions(appVersion, required) < 0)
+    throw new PackTooNewError(label, required, appVersion);
+  const parsed = packMetaSchema.safeParse(raw);
   if (!parsed.success) throw new Error(`Invalid country pack ${label}: ${parsed.error.message}`);
   const years = new Map<number, YearRules>();
   for (const [name, text] of Object.entries(files)) {

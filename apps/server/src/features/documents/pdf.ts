@@ -7,6 +7,7 @@ import {
   type PDF_FONTS,
   type PDF_LAYOUTS,
   QUANTITY_SCALE,
+  regionalLocale,
   type Totals,
 } from '@almanach/shared';
 import { PDFDocument, type PDFFont, type PDFPage, rgb, StandardFonts } from 'pdf-lib';
@@ -219,11 +220,11 @@ function wrap(font: PDFFont, text: string, size: number, width: number): string[
  */
 export async function renderPdf(input: PdfInput): Promise<Uint8Array> {
   const label = LABELS[input.language];
-  const money = (cents: number) => formatMoney(cents, input.currency, LOCALE_TAGS[input.language]);
+  // English documents follow the seller's country for dates (en-GB, en-US); British English otherwise, as before.
+  const tag = regionalLocale(input.language, input.seller.country, LOCALE_TAGS[input.language]);
+  const money = (cents: number) => formatMoney(cents, input.currency, tag);
   const date = (iso: string) =>
-    new Intl.DateTimeFormat(LOCALE_TAGS[input.language], { dateStyle: 'long', timeZone: 'UTC' }).format(
-      new Date(`${iso}T00:00:00Z`),
-    );
+    new Intl.DateTimeFormat(tag, { dateStyle: 'long', timeZone: 'UTC' }).format(new Date(`${iso}T00:00:00Z`));
 
   const pdf = await PDFDocument.create();
   pdf.setTitle(`${label[input.type]} ${input.number ?? label.draft}`);

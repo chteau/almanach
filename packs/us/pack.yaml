@@ -1,5 +1,12 @@
 country: US
 maturity: experimental
+# Maturity per function (verified = sourced and covered by tests); a function not listed is unavailable.
+# No revenue threshold is published for the United States. Activities: one Schedule C per business, SE tax and
+# income tax once on the total.
+features:
+  estimates: experimental
+  deadlines: experimental
+  activities: experimental
 name: { fr: États-Unis, en: United States, de: Vereinigte Staaten }
 currency: USD
 fiscalYearStart: "01-01"

@@ -58,6 +58,23 @@ export function formatMoney(cents: number, currency: string, locale: string): st
 }
 
 /**
+ * Regional variant of an interface language for dates: English follows the pack country, so a British pack shows
+ * 24/11/2026-style dates and an American one 11/24/2026
+ *
+ * @param language {string} - interface or document language, e.g. "en"
+ * @param country {string | null | undefined} - ISO code of the pack in use
+ * @param fallback {string} - locale to use otherwise; the language itself by default
+ * @returns {string} - BCP 47 locale
+ */
+export function regionalLocale(
+  language: string,
+  country: string | null | undefined,
+  fallback: string = language,
+): string {
+  return language === 'en' && (country === 'GB' || country === 'US') ? `en-${country}` : fallback;
+}
+
+/**
  * Validates an IBAN with the ISO 13616 mod-97 checksum
  *
  * @param value {string} - IBAN, spaces allowed

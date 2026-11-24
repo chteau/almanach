@@ -35,7 +35,7 @@ par défaut la première. Montants en centimes.
 | `get_document` | read | document détaillé (local ou en lecture seule) |
 | `list_payments` | read | paiements et recettes des instances liées |
 | `list_deadlines` | read | échéances à venir ou en retard |
-| `get_thresholds` | read | seuils, estimations de cotisations et d'impôt, ventilation par activité, simulation |
+| `get_thresholds` | read | seuils (y compris à la baisse, `direction: below`), estimations de cotisations et d'impôt, ventilation par activité, simulation, maturité du pack par fonctionnalité (`pack.features` : absente = indisponible) |
 | `get_dashboard` | read | résumé du tableau de bord, dont la ventilation par activité |
 | `list_linked_activities` | read | instances liées et sources externes |
 | `create_client`, `update_client` | read_drafts | créer ou modifier un client |
