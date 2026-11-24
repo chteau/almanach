@@ -30,6 +30,8 @@ import { ReviewPage } from '../features/review/ReviewPage.tsx';
 import { SettingsPage } from '../features/settings/SettingsPage.tsx';
 import { ErrorPage, NotFoundPage } from '../features/system/SystemPages.tsx';
 import { TimePage } from '../features/time/TimePage.tsx';
+import { VaultItemPage } from '../features/vault/VaultItemPage.tsx';
+import { VaultPage } from '../features/vault/VaultPage.tsx';
 
 /**
  * Sends every visitor of a fresh instance to the installer before anything else
@@ -97,6 +99,8 @@ const router = createBrowserRouter([
           { path: '/payments', element: <PaymentsPage /> },
           { path: '/review', element: <ReviewPage /> },
           { path: '/expenses', element: <ExpensesPage /> },
+          { path: '/vault', element: <VaultPage /> },
+          { path: '/vault/:id', element: <VaultItemPage /> },
           { path: '/linked/:kind/:linkId/:id', element: <LinkedRecordPage /> },
         ],
       },

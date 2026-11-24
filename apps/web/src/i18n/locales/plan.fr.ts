@@ -810,4 +810,6 @@ export const planFr: Record<keyof typeof planEn, string> = {
   'review.age': '{days} jours',
   'review.disclaimer':
     'Établi à partir de vos données Almanach, données de test exclues. Ne constitue pas un conseil fiscal.',
+  'notifications.vault_expiring': '{title} expire dans {days} j ({date})',
+  'notifications.vault_expired': '{title} a expiré le {date}',
 };

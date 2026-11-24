@@ -27,6 +27,7 @@ import { formatDate, formatMoney, today } from '../../lib/format.ts';
 import { useResource } from '../../lib/useResource.ts';
 import { ActivitySelect } from '../activities/ActivitySelect.tsx';
 import { useAction } from '../settings/useAction.ts';
+import { VaultItemSelect } from '../vault/VaultItemSelect.tsx';
 
 interface ExpenseList {
   expenses: ExpenseView[];
@@ -217,6 +218,10 @@ function ExpenseForm({ currency, onSaved }: { currency: string; onSaved: () => v
             value={values.activityId}
             onChange={(activityId) => setValues({ ...values, activityId })}
             inheritLabel={t('activities.inherit')}
+          />
+          <VaultItemSelect
+            value={values.vaultItemId}
+            onChange={(vaultItemId) => setValues({ ...values, vaultItemId })}
           />
         </div>
       </SettingsSection>

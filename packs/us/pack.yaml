@@ -15,8 +15,39 @@ features:
   # Expenses: experimental — lower the Schedule C profit of the SE tax and income tax estimates; allowability and
   # Schedule C lines not checked.
   expenses: experimental
-# Packs using fields added in Almanach 0.1.0 (reserve, fr_income_tax, prepare, expenses).
+  # Vault kinds: experimental — usual documents, no legal validity period is claimed.
+  vault_types: experimental
+# Packs using fields added in Almanach 0.1.0 (reserve, fr_income_tax, prepare, expenses, vault).
 minAppVersion: "0.1.0"
+vault:
+  kinds:
+    - id: ein_letter
+      label:
+        {
+          fr: "Lettre de confirmation de l'EIN (CP 575)",
+          en: "EIN confirmation letter (CP 575)",
+          de: "EIN-Bestätigungsschreiben (CP 575)",
+        }
+    - id: w9_copy
+      label:
+        {
+          fr: "Copie du formulaire W-9 remis aux clients",
+          en: "Copy of the W-9 given to clients",
+          de: "Kopie des an Kunden übergebenen W-9",
+        }
+    - id: business_license
+      label:
+        {
+          fr: "Licence commerciale (ville ou État)",
+          en: "Business license (city or state)",
+          de: "Gewerbelizenz (Stadt oder Bundesstaat)",
+        }
+      expires: true
+      remindDays: [60, 30]
+    - id: insurance_certificate
+      label: { fr: "Certificat d'assurance", en: "Certificate of insurance", de: "Versicherungsnachweis" }
+      expires: true
+      remindDays: [30, 7]
 expensesNote:
   {
     fr: "Les dépenses saisies réduisent le bénéfice (Schedule C) des estimations de self-employment tax et d'impôt sur le revenu. Almanach ne vérifie pas qu'elles sont déductibles.",

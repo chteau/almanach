@@ -361,6 +361,32 @@ const TOOLS = {
       };
     },
   }),
+  list_vault_items: tool({
+    scope: 'read',
+    description:
+      'List the documents of the vault (insurance certificates, registration extracts, contracts…): metadata only, never the file content. `status` is expired, expiring (within 60 days), valid or undated; `file` describes the current file (name, type, size, SHA-256) or is null.',
+    input: z.object({
+      company,
+      expiringWithinDays: z.number().int().min(0).max(366).optional(),
+      kind: z.string().max(40).optional(),
+      client: z.string().max(36).optional().describe('Client id.'),
+    }),
+    run: async ({ api, args }) => {
+      const { items } = (await api('/api/vault')) as {
+        items: { kind: string; clientId: string | null; expiresOn: string | null }[];
+      };
+      const limit =
+        args.expiringWithinDays === undefined
+          ? null
+          : new Date(Date.now() + args.expiringWithinDays * 86_400_000).toISOString().slice(0, 10);
+      return items.filter(
+        (item) =>
+          (!args.kind || item.kind === args.kind) &&
+          (!args.client || item.clientId === args.client) &&
+          (limit === null || (item.expiresOn !== null && item.expiresOn <= limit)),
+      );
+    },
+  }),
   weekly_review: tool({
     scope: 'read',
     description:

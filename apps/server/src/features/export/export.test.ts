@@ -17,6 +17,7 @@ const empty = {
   externalRevenues: [],
   reserveSettings: [],
   deadlineNotices: [],
+  vaultItems: [],
   expenses: [],
 };
 

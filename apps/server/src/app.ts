@@ -55,6 +55,7 @@ export interface AppDeps {
     | 'federation'
     | 'externalSources'
     | 'mcp'
+    | 'vaultQuotaBytes'
   >;
   install: InstallService;
   db: Database;
@@ -121,7 +122,11 @@ export function createApp(deps: AppDeps): Hono<AppEnv> {
     maxSize: 8 * 1024 * 1024,
     onError: (c) => c.json({ error: 'payload_too_large' }, 413),
   });
-  app.use('/api/*', (c, next) => (largePaths.has(c.req.path) ? largeBody(c, next) : tooLarge(c, next)));
+  // A vault file may weigh as much as the large bodies (8 MiB).
+  const vaultFile = /^\/api\/vault\/[0-9a-f-]{36}\/file$/;
+  app.use('/api/*', (c, next) =>
+    largePaths.has(c.req.path) || vaultFile.test(c.req.path) ? largeBody(c, next) : tooLarge(c, next),
+  );
   app.use('/api/*', sameOrigin(deps.config.trustProxy));
   app.use('/api/*', async (c, next) => {
     c.header('Cache-Control', 'no-store');
@@ -157,6 +162,8 @@ export function createApp(deps: AppDeps): Hono<AppEnv> {
     '/api/review/*',
     '/api/expenses',
     '/api/expenses/*',
+    '/api/vault',
+    '/api/vault/*',
     '/api/notifications/*',
     '/api/settings/*',
     '/api/account',
@@ -195,6 +202,8 @@ export function createApp(deps: AppDeps): Hono<AppEnv> {
     '/api/time/*',
     '/api/expenses',
     '/api/expenses/*',
+    '/api/vault',
+    '/api/vault/*',
   ]) {
     app.use(path, readOnly);
   }

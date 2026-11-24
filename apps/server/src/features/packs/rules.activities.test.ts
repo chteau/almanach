@@ -58,6 +58,7 @@ describe('maturity per function', () => {
         reserve: 'experimental',
         prepare: 'experimental',
         expenses: 'experimental',
+        vault_types: 'experimental',
       },
       FR: {
         thresholds: 'verified',
@@ -67,6 +68,7 @@ describe('maturity per function', () => {
         reserve: 'experimental',
         prepare: 'experimental',
         expenses: 'experimental',
+        vault_types: 'experimental',
       },
       GB: {
         thresholds: 'verified',
@@ -75,6 +77,7 @@ describe('maturity per function', () => {
         reserve: 'verified',
         prepare: 'experimental',
         expenses: 'experimental',
+        vault_types: 'experimental',
       },
       US: {
         estimates: 'experimental',
@@ -83,6 +86,7 @@ describe('maturity per function', () => {
         reserve: 'experimental',
         prepare: 'experimental',
         expenses: 'experimental',
+        vault_types: 'experimental',
       },
     });
   });

@@ -787,4 +787,6 @@ export const planEn = {
   'review.quotes': 'Quotes awaiting an answer',
   'review.age': '{days} days',
   'review.disclaimer': 'Built from your Almanach data; test data excluded. Not tax advice.',
+  'notifications.vault_expiring': '{title} expires in {days} days ({date})',
+  'notifications.vault_expired': '{title} expired on {date}',
 };

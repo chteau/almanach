@@ -17,8 +17,49 @@ features:
   # Expenses: experimental — shown for information only: the micro regime deducts a flat-rate allowance, never
   # actual expenses (art. 50-0 and 102 ter CGI, allowance rules in 2026.yaml).
   expenses: experimental
-# Packs using fields added in Almanach 0.1.0 (reserve, fr_income_tax, prepare, expenses).
+  # Vault kinds: experimental — usual documents, no legal validity period is claimed (dates are entered from the
+  # document itself).
+  vault_types: experimental
+# Packs using fields added in Almanach 0.1.0 (reserve, fr_income_tax, prepare, expenses, vault).
 minAppVersion: "0.1.0"
+vault:
+  kinds:
+    - id: rc_pro
+      label:
+        {
+          fr: "Attestation d'assurance RC professionnelle",
+          en: "Professional liability insurance certificate",
+          de: "Berufshaftpflicht-Versicherungsnachweis",
+        }
+      expires: true
+      remindDays: [30, 7]
+    - id: sirene_situation
+      label:
+        {
+          fr: "Avis de situation au répertoire SIRENE",
+          en: "SIRENE registration notice (Insee)",
+          de: "SIRENE-Eintragungsbescheinigung (Insee)",
+        }
+    - id: registration_extract
+      label:
+        {
+          fr: "Attestation d'immatriculation (RNE) ou extrait Kbis",
+          en: "Registration certificate (RNE) or Kbis extract",
+          de: "Eintragungsnachweis (RNE) oder Kbis-Auszug",
+        }
+    - id: domiciliation
+      label: { fr: "Contrat de domiciliation", en: "Business address contract", de: "Domizilierungsvertrag" }
+      expires: true
+      remindDays: [60, 30]
+    - id: urssaf_vigilance
+      label:
+        {
+          fr: "Attestation de vigilance Urssaf",
+          en: "Urssaf compliance certificate (attestation de vigilance)",
+          de: "Urssaf-Unbedenklichkeitsbescheinigung",
+        }
+      expires: true
+      remindDays: [30, 7]
 expensesNote:
   {
     fr: "En micro-entreprise, les dépenses réelles ne sont pas déductibles : l'abattement forfaitaire s'applique à leur place. Elles sont affichées ici à titre indicatif et ne changent aucun calcul.",

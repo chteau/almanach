@@ -811,4 +811,6 @@ export const planDe: Record<keyof typeof planEn, string> = {
   'review.quotes': 'Angebote ohne Antwort',
   'review.age': '{days} Tage',
   'review.disclaimer': 'Aus Ihren Almanach-Daten erstellt, Testdaten ausgenommen. Keine Steuerberatung.',
+  'notifications.vault_expiring': '{title} läuft in {days} Tagen ab ({date})',
+  'notifications.vault_expired': '{title} ist am {date} abgelaufen',
 };

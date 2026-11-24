@@ -19,8 +19,38 @@ features:
   # Expenses: experimental — fill the MTD expenses total and lower the profit (instead of the trading allowance when
   # larger); HMRC categories not mapped, allowability not checked.
   expenses: experimental
-# Packs using fields added in Almanach 0.1.0 (reserve, fr_income_tax, prepare, expenses).
+  # Vault kinds: experimental — usual documents, no legal validity period is claimed.
+  vault_types: experimental
+# Packs using fields added in Almanach 0.1.0 (reserve, fr_income_tax, prepare, expenses, vault).
 minAppVersion: "0.1.0"
+vault:
+  kinds:
+    - id: utr_letter
+      label: { fr: "Courrier HMRC avec l'UTR", en: "HMRC letter with your UTR", de: "HMRC-Schreiben mit UTR" }
+    - id: vat_certificate
+      label:
+        {
+          fr: "Certificat d'enregistrement à la TVA",
+          en: "VAT registration certificate",
+          de: "Umsatzsteuer-Registrierungsbescheinigung",
+        }
+      appliesTo: { options: [vat_registered] }
+    - id: professional_indemnity
+      label:
+        {
+          fr: "Assurance professional indemnity",
+          en: "Professional indemnity insurance",
+          de: "Berufshaftpflicht (professional indemnity)",
+        }
+      expires: true
+      remindDays: [30, 7]
+    - id: ir35_determination
+      label:
+        {
+          fr: "Décision de statut IR35 d'un client",
+          en: "IR35 status determination from a client",
+          de: "IR35-Statusfeststellung eines Kunden",
+        }
 expensesNote:
   {
     fr: "Les dépenses saisies donnent le total des dépenses des mises à jour MTD et réduisent le bénéfice estimé ; quand elles dépassent le trading allowance de 1 000 £, elles le remplacent (on ne peut pas cumuler les deux).",

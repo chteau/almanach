@@ -155,6 +155,13 @@
       "when": 1795484374709,
       "tag": "0021_expenses",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1795484652538,
+      "tag": "0022_vault",
+      "breakpoints": true
     }
   ]
 }

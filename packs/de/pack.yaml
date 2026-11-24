@@ -15,8 +15,45 @@ features:
   # Expenses: experimental — lower the profit of the income tax estimate and give the input VAT of the VAT return;
   # no check of what is deductible (§ 4 Abs. 4 EStG, § 15 UStG), categories not mapped to EÜR lines.
   expenses: experimental
-# Packs using fields added in Almanach 0.1.0 (reserve, fr_income_tax, prepare, expenses).
+  # Vault kinds: experimental — usual documents, no legal validity period is claimed.
+  vault_types: experimental
+# Packs using fields added in Almanach 0.1.0 (reserve, fr_income_tax, prepare, expenses, vault).
 minAppVersion: "0.1.0"
+vault:
+  kinds:
+    - id: gewerbeanmeldung
+      label:
+        {
+          fr: "Déclaration d'activité (Gewerbeanmeldung)",
+          en: "Trade registration (Gewerbeanmeldung)",
+          de: "Gewerbeanmeldung",
+        }
+      appliesTo: { statuses: [gewerbe] }
+    - id: steuernummer_letter
+      label:
+        {
+          fr: "Courrier d'attribution du numéro fiscal",
+          en: "Tax number allocation letter",
+          de: "Schreiben zur Erteilung der Steuernummer",
+        }
+    - id: tax_certificate
+      label:
+        {
+          fr: "Attestation de situation fiscale (Bescheinigung in Steuersachen)",
+          en: "Tax clearance certificate (Bescheinigung in Steuersachen)",
+          de: "Bescheinigung in Steuersachen",
+        }
+      expires: true
+      remindDays: [30, 7]
+    - id: professional_liability
+      label:
+        {
+          fr: "Assurance responsabilité professionnelle",
+          en: "Professional liability insurance",
+          de: "Berufshaftpflichtversicherung",
+        }
+      expires: true
+      remindDays: [30, 7]
 expensesNote:
   {
     fr: "Les dépenses saisies réduisent le bénéfice de l'estimation d'impôt et donnent la TVA déductible de la déclaration de TVA. Almanach ne vérifie pas qu'elles sont déductibles.",

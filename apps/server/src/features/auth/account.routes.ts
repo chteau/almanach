@@ -13,6 +13,8 @@ import { exportData, importData } from '../export/export.ts';
 interface AccountOptions {
   cookieSecure: boolean;
   trustProxy: boolean;
+  /** Vault files are exported decrypted and encrypted again on import. */
+  secretsKey?: Buffer | undefined;
 }
 
 /** Sessions are identified by the first characters of their token hash, never by the token itself. */
@@ -169,7 +171,7 @@ export function accountRoutes(db: Database, options: AccountOptions): Hono<AppEn
   });
 
   router.get('/export', async (c) => {
-    const file = await exportData(db, c.var.user.id);
+    const file = await exportData(db, c.var.user.id, options.secretsKey);
     await db.insert(auditLog).values({
       userId: c.var.user.id,
       action: 'data.exported',
@@ -184,7 +186,12 @@ export function accountRoutes(db: Database, options: AccountOptions): Hono<AppEn
 
   router.post('/import', async (c) => {
     const body = await c.req.json().catch(() => null);
-    const result = await importData(db, { userId: c.var.user.id, companyId: c.var.company.id }, body);
+    const result = await importData(
+      db,
+      { userId: c.var.user.id, companyId: c.var.company.id },
+      body,
+      options.secretsKey,
+    );
     if ('error' in result) return c.json(result, result.error === 'not_empty' ? 409 : 422);
     return c.json(result);
   });

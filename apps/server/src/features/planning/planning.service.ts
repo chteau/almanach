@@ -141,7 +141,7 @@ export class PlanningService {
    */
   constructor(
     private readonly db: Database,
-    private readonly packs: PackRegistry,
+    readonly packs: PackRegistry,
     private readonly federationPreset = false,
   ) {}
 

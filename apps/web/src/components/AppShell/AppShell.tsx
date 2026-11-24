@@ -52,6 +52,7 @@ export const NAV_ITEMS: {
   },
   { to: '/payments', label: 'nav.payments', icon: 'M3 7h18v10H3zM3 11h18M7 15h3' },
   { to: '/expenses', label: 'nav.expenses', icon: 'M6 3h12v18l-3-2-3 2-3-2-3 2zM9 9h6M12 7v8' },
+  { to: '/vault', label: 'nav.vault', icon: 'M4 5h16v14H4zM12 10v4M9 12h6' },
   { to: '/thresholds', label: 'nav.thresholds', icon: 'M4 20h16M6 16l4-5 3 3 5-7' },
   {
     to: '/settings',

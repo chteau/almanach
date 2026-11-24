@@ -19,3 +19,4 @@ export * from './reserve.ts';
 export * from './review.ts';
 export * from './rules.ts';
 export * from './time.ts';
+export * from './vault.ts';

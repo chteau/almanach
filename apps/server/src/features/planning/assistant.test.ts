@@ -177,7 +177,13 @@ describe.skipIf(!url)('administrative assistant (database)', () => {
         client: client?.id ?? '',
       };
     }
-    const config = { ...loadConfig({ DATABASE_URL: target.toString() }), cookieSecure: false };
+    const config = {
+      ...loadConfig({ DATABASE_URL: target.toString() }),
+      cookieSecure: false,
+      secretsKey: Buffer.alloc(32, 3),
+      // Two small files fit, a third does not.
+      vaultQuotaBytes: 3000,
+    };
     const packs = await PackRegistry.load();
     const planning = new PlanningService(db, packs);
     app = createApp({
@@ -313,6 +319,7 @@ describe.skipIf(!url)('administrative assistant (database)', () => {
         'reserve',
         'testDataExcluded',
         'thresholds',
+        'vault',
         'week',
       ].sort(),
     );
@@ -378,5 +385,86 @@ describe.skipIf(!url)('administrative assistant (database)', () => {
     expect((await json('a', '/api/reserve')).reserve.reserveCents).toBe(reserveBefore);
     const tool = await mcp('a', 'read', 'list_expenses', { from: today });
     expect(tool.value.expenses.map((item: Body) => item.amountCents)).toEqual([15_000]);
+  });
+
+  test('vault: encrypted files checked by content, versions, quota, isolation, export and MCP', async () => {
+    const upload = (who: 'a' | 'b', id: string, bytes: Uint8Array, fileName = 'doc.pdf') => {
+      const form = new FormData();
+      form.append('file', new File([bytes], fileName));
+      return app.request(`/api/vault/${id}/file`, {
+        method: 'PUT',
+        headers: { cookie: `almanach_session=${people[who].cookie}` },
+        body: form,
+      });
+    };
+    const pdf = (fill: number) =>
+      new Uint8Array([...Buffer.from('%PDF-1.7\n'), ...new Array(1000).fill(fill)]);
+    const { kinds } = await json('a', '/api/vault/kinds');
+    expect(kinds.map((kind: Body) => kind.id)).toContain('rc_pro');
+    expect(
+      (await call('a', '/api/vault', { method: 'POST', body: { kind: 'utr_letter', title: 'x' } })).status,
+    ).toBe(422);
+    const expiresOn = new Date(Date.now() + 20 * 86_400_000).toISOString().slice(0, 10);
+    const created = await call('a', '/api/vault', {
+      method: 'POST',
+      body: { kind: 'rc_pro', title: 'RC Pro 2026', expiresOn },
+    });
+    expect(created.status).toBe(201);
+    const item = ((await created.json()) as Body).item;
+    expect(item).toMatchObject({ status: 'expiring', file: null });
+
+    // An HTML file renamed .pdf is refused on its content.
+    expect((await upload('a', item.id, new TextEncoder().encode('<html><script>'))).status).toBe(415);
+    const first = await upload('a', item.id, pdf(1));
+    expect(first.status).toBe(201);
+    expect(((await first.json()) as Body).duplicate).toBe(false);
+    const second = await upload('a', item.id, pdf(2), 'rc-2026.pdf');
+    expect(second.status).toBe(201);
+    // The quota counts old versions too: a third 1 kB file goes past 3 000 bytes.
+    expect((await upload('a', item.id, pdf(3))).status).toBe(507);
+
+    const detail = (await json('a', `/api/vault/${item.id}`)).item;
+    expect(detail.versions).toHaveLength(2);
+    expect(detail.file.fileName).toBe('rc-2026.pdf');
+    const download = await call('a', `/api/vault/${item.id}/file`);
+    expect(download.headers.get('x-content-type-options')).toBe('nosniff');
+    expect(download.headers.get('content-disposition')).toStartWith('attachment');
+    expect(new Uint8Array(await download.arrayBuffer())).toEqual(pdf(2));
+    const old = detail.versions.find((version: Body) => version.supersededAt);
+    expect(
+      new Uint8Array(await (await call('a', `/api/vault/${item.id}/file?version=${old.id}`)).arrayBuffer()),
+    ).toEqual(pdf(1));
+    // Stored encrypted: the plain bytes are not in the database.
+    const [raw] = await db.$client.unsafe('select data from vault_files limit 1');
+    expect(Buffer.from(raw.data).includes(Buffer.from('%PDF'))).toBe(false);
+
+    // Another account sees nothing and cannot point an expense to it.
+    expect((await call('b', `/api/vault/${item.id}`)).status).toBe(404);
+    expect((await call('b', `/api/vault/${item.id}/file`)).status).toBe(404);
+    expect((await upload('b', item.id, pdf(4))).status).toBe(404);
+    expect((await json('b', '/api/vault')).items).toEqual([]);
+    const expense = { date: today, amountCents: 1000, vatCents: 0, category: 'insurance', description: 'RC' };
+    expect(
+      (await call('b', '/api/expenses', { method: 'POST', body: { ...expense, vaultItemId: item.id } }))
+        .status,
+    ).toBe(422);
+    expect(
+      (await call('a', '/api/expenses', { method: 'POST', body: { ...expense, vaultItemId: item.id } }))
+        .status,
+    ).toBe(201);
+
+    const review = (await json('a', '/api/review/weekly')).review;
+    expect(review.vault.expiringWithin60Days.map((entry: Body) => entry.id)).toEqual([item.id]);
+    const tool = await mcp('a', 'read', 'list_vault_items', { expiringWithinDays: 30 });
+    expect(tool.value).toHaveLength(1);
+    expect(JSON.stringify(tool.value)).not.toContain('data');
+
+    const exported = await json('a', '/api/account/export');
+    const files = exported.companies[0].data.vaultFiles;
+    expect(files).toHaveLength(1);
+    expect(Buffer.from(files[0].data, 'base64')).toEqual(Buffer.from(pdf(2)));
+
+    expect((await call('a', `/api/vault/${item.id}`, { method: 'DELETE' })).status).toBe(204);
+    expect((await json('a', '/api/vault')).usage.bytes).toBe(0);
   });
 });

@@ -69,6 +69,8 @@ const envSchema = z.object({
   EXTERNAL_SOURCES: booleanFromEnv.default(false),
   /** The server administrator allows the MCP endpoint here instead of in Settings → Instance. */
   MCP: booleanFromEnv.default(false),
+  /** Space the document vault may use on the whole instance, old versions included, in megabytes. */
+  VAULT_QUOTA_MB: z.coerce.number().int().min(1).max(100_000).default(250),
   /** Minutes between two scheduled exchanges with linked instances. */
   FEDERATION_INTERVAL_MINUTES: z.coerce.number().int().min(1).max(1440).default(15),
   RELEASE_CHECK_URL: z
@@ -110,6 +112,8 @@ export interface Config {
   externalSources: boolean;
   /** MCP=true: the /mcp endpoint allowed by the server configuration, locked on. */
   mcp: boolean;
+  /** Bytes the document vault may store on the instance. */
+  vaultQuotaBytes: number;
   /** Minutes between two scheduled exchanges with the linked instances this side calls. */
   federationIntervalMinutes: number;
 }
@@ -148,6 +152,7 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     federation: value.FEDERATION,
     externalSources: value.EXTERNAL_SOURCES,
     mcp: value.MCP,
+    vaultQuotaBytes: value.VAULT_QUOTA_MB * 1024 * 1024,
     federationIntervalMinutes: value.FEDERATION_INTERVAL_MINUTES,
   };
 }

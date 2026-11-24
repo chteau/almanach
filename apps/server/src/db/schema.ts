@@ -20,6 +20,7 @@ import {
   bigserial,
   boolean,
   check,
+  customType,
   date,
   index,
   integer,
@@ -375,6 +376,54 @@ export const deadlineMarks = pgTable(
   (table) => [primaryKey({ columns: [table.companyId, table.key] })],
 );
 
+/** Raw bytes, for encrypted vault files kept out of every list query. */
+const bytea = customType<{ data: Buffer }>({ dataType: () => 'bytea' });
+
+/** Documents of the vault: insurance certificates, registration extracts, contracts… with an optional expiry. */
+export const vaultItems = pgTable(
+  'vault_items',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    companyId: uuid('company_id')
+      .notNull()
+      .references(() => companies.id, { onDelete: 'cascade' }),
+    activityId: activityColumn(),
+    /** Kind id from the country pack or the core (client_contract, other). */
+    kind: text('kind').notNull(),
+    title: text('title').notNull(),
+    clientId: uuid('client_id').references(() => clients.id, { onDelete: 'set null' }),
+    missionId: uuid('mission_id').references(() => missions.id, { onDelete: 'set null' }),
+    issuedOn: date('issued_on'),
+    expiresOn: date('expires_on'),
+    /** Days before expiry to remind; null keeps the kind's. */
+    remindDays: jsonb('remind_days').$type<number[]>(),
+    notes: text('notes').notNull().default(''),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index('vault_items_company_expiry_idx').on(table.companyId, table.expiresOn)],
+);
+
+/** Encrypted files of the vault; a replaced version is kept one year (supersededAt), then purged. */
+export const vaultFiles = pgTable(
+  'vault_files',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    itemId: uuid('item_id')
+      .notNull()
+      .references(() => vaultItems.id, { onDelete: 'cascade' }),
+    fileName: text('file_name').notNull(),
+    mimeType: text('mime_type').notNull(),
+    sizeBytes: integer('size_bytes').notNull(),
+    sha256: text('sha256').notNull(),
+    /** "v1" | iv (12) | tag (16) | AES-256-GCM ciphertext, key derived from SECRETS_KEY. */
+    data: bytea('data').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    supersededAt: timestamp('superseded_at', { withTimezone: true }),
+  },
+  (table) => [index('vault_files_item_idx').on(table.itemId)],
+);
+
 /** Simple expenses: amount before VAT, VAT paid, category and optional receipt from the vault. */
 export const expenses = pgTable(
   'expenses',
@@ -391,7 +440,7 @@ export const expenses = pgTable(
     currency: text('currency').notNull(),
     category: text('category').notNull(),
     description: text('description').notNull().default(''),
-    vaultItemId: uuid('vault_item_id'),
+    vaultItemId: uuid('vault_item_id').references((): AnyPgColumn => vaultItems.id, { onDelete: 'set null' }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
