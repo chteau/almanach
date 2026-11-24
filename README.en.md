@@ -37,14 +37,15 @@ tools don't know your country's rules. Almanach does both.
 
 In development, close to 1.0, no release yet. France is the reference country: its 2026 rules
 are **verified**, and every figure cites its official source and the date it was checked.
-Germany, the UK and the US are **experimental**, and the app says so at sign-up. The full
+The UK is verified too (2026-27 tax year, against gov.uk). Germany and the US are
+**experimental**, and the app says so at sign-up. The full
 picture is in the [specification](docs/cahier-des-charges.md) (French).
 
 | Country | Pack | What it covers |
 |---|---|---|
 | France | Verified | Micro-entreprise (BNC, BIC services and sales), monthly or quarterly URSSAF, versement libératoire, ACRE, CIPAV, CFE, VAT exemption |
 | Germany | Experimental | Freiberufler and Gewerbe, Kleinunternehmer, Umsatzsteuer-Voranmeldung, prepayments (ESt, GewSt) |
-| United Kingdom | Experimental | Sole trader, Self Assessment, Class 4 NIC, payments on account, Making Tax Digital, VAT threshold |
+| United Kingdom | Verified | Sole trader, Self Assessment (registration, returns, payments on account), income tax with or without Scotland, Class 4 NIC, Making Tax Digital (quarterly), VAT threshold. Out of scope: partnerships, limited companies, flat rate scheme; estimates ignore expenses and the trading allowance |
 | United States | Experimental | Sole proprietor and single-member LLC, self-employment tax, estimated taxes, Form 1040 |
 
 ## What it does

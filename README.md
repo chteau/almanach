@@ -37,7 +37,8 @@ données. Les outils libres, eux, ne connaissent pas les règles de ton pays. Al
 
 En développement, proche de la 1.0, pas encore de release. La France est le pays de référence :
 ses règles 2026 sont **vérifiées**, chaque chiffre cite sa source officielle et sa date de
-vérification. L'Allemagne, le Royaume-Uni et les États-Unis sont **expérimentaux**, et
+vérification. Le Royaume-Uni est vérifié aussi (année fiscale 2026-27, sur gov.uk). L'Allemagne
+et les États-Unis sont **expérimentaux**, et
 l'application le dit à l'inscription. Le détail est dans le
 [cahier des charges](docs/cahier-des-charges.md).
 
@@ -45,7 +46,7 @@ l'application le dit à l'inscription. Le détail est dans le
 |---|---|---|
 | France | Vérifié | Micro-entreprise (BNC, BIC services et ventes), URSSAF mensuelle ou trimestrielle, versement libératoire, ACRE, CIPAV, CFE, franchise de TVA |
 | Allemagne | Expérimental | Freiberufler et Gewerbe, Kleinunternehmer, Umsatzsteuer-Voranmeldung, Vorauszahlungen (ESt, GewSt) |
-| Royaume-Uni | Expérimental | Sole trader, Self Assessment, Class 4 NIC, payments on account, Making Tax Digital, seuil de TVA |
+| Royaume-Uni | Vérifié | Sole trader, Self Assessment (inscription, déclarations, payments on account), income tax avec ou sans Écosse, Class 4 NIC, Making Tax Digital (trimestriel), seuil de TVA. Hors périmètre : partnerships, limited companies, flat rate scheme ; estimations sans frais ni trading allowance |
 | États-Unis | Expérimental | Sole proprietor et single-member LLC, self-employment tax, estimated taxes, Form 1040 |
 
 ## Ce que ça fait

@@ -1,11 +1,30 @@
 # United Kingdom — tax year 2025-26 (6 April 2025 to 5 April 2026).
-# Only the obligations still falling due are listed; figures for estimates start with 2026.yaml.
+# Checked on gov.uk on the date given in verified_on. Only the obligations still falling due are listed;
+# figures for estimates start with 2026.yaml.
 year: 2025
 shift: none
 shiftSource: https://www.gov.uk/pay-self-assessment-tax-bill
 holidaysSource: https://www.gov.uk/bank-holidays
 holidays: []
 deadlines:
+  - id: self_assessment_registration
+    kind: tax
+    label:
+      {
+        fr: "Inscription au Self Assessment",
+        en: Register for Self Assessment,
+        de: Anmeldung zum Self Assessment,
+      }
+    description:
+      fr: "Si vous avez commencé à travailler à votre compte pendant l'année fiscale 2025-26 et gagné plus de 1 000 £, inscrivez-vous auprès de HMRC pour recevoir votre UTR."
+      en: "If you started working for yourself in the 2025-26 tax year and earned more than £1,000, register with HMRC to get your UTR."
+      de: "Wenn Sie im Steuerjahr 2025-26 selbstständig geworden sind und mehr als 1.000 £ verdient haben, melden Sie sich bei HMRC an, um Ihre UTR zu erhalten."
+    appliesTo: { options: [sa_not_registered] }
+    schedule:
+      { type: dates, dates: [{ due: "2026-10-05", periodStart: "2025-04-06", periodEnd: "2026-04-05" }] }
+    link: https://www.gov.uk/register-for-self-assessment
+    source: https://www.gov.uk/register-for-self-assessment
+    verified_on: "2026-11-24"
   - id: payment_on_account_2
     kind: tax
     label:
@@ -17,7 +36,7 @@ deadlines:
     schedule: { type: dates, dates: [{ due: "2026-07-31" }] }
     link: https://www.gov.uk/understand-self-assessment-bill/payments-on-account
     source: https://www.gov.uk/understand-self-assessment-bill/payments-on-account
-    verified_on: "2026-11-18"
+    verified_on: "2026-11-24"
   - id: self_assessment_paper
     kind: tax
     label:
@@ -34,7 +53,7 @@ deadlines:
       { type: dates, dates: [{ due: "2026-10-31", periodStart: "2025-04-06", periodEnd: "2026-04-05" }] }
     link: https://www.gov.uk/self-assessment-tax-returns/deadlines
     source: https://www.gov.uk/self-assessment-tax-returns/deadlines
-    verified_on: "2026-11-18"
+    verified_on: "2026-11-24"
   - id: self_assessment_online
     kind: tax
     label:
@@ -52,4 +71,4 @@ deadlines:
     declaresRevenue: true
     link: https://www.gov.uk/self-assessment-tax-returns/deadlines
     source: https://www.gov.uk/self-assessment-tax-returns/deadlines
-    verified_on: "2026-11-18"
+    verified_on: "2026-11-24"

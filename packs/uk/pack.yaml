@@ -1,5 +1,9 @@
+# Pack United Kingdom — metadata used by onboarding. Yearly rules live in <year>.yaml.
+# Checked on gov.uk on 2026-11-24. Only sole traders are modelled: partnerships and limited companies are not.
+# Income tax depends on where you live: rest of the UK (England, Wales, Northern Ireland share the same bands
+# while the Welsh rates equal them) or Scotland (option `scotland`).
 country: GB
-maturity: experimental
+maturity: verified
 name: { fr: Royaume-Uni, en: United Kingdom, de: Vereinigtes Königreich }
 currency: GBP
 fiscalYearStart: "04-06"
@@ -16,25 +20,40 @@ options:
   - id: northern_ireland
     label:
       { fr: "Résident en Irlande du Nord", en: "Living in Northern Ireland", de: "Wohnsitz in Nordirland" }
+  # https://www.gov.uk/guidance/check-if-youre-eligible-for-making-tax-digital-for-income-tax (2026-11-24):
+  # from 6 April 2026 above £50,000 (2024-25), 6 April 2027 above £30,000 (2025-26), 6 April 2028 above £20,000
+  # (2026-27). The 2026 rules gate the 2026-27 quarterly updates on this option.
   - id: mtd_itsa
     label:
       {
-        fr: "Concerné par Making Tax Digital (revenus éligibles > 50 000 £ en 2024-25)",
-        en: "Within Making Tax Digital for Income Tax (qualifying income over £50,000 in 2024-25)",
-        de: "Making Tax Digital für Einkommensteuer (qualifizierte Einkünfte über 50.000 £ in 2024-25)",
+        fr: "Concerné par Making Tax Digital depuis avril 2026 (revenus éligibles > 50 000 £ en 2024-25)",
+        en: "Using Making Tax Digital for Income Tax from April 2026 (qualifying income over £50,000 in 2024-25)",
+        de: "Making Tax Digital für Einkommensteuer ab April 2026 (qualifizierte Einkünfte über 50.000 £ in 2024-25)",
+      }
+  # https://www.gov.uk/register-for-self-assessment (2026-11-24): first return, register by 5 October.
+  - id: sa_not_registered
+    label:
+      {
+        fr: "Pas encore inscrit au Self Assessment (activité démarrée récemment)",
+        en: "Not registered for Self Assessment yet (recently started trading)",
+        de: "Noch nicht für Self Assessment registriert (Tätigkeit kürzlich begonnen)",
       }
 identifiers:
   - id: utr
     label: { fr: UTR, en: Unique Taxpayer Reference (UTR), de: UTR }
+    # https://www.gov.uk/find-utr-number (2026-11-24): a 10-digit number.
     pattern: "^\\d{10}$"
     example: "1234567890"
     required: true
   - id: vat
     label: { fr: N° de TVA, en: VAT number, de: USt-Nummer }
+    # 9 digits, plus a 3-digit subsidiary identifier for some businesses:
+    # https://www.gov.uk/guidance/submitting-ec-sales-list-declarations-online-using-csvs (2026-11-24).
     pattern: "^GB(\\d{9}|\\d{12})$"
     example: "GB123456789"
     required: false
 invoice:
+  # Standard rate 20 %: https://www.gov.uk/vat-rates (2026-11-24).
   vatRateBp: 2000
   defaultMode: none
   toggle: { option: vat_registered, mode: standard }

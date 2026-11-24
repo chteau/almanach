@@ -1,0 +1,228 @@
+import { describe, expect, test } from 'bun:test';
+import { computeEstimates, expandDeadlines, measureThresholds, type RuleProfile } from '@almanach/shared';
+import { PackRegistry } from './packs.ts';
+
+// United Kingdom pack, checked on gov.uk on 2026-11-24. Expected amounts are worked out by hand in the comments.
+const packs = await PackRegistry.load();
+const soleTrader: RuleProfile = {
+  status: 'sole_trader',
+  options: [],
+  declarationPeriod: 'yearly',
+  activityStart: '2020-01-01',
+};
+
+/**
+ * UK rules of a published year, failing the test when missing
+ *
+ * @param year {number} - tax year starting on 6 April of that year
+ * @returns {import('@almanach/shared').YearRules} - the rules
+ */
+function rulesOf(year: number) {
+  const found = packs.rules('GB', year);
+  if (!found || found.fallback) throw new Error(`no GB ${year} rules`);
+  return found.rules;
+}
+
+/**
+ * 2026-27 estimates in pence for a yearly profit received in one payment
+ *
+ * @param options {string[]} - pack options of the profile
+ * @param pence {number} - yearly profit
+ * @returns {Record<string, number>} - estimate id → pence
+ */
+function yearly(options: string[], pence: number): Record<string, number> {
+  const results = computeEstimates(rulesOf(2026), { ...soleTrader, options }, [
+    { date: '2026-06-30', cents: pence },
+  ]);
+  return Object.fromEntries(results.map((result) => [result.id, result.cents]));
+}
+
+/**
+ * Due dates by rule id for the obligations of a tax year
+ *
+ * @param year {number} - tax year
+ * @param options {string[]} - pack options of the profile
+ * @returns {Record<string, string[]>} - rule id → due dates in order
+ */
+function dues(year: number, options: string[]): Record<string, string[]> {
+  const out: Record<string, string[]> = {};
+  for (const item of expandDeadlines(rulesOf(year), { ...soleTrader, options }, packs.holidays('GB'))) {
+    out[item.ruleId] = [...(out[item.ruleId] ?? []), item.due];
+  }
+  return out;
+}
+
+describe('United Kingdom pack', () => {
+  test('is verified, in pounds, with a tax year from 6 April and sole traders only', () => {
+    const pack = packs.get('GB');
+    expect(pack).toMatchObject({ maturity: 'verified', currency: 'GBP', fiscalYearStart: '04-06' });
+    expect(pack?.statuses.map((status) => status.id)).toEqual(['sole_trader']);
+    expect(pack?.invoice.vatRateBp).toBe(2000);
+  });
+
+  test('every rule cites gov.uk and was checked on 2026-11-24', () => {
+    for (const year of packs.publishedYears('GB')) {
+      const rules = rulesOf(year);
+      for (const item of [...rules.thresholds, ...rules.estimates, ...rules.deadlines]) {
+        expect(item.source.startsWith('https://www.gov.uk/')).toBe(true);
+        expect(item.verified_on).toBe('2026-11-24');
+      }
+    }
+  });
+});
+
+describe('United Kingdom 2026-27 income tax (England, Wales, Northern Ireland)', () => {
+  test('nothing is due up to the £12,570 personal allowance', () => {
+    expect(yearly([], 1_257_000)).toEqual({ income_tax: 0, class4_nic: 0 });
+  });
+
+  test('basic rate up to £50,270', () => {
+    // 50,270 − 12,570 = 37,700 × 20 % = 7,540.00
+    expect(yearly([], 5_027_000).income_tax).toBe(754_000);
+  });
+
+  test('higher rate above £50,270', () => {
+    // 7,540 + (60,000 − 50,270 = 9,730) × 40 % = 3,892 → 11,432.00
+    expect(yearly([], 6_000_000).income_tax).toBe(1_143_200);
+  });
+
+  test('the personal allowance is whole at £100,000', () => {
+    // 7,540 + (100,000 − 50,270 = 49,730) × 40 % = 19,892 → 27,432.00
+    expect(yearly([], 10_000_000).income_tax).toBe(2_743_200);
+  });
+
+  test('the personal allowance loses £1 for every £2 above £100,000', () => {
+    // £100,002: allowance 12,569, taxable 87,433 = 37,700 × 20 % (7,540) + 49,733 × 40 % (19,893.20) → 27,433.20
+    expect(yearly([], 10_000_200).income_tax).toBe(2_743_320);
+    // £100,001: £1 above, not yet a full £2, so the allowance stays at 12,570
+    expect(yearly([], 10_000_100).income_tax).toBe(2_743_240);
+  });
+
+  test('the personal allowance is zero from £125,140', () => {
+    // 37,700 × 20 % (7,540) + (125,140 − 37,700 = 87,440) × 40 % (34,976) → 42,516.00
+    expect(yearly([], 12_514_000).income_tax).toBe(4_251_600);
+  });
+
+  test('additional rate above £125,140', () => {
+    // 7,540 + 34,976 + (150,000 − 125,140 = 24,860) × 45 % (11,187) → 53,703.00
+    expect(yearly([], 15_000_000).income_tax).toBe(5_370_300);
+  });
+
+  test('Northern Ireland uses the same bands', () => {
+    // (30,000 − 12,570 = 17,430) × 20 % = 3,486.00
+    expect(yearly(['northern_ireland'], 3_000_000)).toEqual({ income_tax: 348_600, class4_nic: 104_580 });
+  });
+});
+
+describe('United Kingdom 2026-27 Scottish income tax', () => {
+  test('replaces the rest-of-UK bands for Scottish taxpayers', () => {
+    // Taxable 60,000 − 12,570 = 47,430: 3,967 × 19 % (753.73) + 12,989 × 20 % (2,597.80)
+    // + 14,136 × 21 % (2,968.56) + 16,338 × 42 % (6,861.96) → 13,182.05
+    expect(yearly(['scotland'], 6_000_000)).toEqual({ income_tax_scotland: 1_318_205, class4_nic: 245_660 });
+  });
+
+  test('advanced and top rates once the allowance is gone', () => {
+    // Taxable 150,000: 753.73 + 2,597.80 + 2,968.56 + 31,338 × 42 % (13,161.96)
+    // + 62,710 × 45 % (28,219.50) + 24,860 × 48 % (11,932.80) → 59,634.35
+    expect(yearly(['scotland'], 15_000_000).income_tax_scotland).toBe(5_963_435);
+  });
+});
+
+describe('United Kingdom 2026-27 Class 4 National Insurance', () => {
+  test('6 % between £12,570 and £50,270', () => {
+    // (20,000 − 12,570 = 7,430) × 6 % = 445.80
+    expect(yearly([], 2_000_000).class4_nic).toBe(44_580);
+    // 37,700 × 6 % = 2,262.00
+    expect(yearly([], 5_027_000).class4_nic).toBe(226_200);
+  });
+
+  test('2 % above £50,270', () => {
+    // 2,262 + (150,000 − 50,270 = 99,730) × 2 % (1,994.60) → 4,256.60
+    expect(yearly([], 15_000_000).class4_nic).toBe(425_660);
+  });
+
+  test('no Class 2 charge: it is treated as paid and only voluntary', () => {
+    expect(rulesOf(2026).estimates.map((estimate) => estimate.id)).toEqual([
+      'income_tax',
+      'income_tax_scotland',
+      'class4_nic',
+    ]);
+  });
+});
+
+describe('United Kingdom VAT registration threshold', () => {
+  const measure = (options: string[], receipts: { date: string; cents: number }[]) =>
+    measureThresholds(
+      rulesOf(2026),
+      { ...soleTrader, options },
+      receipts,
+      { start: '2026-04-06', end: '2027-04-05' },
+      '2026-11-24',
+      null,
+    );
+
+  test('£90,000 over the last 12 months is not over the threshold, a penny more is', () => {
+    // Window 25 November 2025 to 24 November 2026; the receipt of 24 November 2025 falls outside it.
+    const at = measure(
+      [],
+      [
+        { date: '2025-11-24', cents: 1_000_000 },
+        { date: '2025-11-25', cents: 4_000_000 },
+        { date: '2026-11-24', cents: 5_000_000 },
+      ],
+    );
+    expect(at[0]).toMatchObject({ id: 'vat_registration', limitCents: 9_000_000, reachedCents: 9_000_000 });
+    expect(at[0]?.exceeded).toBe(false);
+    expect(measure([], [{ date: '2026-05-01', cents: 9_000_001 }])[0]?.exceeded).toBe(true);
+  });
+
+  test('is not watched once registered, and explains the 30-day rules and £88,000 deregistration', () => {
+    expect(measure(['vat_registered'], [{ date: '2026-05-01', cents: 9_500_000 }])).toEqual([]);
+    const text = rulesOf(2026).thresholds[0]?.consequence.en ?? '';
+    expect(text).toContain('within 30 days of the end of the month');
+    expect(text).toContain('next 30 days');
+    expect(text).toContain('£88,000');
+  });
+});
+
+describe('United Kingdom deadlines', () => {
+  test('Self Assessment and payments on account for 2026-27', () => {
+    expect(dues(2026, [])).toEqual({
+      payment_on_account_1: ['2027-01-31'],
+      payment_on_account_2: ['2027-07-31'],
+      self_assessment_paper: ['2027-10-31'],
+      self_assessment_online: ['2028-01-31'],
+    });
+  });
+
+  test('2025-26 return still due: paper 31 October 2026, online 31 January 2027', () => {
+    expect(dues(2025, [])).toEqual({
+      payment_on_account_2: ['2026-07-31'],
+      self_assessment_paper: ['2026-10-31'],
+      self_assessment_online: ['2027-01-31'],
+    });
+  });
+
+  test('registration by 5 October after the tax year trading started', () => {
+    expect(dues(2025, ['sa_not_registered']).self_assessment_registration).toEqual(['2026-10-05']);
+    expect(dues(2026, ['sa_not_registered']).self_assessment_registration).toEqual(['2027-10-05']);
+  });
+
+  test('Making Tax Digital quarterly updates, cumulative from 6 April, never moved off weekends', () => {
+    const updates = expandDeadlines(
+      rulesOf(2026),
+      { ...soleTrader, options: ['mtd_itsa'] },
+      packs.holidays('GB'),
+    )
+      .filter((item) => item.ruleId === 'mtd_quarterly_update')
+      .map((item) => [item.periodStart, item.periodEnd, item.due, item.movedFrom]);
+    // 7 November 2026 is a Saturday and 7 February 2027 a Sunday: HMRC keeps the date.
+    expect(updates).toEqual([
+      ['2026-04-06', '2026-07-05', '2026-08-07', null],
+      ['2026-04-06', '2026-10-05', '2026-11-07', null],
+      ['2026-04-06', '2027-01-05', '2027-02-07', null],
+      ['2026-04-06', '2027-04-05', '2027-05-07', null],
+    ]);
+    expect(dues(2026, []).mtd_quarterly_update).toBeUndefined();
+  });
+});

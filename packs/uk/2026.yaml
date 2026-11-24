@@ -1,5 +1,10 @@
 # United Kingdom — tax year 2026-27 (6 April 2026 to 5 April 2027).
-# Every figure was checked on gov.uk or legislation.gov.uk on the date given in verified_on.
+# Every figure was checked on gov.uk on the date given in verified_on.
+# Estimates treat all takings as profit (Almanach does not track expenses), so they ignore allowable expenses
+# and the £1,000 trading allowance (https://www.gov.uk/guidance/tax-free-allowances-on-property-and-trading-income).
+# Class 2 National Insurance is treated as paid and only voluntary (£3.65 a week below £7,105 of profits):
+# https://www.gov.uk/self-employed-national-insurance-rates. Not modelled: VAT flat rate scheme, partnerships,
+# limited companies.
 year: 2026
 # HMRC deadlines do not move when they fall on a weekend or bank holiday.
 shift: none
@@ -34,11 +39,11 @@ thresholds:
     window: rolling_12_months
     limitCents: 9000000
     consequence:
-      fr: "Au-delà de 90 000 £ de chiffre d'affaires imposable sur 12 mois glissants, vous devez vous immatriculer à la TVA dans les 30 jours suivant la fin du mois de dépassement. L'immatriculation prend effet le 1er jour du deuxième mois suivant."
-      en: "Above £90,000 of VAT taxable turnover in the last 12 months, you must register for VAT within 30 days of the end of the month you went over. Registration takes effect from the first day of the second month after."
-      de: "Über 90.000 £ steuerpflichtigem Umsatz in den letzten 12 Monaten müssen Sie sich innerhalb von 30 Tagen nach Ende des Überschreitungsmonats für die Umsatzsteuer registrieren. Die Registrierung gilt ab dem ersten Tag des übernächsten Monats."
+      fr: "Au-delà de 90 000 £ de chiffre d'affaires imposable sur les 12 derniers mois, vous devez vous immatriculer à la TVA dans les 30 jours suivant la fin du mois de dépassement ; l'immatriculation prend effet le 1er jour du deuxième mois suivant. Si vous prévoyez de dépasser 90 000 £ dans les 30 prochains jours à eux seuls, immatriculez-vous avant la fin de ces 30 jours : elle prend effet à la date où vous l'avez su. Une fois immatriculé, vous pourrez demander la radiation si le chiffre d'affaires imposable passe sous 88 000 £."
+      en: "Above £90,000 of VAT taxable turnover in the last 12 months, you must register for VAT within 30 days of the end of the month you went over; registration takes effect from the first day of the second month after. If you expect to go over £90,000 in the next 30 days alone, register by the end of that 30-day period: registration takes effect from the date you realised. Once registered, you can cancel if your taxable turnover falls below £88,000."
+      de: "Über 90.000 £ steuerpflichtigem Umsatz in den letzten 12 Monaten müssen Sie sich innerhalb von 30 Tagen nach Ende des Überschreitungsmonats für die Umsatzsteuer registrieren; die Registrierung gilt ab dem ersten Tag des übernächsten Monats. Erwarten Sie, allein in den nächsten 30 Tagen 90.000 £ zu überschreiten, registrieren Sie sich bis zum Ende dieser 30 Tage: Die Registrierung gilt ab dem Tag, an dem Sie es wussten. Nach der Registrierung können Sie die Löschung beantragen, wenn der steuerpflichtige Umsatz unter 88.000 £ fällt."
     source: https://www.gov.uk/register-for-vat
-    verified_on: "2026-11-18"
+    verified_on: "2026-11-24"
 
 estimates:
   - id: income_tax
@@ -54,7 +59,7 @@ estimates:
         - { upToCents: 12514000, rateBp: 4000 }
         - { upToCents: null, rateBp: 4500 }
     source: https://www.gov.uk/income-tax-rates
-    verified_on: "2026-11-18"
+    verified_on: "2026-11-24"
   - id: income_tax_scotland
     label: { fr: "Impôt sur le revenu (Écosse)", en: Scottish Income Tax, de: Einkommensteuer (Schottland) }
     appliesTo: { options: [scotland] }
@@ -71,7 +76,7 @@ estimates:
         - { upToCents: 12514000, rateBp: 4500 }
         - { upToCents: null, rateBp: 4800 }
     source: https://www.gov.uk/scottish-income-tax
-    verified_on: "2026-11-18"
+    verified_on: "2026-11-24"
   - id: class4_nic
     label:
       {
@@ -86,9 +91,27 @@ estimates:
         - { fromCents: 1257000, rateBp: 600 }
         - { fromCents: 5027000, rateBp: 200 }
     source: https://www.gov.uk/self-employed-national-insurance-rates
-    verified_on: "2026-11-18"
+    verified_on: "2026-11-24"
 
 deadlines:
+  - id: self_assessment_registration
+    kind: tax
+    label:
+      {
+        fr: "Inscription au Self Assessment",
+        en: Register for Self Assessment,
+        de: Anmeldung zum Self Assessment,
+      }
+    description:
+      fr: "Si vous avez commencé à travailler à votre compte pendant l'année fiscale 2026-27 et gagné plus de 1 000 £, inscrivez-vous auprès de HMRC pour recevoir votre UTR."
+      en: "If you started working for yourself in the 2026-27 tax year and earned more than £1,000, register with HMRC to get your UTR."
+      de: "Wenn Sie im Steuerjahr 2026-27 selbstständig geworden sind und mehr als 1.000 £ verdient haben, melden Sie sich bei HMRC an, um Ihre UTR zu erhalten."
+    appliesTo: { options: [sa_not_registered] }
+    schedule:
+      { type: dates, dates: [{ due: "2027-10-05", periodStart: "2026-04-06", periodEnd: "2027-04-05" }] }
+    link: https://www.gov.uk/register-for-self-assessment
+    source: https://www.gov.uk/register-for-self-assessment
+    verified_on: "2026-11-24"
   - id: mtd_quarterly_update
     kind: tax
     label:
@@ -98,9 +121,9 @@ deadlines:
         de: MTD-Quartalsmeldung,
       }
     description:
-      fr: "Envoyer à HMRC, avec un logiciel compatible, le cumul des recettes et dépenses depuis le début de l'année fiscale. Un retard ajoute un point de pénalité ; 4 points entraînent une amende de 200 £."
-      en: "Send HMRC your income and expenses since the start of the tax year with compatible software. A late update earns a penalty point; 4 points lead to a £200 penalty."
-      de: "Einnahmen und Ausgaben seit Beginn des Steuerjahres mit kompatibler Software an HMRC melden. Verspätung bringt einen Strafpunkt; 4 Punkte führen zu 200 £ Strafe."
+      fr: "Envoyer à HMRC, avec un logiciel compatible, le cumul des recettes et dépenses depuis le 6 avril. Pour l'année 2026-27, HMRC n'attribue pas de point de pénalité aux mises à jour en retard ; ensuite, chaque retard ajoute un point et 4 points entraînent une amende de 200 £."
+      en: "Send HMRC your income and expenses since 6 April with compatible software. HMRC will not apply penalty points for late quarterly updates in the 2026-27 tax year; after that, each late update earns a point and 4 points lead to a £200 penalty."
+      de: "Einnahmen und Ausgaben seit dem 6. April mit kompatibler Software an HMRC melden. Im Steuerjahr 2026-27 vergibt HMRC für verspätete Quartalsmeldungen keine Strafpunkte; danach bringt jede Verspätung einen Punkt, und 4 Punkte führen zu 200 £ Strafe."
     appliesTo: { options: [mtd_itsa] }
     schedule:
       type: dates
@@ -112,19 +135,19 @@ deadlines:
     declaresRevenue: true
     link: https://www.gov.uk/guidance/use-making-tax-digital-for-income-tax/send-quarterly-updates
     source: https://www.gov.uk/guidance/use-making-tax-digital-for-income-tax/send-quarterly-updates
-    verified_on: "2026-11-18"
+    verified_on: "2026-11-24"
   - id: payment_on_account_1
     kind: tax
     label:
       { fr: "Premier acompte (payment on account)", en: First payment on account, de: Erste Vorauszahlung }
     description:
-      fr: "Premier acompte de l'impôt 2026-27, égal à la moitié de l'impôt de l'année précédente. Non dû si l'impôt de l'an dernier était inférieur à 1 000 £."
-      en: "First advance payment towards your 2026-27 tax bill, half of last year's bill. Not due if last year's bill was under £1,000."
-      de: "Erste Vorauszahlung auf die Steuer 2026-27, die Hälfte der Vorjahressteuer. Entfällt, wenn die Vorjahressteuer unter 1.000 £ lag."
+      fr: "Premier acompte de l'impôt 2026-27, égal à la moitié de l'impôt de l'année précédente. Non dû si l'impôt de l'an dernier était inférieur à 1 000 £ ou si plus de 80 % a été prélevé à la source."
+      en: "First advance payment towards your 2026-27 tax bill, half of last year's bill. Not due if last year's bill was under £1,000 or more than 80% of it was taken at source."
+      de: "Erste Vorauszahlung auf die Steuer 2026-27, die Hälfte der Vorjahressteuer. Entfällt, wenn die Vorjahressteuer unter 1.000 £ lag oder mehr als 80 % an der Quelle einbehalten wurden."
     schedule: { type: dates, dates: [{ due: "2027-01-31" }] }
     link: https://www.gov.uk/understand-self-assessment-bill/payments-on-account
     source: https://www.gov.uk/understand-self-assessment-bill/payments-on-account
-    verified_on: "2026-11-18"
+    verified_on: "2026-11-24"
   - id: payment_on_account_2
     kind: tax
     label:
@@ -136,7 +159,7 @@ deadlines:
     schedule: { type: dates, dates: [{ due: "2027-07-31" }] }
     link: https://www.gov.uk/understand-self-assessment-bill/payments-on-account
     source: https://www.gov.uk/understand-self-assessment-bill/payments-on-account
-    verified_on: "2026-11-18"
+    verified_on: "2026-11-24"
   - id: self_assessment_paper
     kind: tax
     label:
@@ -153,7 +176,7 @@ deadlines:
       { type: dates, dates: [{ due: "2027-10-31", periodStart: "2026-04-06", periodEnd: "2027-04-05" }] }
     link: https://www.gov.uk/self-assessment-tax-returns/deadlines
     source: https://www.gov.uk/self-assessment-tax-returns/deadlines
-    verified_on: "2026-11-18"
+    verified_on: "2026-11-24"
   - id: self_assessment_online
     kind: tax
     label:
@@ -163,13 +186,13 @@ deadlines:
         de: Online-Erklärung und Restzahlung,
       }
     description:
-      fr: "Déclaration en ligne de l'année fiscale 2026-27 et paiement du solde (plus le premier acompte de 2027-28)."
-      en: "Online tax return for 2026-27 and balancing payment (with the first payment on account for 2027-28)."
-      de: "Online-Erklärung für 2026-27 und Restzahlung (mit der ersten Vorauszahlung für 2027-28)."
+      fr: "Déclaration en ligne de l'année fiscale 2026-27 et paiement du solde (plus le premier acompte de 2027-28). L'estimation traite toutes les recettes comme du bénéfice : déduisez vos frais réels ou, à la place, la trading allowance de 1 000 £. Les cotisations Class 2 ne sont plus dues ; sous 7 105 £ de bénéfice, vous pouvez en verser volontairement (3,65 £ par semaine)."
+      en: "Online tax return for 2026-27 and balancing payment (with the first payment on account for 2027-28). The estimate treats all takings as profit: deduct your allowable expenses or, instead, the £1,000 trading allowance. Class 2 contributions are no longer due; with profits under £7,105 you can pay them voluntarily (£3.65 a week)."
+      de: "Online-Erklärung für 2026-27 und Restzahlung (mit der ersten Vorauszahlung für 2027-28). Die Schätzung behandelt alle Einnahmen als Gewinn: Ziehen Sie Ihre Betriebsausgaben oder stattdessen den Trading Allowance von 1.000 £ ab. Class-2-Beiträge sind nicht mehr fällig; bei Gewinnen unter 7.105 £ können Sie sie freiwillig zahlen (3,65 £ pro Woche)."
     schedule:
       { type: dates, dates: [{ due: "2028-01-31", periodStart: "2026-04-06", periodEnd: "2027-04-05" }] }
     estimates: [income_tax, income_tax_scotland, class4_nic]
     declaresRevenue: true
     link: https://www.gov.uk/self-assessment-tax-returns/deadlines
     source: https://www.gov.uk/self-assessment-tax-returns/deadlines
-    verified_on: "2026-11-18"
+    verified_on: "2026-11-24"
