@@ -5,6 +5,8 @@ import { type Resource, useResource } from '../../lib/useResource.ts';
 export interface ActivitiesData {
   activities: CompanyActivity[];
   statuses: PackMeta['statuses'];
+  /** False when the country pack does not offer several activities. */
+  canAdd: boolean;
 }
 
 /**

@@ -20,6 +20,7 @@ import {
   bigserial,
   boolean,
   check,
+  customType,
   date,
   index,
   integer,
@@ -131,7 +132,7 @@ export const apiTokens = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
     name: text('name').notNull(),
-    scope: text('scope', { enum: ['read', 'read_drafts'] }).notNull(),
+    scope: text('scope', { enum: ['read', 'read_drafts', 'read_pipeline'] }).notNull(),
     tokenHash: text('token_hash').notNull().unique(),
     lastUsedAt: timestamp('last_used_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
@@ -367,11 +368,184 @@ export const deadlineMarks = pgTable(
     doneOn: date('done_on'),
     note: text('note'),
     actualCents: bigint('actual_cents', { mode: 'number' }),
+    /** Figures copied into the form, per prepared line id. */
+    declared: jsonb('declared').$type<Record<string, number>>(),
     hidden: boolean('hidden').notNull().default(false),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [primaryKey({ columns: [table.companyId, table.key] })],
 );
+
+/** Commercial pipeline: a lead, its quote, follow-ups, until won or lost (lighter than a mission). */
+export const deals = pgTable(
+  'deals',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    companyId: uuid('company_id')
+      .notNull()
+      .references(() => companies.id, { onDelete: 'cascade' }),
+    activityId: activityColumn(),
+    /** Null while the prospect is not a client yet; prospectName is then required. */
+    clientId: uuid('client_id').references(() => clients.id, { onDelete: 'restrict' }),
+    prospectName: text('prospect_name'),
+    prospectContact: text('prospect_contact'),
+    title: text('title').notNull(),
+    stage: text('stage', { enum: ['lead', 'quote_sent', 'follow_up', 'won', 'lost'] }).notNull(),
+    amountCents: bigint('amount_cents', { mode: 'number' }),
+    currency: text('currency'),
+    /** One quote belongs to one deal at most. */
+    quoteId: uuid('quote_id')
+      .unique()
+      .references(() => documents.id, { onDelete: 'set null' }),
+    missionId: uuid('mission_id').references(() => missions.id, { onDelete: 'set null' }),
+    nextActionOn: date('next_action_on'),
+    nextAction: text('next_action'),
+    lostReason: text('lost_reason'),
+    closedOn: date('closed_on'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index('deals_company_stage_idx').on(table.companyId, table.stage),
+    index('deals_company_next_idx').on(table.companyId, table.nextActionOn),
+    check('deals_named', sql`${table.clientId} is not null or ${table.prospectName} is not null`),
+  ],
+);
+
+/** History of a deal: stage changes (manual or from its quote), follow-ups done, notes. */
+export const dealEvents = pgTable(
+  'deal_events',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    companyId: uuid('company_id')
+      .notNull()
+      .references(() => companies.id, { onDelete: 'cascade' }),
+    dealId: uuid('deal_id')
+      .notNull()
+      .references(() => deals.id, { onDelete: 'cascade' }),
+    kind: text('kind', { enum: ['stage_changed', 'follow_up_done', 'note'] }).notNull(),
+    fromStage: text('from_stage'),
+    toStage: text('to_stage'),
+    note: text('note'),
+    at: timestamp('at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index('deal_events_deal_idx').on(table.dealId)],
+);
+
+/** Pipeline setting of a company: days between a quote sent and its follow-up. */
+export const pipelineSettings = pgTable('pipeline_settings', {
+  companyId: uuid('company_id')
+    .primaryKey()
+    .references(() => companies.id, { onDelete: 'cascade' }),
+  followUpDays: integer('follow_up_days').notNull().default(7),
+});
+
+/** Raw bytes, for encrypted vault files kept out of every list query. */
+const bytea = customType<{ data: Buffer }>({ dataType: () => 'bytea' });
+
+/** Documents of the vault: insurance certificates, registration extracts, contracts… with an optional expiry. */
+export const vaultItems = pgTable(
+  'vault_items',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    companyId: uuid('company_id')
+      .notNull()
+      .references(() => companies.id, { onDelete: 'cascade' }),
+    activityId: activityColumn(),
+    /** Kind id from the country pack or the core (client_contract, other). */
+    kind: text('kind').notNull(),
+    title: text('title').notNull(),
+    clientId: uuid('client_id').references(() => clients.id, { onDelete: 'set null' }),
+    missionId: uuid('mission_id').references(() => missions.id, { onDelete: 'set null' }),
+    issuedOn: date('issued_on'),
+    expiresOn: date('expires_on'),
+    /** Days before expiry to remind; null keeps the kind's. */
+    remindDays: jsonb('remind_days').$type<number[]>(),
+    notes: text('notes').notNull().default(''),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index('vault_items_company_expiry_idx').on(table.companyId, table.expiresOn)],
+);
+
+/** Encrypted files of the vault; a replaced version is kept one year (supersededAt), then purged. */
+export const vaultFiles = pgTable(
+  'vault_files',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    itemId: uuid('item_id')
+      .notNull()
+      .references(() => vaultItems.id, { onDelete: 'cascade' }),
+    fileName: text('file_name').notNull(),
+    mimeType: text('mime_type').notNull(),
+    sizeBytes: integer('size_bytes').notNull(),
+    sha256: text('sha256').notNull(),
+    /** "v1" | iv (12) | tag (16) | AES-256-GCM ciphertext, key derived from SECRETS_KEY. */
+    data: bytea('data').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    supersededAt: timestamp('superseded_at', { withTimezone: true }),
+  },
+  (table) => [index('vault_files_item_idx').on(table.itemId)],
+);
+
+/** Simple expenses: amount before VAT, VAT paid, category and optional receipt from the vault. */
+export const expenses = pgTable(
+  'expenses',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    companyId: uuid('company_id')
+      .notNull()
+      .references(() => companies.id, { onDelete: 'cascade' }),
+    activityId: activityColumn(),
+    date: date('date').notNull(),
+    amountCents: bigint('amount_cents', { mode: 'number' }).notNull(),
+    vatCents: bigint('vat_cents', { mode: 'number' }).notNull().default(0),
+    /** Main currency of the company when entered. */
+    currency: text('currency').notNull(),
+    category: text('category').notNull(),
+    description: text('description').notNull().default(''),
+    vaultItemId: uuid('vault_item_id').references((): AnyPgColumn => vaultItems.id, { onDelete: 'set null' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index('expenses_company_date_idx').on(table.companyId, table.date)],
+);
+
+/** Amounts from a notice or entered by the person for a deadline rule and fiscal year (prepared declarations). */
+export const deadlineNotices = pgTable(
+  'deadline_notices',
+  {
+    companyId: uuid('company_id')
+      .notNull()
+      .references(() => companies.id, { onDelete: 'cascade' }),
+    ruleId: text('rule_id').notNull(),
+    fiscalYear: integer('fiscal_year').notNull(),
+    perOccurrenceCents: bigint('per_occurrence_cents', { mode: 'number' }),
+    priorYearTaxCents: bigint('prior_year_tax_cents', { mode: 'number' }),
+    priorYearIncomeCents: bigint('prior_year_income_cents', { mode: 'number' }),
+    /** Method chosen among those the pack offers; null keeps the pack's default. */
+    method: text('method'),
+    note: text('note'),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [primaryKey({ columns: [table.companyId, table.ruleId, table.fiscalYear] })],
+);
+
+/** Settings of the tax reserve chosen by the person; absent means the pack's margin and no extra. */
+export const reserveSettings = pgTable('reserve_settings', {
+  companyId: uuid('company_id')
+    .primaryKey()
+    .references(() => companies.id, { onDelete: 'cascade' }),
+  /** Null keeps the pack's prudent margin. */
+  marginBp: integer('margin_bp'),
+  extraRateBp: integer('extra_rate_bp').notNull().default(0),
+  extraMonthlyCents: bigint('extra_monthly_cents', { mode: 'number' }).notNull().default(0),
+  extraNote: text('extra_note'),
+  /** Tax household for French income tax: parts in quarters (4 = one part) and joint taxation. */
+  taxPartsQuarters: integer('tax_parts_quarters').notNull().default(4),
+  jointTaxation: boolean('joint_taxation').notNull().default(false),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
 
 /** Deadlines a person adds, once or recurring (S-063). */
 export const customDeadlines = pgTable(

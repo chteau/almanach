@@ -5,6 +5,7 @@ import type {
   Localized,
   PackFeatures,
   PackMaturity,
+  PreparedDeclaration,
   ThresholdProgress,
 } from '@almanach/shared';
 
@@ -55,13 +56,21 @@ export interface Outlook {
 /** Deadline detail as returned by GET /api/deadlines/:key. */
 export interface DeadlineDetail {
   occurrence: DeadlineOccurrence;
+  /** Figures per box and amount to pay, when the pack prepares this declaration. */
+  prepared: PreparedDeclaration | null;
   revenueCents: number | null;
   unconverted: number;
   estimates: EstimateResult[];
   /** Per activity, when the business has several. */
   activities: ActivityBreakdown[];
   currency: string;
-  mark: { doneOn: string | null; note: string | null; actualCents: number | null; hidden: boolean } | null;
+  mark: {
+    doneOn: string | null;
+    note: string | null;
+    actualCents: number | null;
+    declared: Record<string, number> | null;
+    hidden: boolean;
+  } | null;
 }
 
 /**

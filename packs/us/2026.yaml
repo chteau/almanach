@@ -115,6 +115,29 @@ deadlines:
         - { due: "2026-06-15", periodStart: "2026-04-01", periodEnd: "2026-05-31" }
         - { due: "2026-09-15", periodStart: "2026-06-01", periodEnd: "2026-08-31" }
         - { due: "2027-01-15", periodStart: "2026-09-01", periodEnd: "2026-12-31" }
+    # Safe harbor by default: each instalment is 25 % of last year's total tax (100 %), 27.5 % (110 %) when last
+    # year's AGI was above $150,000 (Pub. 505 (2026), chapter 2). Optional annualized income installment method
+    # (Worksheet 2-9: factors 4, 2.4, 1.5, 1 and 22.5 %, 45 %, 67.5 %, 90 % for periods ending 3/31, 5/31, 8/31, 12/31).
+    prepare:
+      basis: collected
+      span: period
+      amount:
+        method: prior_year_share
+        alternatives: [annualized]
+        shareBp: 2500
+        higherIncome: { aboveCents: 15000000, shareBp: 2750 }
+        estimates: [self_employment_tax, income_tax_single, income_tax_joint]
+        periods:
+          - { periodEnd: "03-31", factorBp: 40000, shareBp: 2250 }
+          - { periodEnd: "05-31", factorBp: 24000, shareBp: 4500 }
+          - { periodEnd: "08-31", factorBp: 15000, shareBp: 6750 }
+          - { periodEnd: "12-31", factorBp: 10000, shareBp: 9000 }
+        warning:
+          fr: "Safe harbor : entrez l'impôt total et l'AGI de votre déclaration de l'an passé. Le seuil de 75 000 $ des époux déclarant séparément et les impôts d'État ne sont pas gérés ; la méthode annualisée part du chiffre d'affaires sans dépenses."
+          en: "Safe harbor: enter the total tax and AGI of last year's return. The $75,000 limit for married filing separately and state taxes are not handled; the annualized method uses revenue without expenses."
+          de: "Safe Harbor: Gesamtsteuer und AGI der Vorjahreserklärung eintragen. Die Grenze von 75.000 $ für getrennt veranlagte Ehegatten und bundesstaatliche Steuern werden nicht berücksichtigt; die annualisierte Methode nutzt den Umsatz ohne Ausgaben."
+      source: https://www.irs.gov/publications/p505
+      verified_on: "2026-11-24"
     link: https://www.irs.gov/payments
     source: https://www.irs.gov/pub/irs-pdf/f1040es.pdf
     verified_on: "2026-11-18"
@@ -137,3 +160,19 @@ deadlines:
     link: https://www.irs.gov/filing
     source: https://www.law.cornell.edu/uscode/text/26/6072
     verified_on: "2026-11-18"
+
+# Reserve: federal self-employment tax and income tax of 2026 to date, on revenue (no expenses tracked yet). The
+# 2026 estimated tax payments (1040-ES, periods within 2026) reduce it; the payment due in January 2026 covers
+# 2025. State and local taxes are not modelled. The 10 % margin is a product choice, not a legal value.
+reserve:
+  include: [self_employment_tax, income_tax_single, income_tax_joint]
+  settles:
+    - { deadline: estimated_tax, fiscalYear: period }
+    - { deadline: form_1040, fiscalYear: previous }
+  marginBp: 1000
+  warning:
+    fr: "Estimation indicative de l'impôt fédéral et de la self-employment tax, calculée sur le chiffre d'affaires sans dépenses ni autres revenus. Les impôts d'État ne sont pas comptés : ajoutez-les en supplément personnel. Ne remplace pas un avis de l'IRS."
+    en: "Indicative federal income tax and self-employment tax estimate, based on revenue without expenses or other income. State taxes are not included: add them as a personal extra. Not an IRS notice."
+    de: "Unverbindliche Schätzung der Bundeseinkommensteuer und Self-Employment Tax auf Basis des Umsatzes ohne Ausgaben oder andere Einkünfte. Bundesstaatliche Steuern sind nicht enthalten: als persönlichen Zuschlag ergänzen. Kein Bescheid des IRS."
+  source: https://www.irs.gov/pub/irs-pdf/f1040es.pdf
+  verified_on: "2026-11-24"

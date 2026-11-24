@@ -5,6 +5,7 @@ import { useAuth, useMe } from '../../features/auth/AuthProvider.tsx';
 import { activateCompany, useCompanies } from '../../features/companies/useCompanies.ts';
 import { useI18n } from '../../i18n/I18nProvider.tsx';
 import type { MessageKey } from '../../i18n/messages.ts';
+import { setDateRegion } from '../../lib/format.ts';
 import { useResource } from '../../lib/useResource.ts';
 import { Logo } from '../Logo/Logo.tsx';
 import { SearchDialog } from '../SearchDialog/SearchDialog.tsx';
@@ -40,6 +41,7 @@ export const NAV_ITEMS: {
     icon: 'M4 19c0-3 3.5-5 8-5s8 2 8 5M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8',
     primary: true,
   },
+  { to: '/pipeline', label: 'nav.pipeline', icon: 'M4 5h4v14H4zM10 5h4v9h-4zM16 5h4v5h-4z' },
   { to: '/missions', label: 'nav.missions', icon: 'M4 7h16v12H4zM9 7V4h6v3' },
   { to: '/time', label: 'nav.time', icon: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18M12 7v5l3 2' },
   { to: '/quotes', label: 'nav.quotes', icon: 'M6 3h9l3 3v15H6zM9 10h6M9 14h6M9 18h3' },
@@ -50,6 +52,8 @@ export const NAV_ITEMS: {
     primary: true,
   },
   { to: '/payments', label: 'nav.payments', icon: 'M3 7h18v10H3zM3 11h18M7 15h3' },
+  { to: '/expenses', label: 'nav.expenses', icon: 'M6 3h12v18l-3-2-3 2-3-2-3 2zM9 9h6M12 7v8' },
+  { to: '/vault', label: 'nav.vault', icon: 'M4 5h16v14H4zM12 10v4M9 12h6' },
   { to: '/thresholds', label: 'nav.thresholds', icon: 'M4 20h16M6 16l4-5 3 3 5-7' },
   {
     to: '/settings',
@@ -74,6 +78,9 @@ export function AppShell() {
   const unread = inbox.data?.notifications.filter((item) => !item.read).length ?? 0;
   const [searching, setSearching] = useState(false);
   const companies = useCompanies().data;
+  // Dates follow the country of the active company on every page, set before the pages below render.
+  const country = companies?.companies.find((company) => company.id === companies.active)?.country;
+  if (country !== undefined) setDateRegion(country);
 
   useEffect(() => {
     /**

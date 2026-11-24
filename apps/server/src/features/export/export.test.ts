@@ -15,6 +15,13 @@ const empty = {
   billingSettings: [],
   situationChanges: [],
   externalRevenues: [],
+  reserveSettings: [],
+  deadlineNotices: [],
+  vaultItems: [],
+  expenses: [],
+  deals: [],
+  dealEvents: [],
+  pipelineSettings: [],
 };
 
 describe('import references', () => {

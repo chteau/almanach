@@ -4,6 +4,8 @@ import type { Config } from '../../config.ts';
 import type { Database } from '../../db/client.ts';
 import { companies, instance, notifications, profiles, userSettings, users } from '../../db/schema.ts';
 import { Mailer } from '../mail/mailer.ts';
+import { DealService } from '../pipeline/deals.ts';
+import { VaultService } from '../vault/vault.ts';
 import type { PlanningService } from './planning.service.ts';
 
 type NotificationRow = typeof notifications.$inferSelect;
@@ -18,6 +20,10 @@ const TEXT: Record<Locale, Record<string, (params: Record<string, string | numbe
     threshold_near: (p) => `${p.label} : ${p.percent} % atteint`,
     threshold_exceeded: (p) => `${p.label} : seuil dépassé`,
     threshold_below: (p) => `${p.label} : chiffre d’affaires repassé sous le seuil`,
+    vault_expiring: (p) => `${p.title} expire dans ${p.days} j (${p.date})`,
+    vault_expired: (p) => `${p.title} a expiré le ${p.date}`,
+    deal_follow_up: (p) => `Relance à faire aujourd’hui : ${p.title} (${p.name})`,
+    deal_follow_up_late: (p) => `Relance en retard depuis le ${p.date} : ${p.title} (${p.name})`,
   },
   en: {
     deadline_soon: (p) => (p.days === 0 ? `Today: ${p.title}` : `${p.title} in ${p.days} days (${p.date})`),
@@ -26,6 +32,10 @@ const TEXT: Record<Locale, Record<string, (params: Record<string, string | numbe
     threshold_near: (p) => `${p.label}: ${p.percent} % reached`,
     threshold_exceeded: (p) => `${p.label}: threshold exceeded`,
     threshold_below: (p) => `${p.label}: turnover back under the threshold`,
+    vault_expiring: (p) => `${p.title} expires in ${p.days} days (${p.date})`,
+    vault_expired: (p) => `${p.title} expired on ${p.date}`,
+    deal_follow_up: (p) => `Follow up today: ${p.title} (${p.name})`,
+    deal_follow_up_late: (p) => `Follow-up late since ${p.date}: ${p.title} (${p.name})`,
   },
   de: {
     deadline_soon: (p) => (p.days === 0 ? `Heute: ${p.title}` : `${p.title} in ${p.days} Tagen (${p.date})`),
@@ -34,6 +44,10 @@ const TEXT: Record<Locale, Record<string, (params: Record<string, string | numbe
     threshold_near: (p) => `${p.label}: ${p.percent} % erreicht`,
     threshold_exceeded: (p) => `${p.label}: Schwelle überschritten`,
     threshold_below: (p) => `${p.label}: Umsatz wieder unter der Schwelle`,
+    vault_expiring: (p) => `${p.title} läuft in ${p.days} Tagen ab (${p.date})`,
+    vault_expired: (p) => `${p.title} ist am ${p.date} abgelaufen`,
+    deal_follow_up: (p) => `Heute nachfassen: ${p.title} (${p.name})`,
+    deal_follow_up_late: (p) => `Nachfassen überfällig seit ${p.date}: ${p.title} (${p.name})`,
   },
 };
 
@@ -45,8 +59,15 @@ const TEXT: Record<Locale, Record<string, (params: Record<string, string | numbe
  * @returns {string} - message
  */
 export function notificationText(row: Pick<NotificationRow, 'kind' | 'params'>, locale: Locale): string {
-  return TEXT[locale][row.kind]?.(row.params) ?? row.kind;
+  const text = TEXT[locale][row.kind]?.(row.params) ?? row.kind;
+  const { amountCents, currency } = row.params;
+  if (typeof amountCents !== 'number' || typeof currency !== 'string') return text;
+  const amount = new Intl.NumberFormat(locale, { style: 'currency', currency }).format(amountCents / 100);
+  return `${text} · ${AMOUNT[locale]} ${amount}`;
 }
+
+/** Label of the prepared amount added to a deadline reminder. */
+const AMOUNT: Record<Locale, string> = { fr: 'à payer :', en: 'to pay:', de: 'zu zahlen:' };
 
 /**
  * Tells whether a local time falls within quiet hours, which may span midnight (S-240)
@@ -214,7 +235,13 @@ export class ReminderJob {
         companyId,
         kind: 'deadline_soon',
         dedupeKey: `deadline:${item.key}:${offset}`,
-        params: { title, date: item.date, days: left, key: item.key },
+        params: {
+          title,
+          date: item.date,
+          days: left,
+          key: item.key,
+          ...(await this.preparedAmount(companyId, item)),
+        },
         link,
       });
     }
@@ -228,6 +255,8 @@ export class ReminderJob {
         link: `/documents/${invoice.id}`,
       });
     }
+    rows.push(...(await new VaultService(this.db, this.planning, undefined, 0).reminders(companyId, today)));
+    rows.push(...(await new DealService(this.db).reminders(companyId, today)));
     const outlook = await this.planning.outlook(companyId, today);
     for (const threshold of outlook?.thresholds ?? []) {
       if (threshold.window === 'previous_fiscal_year') continue;
@@ -264,6 +293,23 @@ export class ReminderJob {
       }
     }
     if (rows.length > 0) await this.db.insert(notifications).values(rows).onConflictDoNothing();
+  }
+
+  /**
+   * Amount prepared for a pack deadline, to add to its reminder
+   *
+   * @param companyId {string} - owner
+   * @param item {{ key: string; type: string }} - calendar entry
+   * @returns {Promise<Record<string, string | number>>} - amountCents and currency, empty when none
+   */
+  private async preparedAmount(
+    companyId: string,
+    item: { key: string; type: string },
+  ): Promise<Record<string, string | number>> {
+    if (item.type === 'custom') return {};
+    const detail = await this.planning.deadline(companyId, item.key);
+    const cents = detail?.prepared?.amount?.cents;
+    return typeof cents === 'number' && detail ? { amountCents: cents, currency: detail.currency } : {};
   }
 
   /**

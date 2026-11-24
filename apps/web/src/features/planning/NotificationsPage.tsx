@@ -9,7 +9,7 @@ import { Skeleton } from '../../components/Skeleton/Skeleton.tsx';
 import { useI18n } from '../../i18n/I18nProvider.tsx';
 import type { MessageKey } from '../../i18n/messages.ts';
 import { api } from '../../lib/api.ts';
-import { formatDate } from '../../lib/format.ts';
+import { formatDate, formatMoney } from '../../lib/format.ts';
 import { useResource } from '../../lib/useResource.ts';
 import styles from './Planning.module.css';
 
@@ -50,7 +50,12 @@ export function NotificationsPage() {
       ...row.params,
       date: typeof row.params.date === 'string' ? formatDate(row.params.date, locale) : '',
     };
-    return t(key, params);
+    const { amountCents, currency } = row.params;
+    const amount =
+      typeof amountCents === 'number' && typeof currency === 'string'
+        ? ` · ${t('notifications.amount', { amount: formatMoney(amountCents, currency, locale) })}`
+        : '';
+    return t(key, params) + amount;
   };
 
   /**

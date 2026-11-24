@@ -134,6 +134,41 @@
       "when": 1795480089267,
       "tag": "0018_mail_settings",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1795482685472,
+      "tag": "0019_reserve",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1795483699828,
+      "tag": "0020_declaration_prepared",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1795484374709,
+      "tag": "0021_expenses",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1795484652538,
+      "tag": "0022_vault",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1795485181569,
+      "tag": "0023_pipeline",
+      "breakpoints": true
     }
   ]
 }

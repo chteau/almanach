@@ -1,11 +1,15 @@
+import { createHash } from 'node:crypto';
 import {
   billingSettingsSchema,
+  DEAL_STAGES,
+  EXPENSE_CATEGORIES,
   LOGO_MAX_BYTES,
   logoSchema,
   numberFormatSchema,
   situationSchema,
+  VAULT_FILE_MAX_BYTES,
 } from '@almanach/shared';
-import { and, asc, eq, exists, or } from 'drizzle-orm';
+import { and, asc, eq, exists, isNull, or } from 'drizzle-orm';
 import type { PgTable } from 'drizzle-orm/pg-core';
 import { z } from 'zod';
 import type { Database } from '../../db/client.ts';
@@ -17,18 +21,28 @@ import {
   companyActivities,
   customDeadlines,
   deadlineMarks,
+  deadlineNotices,
+  dealEvents,
+  deals,
   documents,
+  expenses,
   externalRevenues,
   federationLinks,
   missions,
   numberSequences,
   payments,
+  pipelineSettings,
   profiles,
+  reserveSettings,
   situationChanges,
   timeEntries,
   userSettings,
+  vaultFiles,
+  vaultItems,
 } from '../../db/schema.ts';
+import { decryptBytes, encryptBytes, vaultKey } from '../../security/secrets.ts';
 import { imageSize, isImage, LOGO_MAX_SIDE } from '../billing/billing.ts';
+import { detectMime } from '../vault/vault.ts';
 
 export const EXPORT_FORMAT = 'almanach-export/2';
 /** Single-company exports made before companies existed; still accepted on import. */
@@ -52,13 +66,32 @@ const TABLES = {
   billingSettings,
   situationChanges,
   externalRevenues,
+  reserveSettings,
+  deadlineNotices,
+  vaultItems,
+  expenses,
+  deals,
+  dealEvents,
+  pipelineSettings,
 } as const satisfies Record<string, PgTable>;
 
 type TableName = keyof typeof TABLES;
 type Row = Record<string, unknown>;
 
 /** Rows of one company, table by table, and the configuration of its links with other instances. */
-type CompanyData = Record<TableName, Row[]> & { federationLinks?: Row[] };
+type CompanyData = Record<TableName, Row[]> & { federationLinks?: Row[]; vaultFiles?: VaultFileExport[] };
+
+/** Current file of a vault document, decrypted so the export restores on an instance with another key. */
+const vaultFileSchema = z
+  .object({
+    itemId: z.string(),
+    fileName: z.string().min(1).max(120),
+    createdAt: z.string(),
+    /** Base64 content. */
+    data: z.string().max(12 * 1024 * 1024),
+  })
+  .strict();
+type VaultFileExport = z.infer<typeof vaultFileSchema>;
 
 /**
  * Configuration of a link kept by exports: never a key, secret, received total or copy of the linked detail.
@@ -89,9 +122,10 @@ export interface ExportFile {
  *
  * @param db {Database} - database
  * @param userId {string} - person exporting
+ * @param secretsKey {Buffer | undefined} - SECRETS_KEY, to include the vault files decrypted
  * @returns {Promise<ExportFile>} - export
  */
-export async function exportData(db: Database, userId: string): Promise<ExportFile> {
+export async function exportData(db: Database, userId: string, secretsKey?: Buffer): Promise<ExportFile> {
   const owned = await db
     .select({ id: companies.id, name: companies.name })
     .from(companies)
@@ -118,6 +152,32 @@ export async function exportData(db: Database, userId: string): Promise<ExportFi
       })
       .from(federationLinks)
       .where(and(eq(federationLinks.companyId, company.id), eq(federationLinks.state, 'active')));
+    data.vaultFiles = [];
+    if (secretsKey) {
+      const files = await db
+        .select({
+          itemId: vaultFiles.itemId,
+          fileName: vaultFiles.fileName,
+          createdAt: vaultFiles.createdAt,
+          data: vaultFiles.data,
+        })
+        .from(vaultFiles)
+        .innerJoin(vaultItems, eq(vaultItems.id, vaultFiles.itemId))
+        .where(and(eq(vaultItems.companyId, company.id), isNull(vaultFiles.supersededAt)));
+      for (const file of files) {
+        try {
+          const plain = decryptBytes(file.data, vaultKey(secretsKey));
+          data.vaultFiles.push({
+            itemId: file.itemId,
+            fileName: file.fileName,
+            createdAt: file.createdAt.toISOString(),
+            data: plain.toString('base64'),
+          });
+        } catch {
+          // A file encrypted with a lost key cannot be exported; its document still is.
+        }
+      }
+    }
     list.push({ name: company.name, data });
   }
   const settings = await db.select().from(userSettings).where(eq(userSettings.userId, userId));
@@ -166,7 +226,7 @@ export function referenceProblem(data: CompanyData): string | null {
   for (const row of data.companyActivities)
     if (typeof row.status !== 'string' || !/^[a-z0-9_]{1,40}$/.test(row.status) || row.linkId)
       return 'companyActivities.status';
-  for (const name of ['documents', 'payments', 'customDeadlines'] as const)
+  for (const name of ['documents', 'payments', 'customDeadlines', 'expenses', 'vaultItems'] as const)
     for (const row of data[name]) if (!optional(row.activityId, activityIds)) return `${name}.activityId`;
   for (const mission of data.missions) if (!clientIds.has(mission.clientId)) return 'missions.clientId';
   for (const doc of data.documents) {
@@ -177,6 +237,24 @@ export function referenceProblem(data: CompanyData): string | null {
       return 'documents.depositIds';
   }
   for (const payment of data.payments) if (!documentIds.has(payment.documentId)) return 'payments.documentId';
+  const vaultIds = ids('vaultItems');
+  for (const item of data.vaultItems)
+    if (!optional(item.clientId, clientIds) || !optional(item.missionId, missionIds))
+      return 'vaultItems.reference';
+  for (const row of data.expenses) if (!optional(row.vaultItemId, vaultIds)) return 'expenses.vaultItemId';
+  for (const file of data.vaultFiles ?? []) if (!vaultIds.has(file.itemId)) return 'vaultFiles.itemId';
+  const dealIds = ids('deals');
+  for (const deal of data.deals) {
+    if (!DEAL_STAGES.includes(deal.stage as never)) return 'deals.stage';
+    if (!optional(deal.activityId, activityIds)) return 'deals.activityId';
+    if (
+      !optional(deal.clientId, clientIds) ||
+      !optional(deal.quoteId, documentIds) ||
+      !optional(deal.missionId, missionIds)
+    )
+      return 'deals.reference';
+  }
+  for (const event of data.dealEvents) if (!dealIds.has(event.dealId)) return 'dealEvents.dealId';
   for (const row of data.externalRevenues)
     if (!optional(row.clientId, clientIds)) return 'externalRevenues.clientId';
   for (const entry of data.timeEntries) {
@@ -218,6 +296,12 @@ function contentProblem(data: CompanyData): string | null {
         return 'billingSettings.logo';
     }
   }
+  for (const row of data.expenses)
+    if (!EXPENSE_CATEGORIES.includes(row.category as never)) return 'expenses.content';
+  for (const file of data.vaultFiles ?? []) {
+    const bytes = Buffer.from(file.data, 'base64');
+    if (bytes.length > VAULT_FILE_MAX_BYTES || !detectMime(bytes)) return 'vaultFiles.content';
+  }
   const strict = situationSchema.strict();
   for (const row of data.situationChanges) {
     if (!strict.safeParse(row.before).success || !strict.safeParse(row.after).success)
@@ -257,6 +341,12 @@ function readExport(
       .safeParse((raw as Record<string, unknown>).federationLinks ?? []);
     if (!links.success) return 'federationLinks';
     data.federationLinks = links.data;
+    const files = z
+      .array(vaultFileSchema)
+      .max(5000)
+      .safeParse((raw as Record<string, unknown>).vaultFiles ?? []);
+    if (!files.success) return 'vaultFiles';
+    data.vaultFiles = files.data;
     return data;
   };
   let settings: unknown;
@@ -297,15 +387,19 @@ function readExport(
  * @param db {Database} - database
  * @param owner {{ userId: string; companyId: string }} - person importing and their active company
  * @param input {unknown} - parsed JSON body
+ * @param secretsKey {Buffer | undefined} - SECRETS_KEY, to encrypt the vault files again
  * @returns {Promise<{ ok: true; counts: Record<string, number> } | { error: string; detail?: string }>} - counts or problem
  */
 export async function importData(
   db: Database,
   owner: { userId: string; companyId: string },
   input: unknown,
+  secretsKey?: Buffer,
 ): Promise<{ ok: true; counts: Record<string, number> } | { error: string; detail?: string }> {
   const content = readExport(input);
   if ('error' in content) return content;
+  if (!secretsKey && content.companies.some((company) => (company.data.vaultFiles ?? []).length > 0))
+    return { error: 'vault_key_missing' };
   const { userId } = owner;
   const busy = await db
     .select({ id: companies.id })
@@ -355,6 +449,20 @@ export async function importData(
             await tx.insert(TABLES[name]).values(rows.slice(start, start + 500) as never);
           }
         }
+        const files = company.data.vaultFiles ?? [];
+        for (const file of files) {
+          const bytes = Buffer.from(file.data, 'base64');
+          await tx.insert(vaultFiles).values({
+            itemId: file.itemId,
+            fileName: file.fileName,
+            mimeType: detectMime(bytes) ?? 'application/octet-stream',
+            sizeBytes: bytes.length,
+            sha256: createHash('sha256').update(bytes).digest('hex'),
+            data: encryptBytes(bytes, vaultKey(secretsKey as Buffer)),
+            createdAt: new Date(file.createdAt),
+          });
+        }
+        counts.vaultFiles = (counts.vaultFiles ?? 0) + files.length;
         const links = company.data.federationLinks ?? [];
         if (links.length > 0)
           await tx

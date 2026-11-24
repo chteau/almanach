@@ -18,6 +18,7 @@ export const PACK_FEATURES = [
   'activities',
   'reserve',
   'prepare',
+  'expenses',
   'vault_types',
   'einvoicing',
 ] as const;
@@ -45,6 +46,23 @@ const invoiceRules = z
   })
   .strict();
 
+/** A kind of document of the vault proposed by the pack; no tax rule, so a source is optional. */
+const vaultKindSchema = z
+  .object({
+    id: z.string().regex(/^[a-z0-9_]{1,40}$/),
+    label: localized,
+    /** Whether an expiry date is asked. */
+    expires: z.boolean().default(false),
+    remindDays: z.array(z.number().int().min(0).max(365)).max(6).default([]),
+    appliesTo: z
+      .object({ statuses: z.array(z.string()).optional(), options: z.array(z.string()).optional() })
+      .strict()
+      .optional(),
+    source: z.url({ protocol: /^https$/ }).optional(),
+    verified_on: z.iso.date().optional(),
+  })
+  .strict();
+
 /** Country pack metadata, loaded from packs/<country>/pack.yaml and validated before use. */
 export const packMetaSchema = z
   .object({
@@ -56,6 +74,13 @@ export const packMetaSchema = z
     minAppVersion: z
       .string()
       .regex(/^\d{1,4}\.\d{1,4}\.\d{1,4}$/)
+      .optional(),
+    /** How expenses recorded in Almanach are used in this country (deductible or shown for information). */
+    expensesNote: localized.optional(),
+    /** Kinds of documents the vault proposes in this country. */
+    vault: z
+      .object({ kinds: z.array(vaultKindSchema).default([]) })
+      .strict()
       .optional(),
     name: localized,
     currency: currencySchema,
@@ -84,6 +109,7 @@ export const packMetaSchema = z
 
 export type PackMeta = z.infer<typeof packMetaSchema>;
 export type PackMaturity = (typeof PACK_MATURITIES)[number];
+export type VaultKind = z.infer<typeof vaultKindSchema>;
 export type PackFeature = (typeof PACK_FEATURES)[number];
 export type PackFeatures = Partial<Record<PackFeature, PackMaturity>>;
 

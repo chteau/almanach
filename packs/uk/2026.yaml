@@ -178,6 +178,28 @@ deadlines:
         - { due: "2027-02-07", periodStart: "2026-04-06", periodEnd: "2027-01-05" }
         - { due: "2027-05-07", periodStart: "2026-04-06", periodEnd: "2027-04-05" }
     declaresRevenue: true
+    # Prepared figures only: Almanach does not send updates to HMRC (no recognised software). Cumulative since 6 April.
+    prepare:
+      basis: collected
+      span: fiscal_year_to_period_end
+      lines:
+        - id: turnover
+          label: { fr: "Recettes (turnover)", en: "Turnover", de: "Einnahmen (turnover)" }
+          measure: revenue
+        - id: expenses
+          label:
+            {
+              fr: "Dépenses admissibles (total)",
+              en: "Allowable expenses (total)",
+              de: "Abzugsfähige Ausgaben (gesamt)",
+            }
+          measure: expenses
+      note:
+        fr: "Chiffres à reporter dans votre logiciel compatible MTD, qui demande les dépenses par catégorie. Almanach ne transmet rien à HMRC."
+        en: "Figures to copy into your MTD-compatible software, which asks for expenses by category. Almanach sends nothing to HMRC."
+        de: "Zahlen zur Übernahme in Ihre MTD-kompatible Software, die Ausgaben nach Kategorien verlangt. Almanach übermittelt nichts an HMRC."
+      source: https://www.gov.uk/guidance/use-making-tax-digital-for-income-tax/send-quarterly-updates
+      verified_on: "2026-11-24"
     link: https://www.gov.uk/guidance/use-making-tax-digital-for-income-tax/send-quarterly-updates
     source: https://www.gov.uk/guidance/use-making-tax-digital-for-income-tax/send-quarterly-updates
     verified_on: "2026-11-24"
@@ -190,6 +212,18 @@ deadlines:
       en: "First advance payment towards your 2026-27 tax bill, half of last year's bill. Not due if last year's bill was under £1,000 or more than 80% of it was taken at source."
       de: "Erste Vorauszahlung auf die Steuer 2026-27, die Hälfte der Vorjahressteuer. Entfällt, wenn die Vorjahressteuer unter 1.000 £ lag oder mehr als 80 % an der Quelle einbehalten wurden."
     schedule: { type: dates, dates: [{ due: "2027-01-31" }] }
+    prepare:
+      basis: collected
+      span: period
+      amount:
+        method: prior_year_share
+        shareBp: 5000
+        warning:
+          fr: "La moitié de l'impôt de l'année précédente (Class 4 incluse) : saisissez-le depuis votre décompte HMRC. Non dû sous 1 000 £ ou si plus de 80 % a été prélevé à la source."
+          en: "Half of last year's bill (Class 4 included): enter it from your HMRC calculation. Not due under £1,000 or when more than 80 % was taken at source."
+          de: "Die Hälfte der Vorjahressteuer (inkl. Class 4): aus der HMRC-Berechnung eintragen. Entfällt unter 1.000 £ oder wenn mehr als 80 % an der Quelle einbehalten wurden."
+      source: https://www.gov.uk/understand-self-assessment-bill/payments-on-account
+      verified_on: "2026-11-24"
     link: https://www.gov.uk/understand-self-assessment-bill/payments-on-account
     source: https://www.gov.uk/understand-self-assessment-bill/payments-on-account
     verified_on: "2026-11-24"
@@ -202,6 +236,18 @@ deadlines:
       en: "Second advance payment towards your 2026-27 tax bill."
       de: "Zweite Vorauszahlung auf die Steuer 2026-27."
     schedule: { type: dates, dates: [{ due: "2027-07-31" }] }
+    prepare:
+      basis: collected
+      span: period
+      amount:
+        method: prior_year_share
+        shareBp: 5000
+        warning:
+          fr: "La moitié de l'impôt de l'année précédente (Class 4 incluse) : saisissez-le depuis votre décompte HMRC. Non dû sous 1 000 £ ou si plus de 80 % a été prélevé à la source."
+          en: "Half of last year's bill (Class 4 included): enter it from your HMRC calculation. Not due under £1,000 or when more than 80 % was taken at source."
+          de: "Die Hälfte der Vorjahressteuer (inkl. Class 4): aus der HMRC-Berechnung eintragen. Entfällt unter 1.000 £ oder wenn mehr als 80 % an der Quelle einbehalten wurden."
+      source: https://www.gov.uk/understand-self-assessment-bill/payments-on-account
+      verified_on: "2026-11-24"
     link: https://www.gov.uk/understand-self-assessment-bill/payments-on-account
     source: https://www.gov.uk/understand-self-assessment-bill/payments-on-account
     verified_on: "2026-11-24"
@@ -241,3 +287,21 @@ deadlines:
     link: https://www.gov.uk/self-assessment-tax-returns/deadlines
     source: https://www.gov.uk/self-assessment-tax-returns/deadlines
     verified_on: "2026-11-24"
+
+# Reserve: Income Tax and Class 4 of the 2026-27 tax year to date, on takings less the trading allowance (no
+# expenses tracked yet). The payments on account due 31 January and 31 July 2027 are for 2026-27 (each half of the
+# previous year's bill, https://www.gov.uk/understand-self-assessment-bill/payments-on-account, 2026-11-24) and
+# reduce it; the balancing payment on 31 January 2028 settles the year itself. The 10 % margin is a product choice.
+reserve:
+  include: [income_tax, income_tax_scotland, class4_nic]
+  settles:
+    - { deadline: payment_on_account_1, fiscalYear: current }
+    - { deadline: payment_on_account_2, fiscalYear: current }
+    - { deadline: self_assessment_online, fiscalYear: previous }
+  marginBp: 1000
+  warning:
+    fr: "Estimation indicative de l'impôt sur le revenu et de la Class 4, calculée sur le chiffre d'affaires moins le trading allowance, sans autres revenus. Ne remplace pas votre décompte HMRC."
+    en: "Indicative Income Tax and Class 4 estimate, based on takings less the trading allowance, without other income. Not your HMRC calculation."
+    de: "Unverbindliche Schätzung von Einkommensteuer und Class 4 auf Basis des Umsatzes abzüglich Trading Allowance, ohne andere Einkünfte. Ersetzt nicht die Berechnung von HMRC."
+  source: https://www.gov.uk/understand-self-assessment-bill/payments-on-account
+  verified_on: "2026-11-24"

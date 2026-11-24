@@ -7,6 +7,7 @@ import {
   LOCALES,
   type Localized,
   optionalText,
+  PREPARE_METHODS,
 } from '@almanach/shared';
 import { and, desc, eq, gte, inArray, isNull, lte, ne, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
@@ -16,6 +17,7 @@ import {
   companies,
   customDeadlines,
   deadlineMarks,
+  deadlineNotices,
   documents,
   instance,
   notifications,
@@ -31,6 +33,7 @@ import type { PackRegistry } from '../packs/packs.ts';
 import { renderIcal } from './ical.ts';
 import { type CalendarItem, occurrencesOf, type PlanningService } from './planning.service.ts';
 import type { ReminderJob } from './reminders.ts';
+import type { ReserveService } from './reserve.ts';
 
 const KEY = /^(?:[a-z0-9_]{1,60}:\d{4}-\d{2}-\d{2}|custom:[0-9a-f-]{36}:\d{4}-\d{2}-\d{2})$/;
 
@@ -54,6 +57,22 @@ const markSchema = z
     doneOn: isoDateSchema.nullable(),
     note: optionalText(500),
     actualCents: z.number().int().min(0).max(100_000_000_000).nullable(),
+    /** Figures copied into the form, per prepared line id. */
+    declared: z
+      .record(z.string().regex(/^[a-z0-9_]{1,60}$/), z.number().int().min(0).max(100_000_000_000))
+      .nullable()
+      .optional(),
+  })
+  .strict();
+
+const amount = z.number().int().min(0).max(100_000_000_000).nullable();
+const noticeSchema = z
+  .object({
+    perOccurrenceCents: amount,
+    priorYearTaxCents: amount,
+    priorYearIncomeCents: amount,
+    method: z.enum(PREPARE_METHODS).nullable(),
+    note: optionalText(500),
   })
   .strict();
 
@@ -110,6 +129,7 @@ function dateParam(value: string | undefined, fallback: string): string | null {
  * @param planning {PlanningService} - planning rules
  * @param packs {PackRegistry} - country packs
  * @param reminders {ReminderJob} - reminder delivery, for test messages
+ * @param reserve {ReserveService | undefined} - tax reserve, summarized on the dashboard
  * @returns {{ api: Hono<AppEnv>; feed: Hono<AppEnv> }} - authenticated routes and the public feed
  */
 export function planningRoutes(
@@ -117,6 +137,7 @@ export function planningRoutes(
   planning: PlanningService,
   packs: PackRegistry,
   reminders: ReminderJob,
+  reserve?: ReserveService,
 ) {
   const api = new Hono<AppEnv>();
 
@@ -126,6 +147,41 @@ export function planningRoutes(
     const to = dateParam(c.req.query('to'), addDays(today, 62));
     if (!from || !to || to < from || addDays(from, 400) < to) return c.json({ error: 'invalid_range' }, 422);
     return c.json({ today, items: await planning.calendar(c.var.company.id, from, to, today) });
+  });
+
+  /** The next deadline not done yet that has a prepared declaration, overdue ones first. */
+  api.get('/deadlines/next-prepared', async (c) => {
+    const today = await instanceToday(db);
+    const items = await planning.calendar(c.var.company.id, addDays(today, -62), addDays(today, 185), today);
+    for (const item of items) {
+      if (item.done || item.hidden || (item.type !== 'tax' && item.type !== 'social')) continue;
+      const detail = await planning.deadline(c.var.company.id, item.key);
+      if (detail?.prepared) return c.json({ deadline: detail, today });
+    }
+    return c.json({ deadline: null, today });
+  });
+
+  api.put('/deadline-notices/:ruleId/:year', async (c) => {
+    const ruleId = c.req.param('ruleId');
+    const fiscalYear = Number(c.req.param('year'));
+    if (
+      !/^[a-z0-9_]{1,60}$/.test(ruleId) ||
+      !Number.isInteger(fiscalYear) ||
+      fiscalYear < 2000 ||
+      fiscalYear > 2100
+    )
+      return c.json({ error: 'not_found' }, 404);
+    const { data, response } = await parseBody(c, noticeSchema);
+    if (response) return response;
+    const values = { ...data, note: data.note || null };
+    await db
+      .insert(deadlineNotices)
+      .values({ companyId: c.var.company.id, ruleId, fiscalYear, ...values })
+      .onConflictDoUpdate({
+        target: [deadlineNotices.companyId, deadlineNotices.ruleId, deadlineNotices.fiscalYear],
+        set: { ...values, updatedAt: new Date() },
+      });
+    return c.body(null, 204);
   });
 
   api.get('/deadlines/:key', async (c) => {
@@ -164,6 +220,20 @@ export function planningRoutes(
     if (!(await ownsKey(c.var.company.id, key))) return c.json({ error: 'not_found' }, 404);
     const { data, response } = await parseBody(c, markSchema);
     if (response) return response;
+    if (data.declared) {
+      const lines = key.startsWith('custom:')
+        ? []
+        : ((await planning.deadline(c.var.company.id, key))?.prepared?.lines.map((line) => line.id) ?? []);
+      const unknown = Object.keys(data.declared).filter((id) => !lines.includes(id));
+      if (unknown.length > 0)
+        return c.json(
+          {
+            error: 'validation_failed',
+            issues: unknown.map((id) => ({ path: `declared.${id}`, message: 'unknown_line' })),
+          },
+          422,
+        );
+    }
     await db
       .insert(deadlineMarks)
       .values({ companyId: c.var.company.id, key, ...data })
@@ -325,6 +395,7 @@ export function planningRoutes(
     const calendar = await planning.calendar(companyId, addDays(today, -366), addDays(today, 30), today);
     const visible = calendar.filter((item) => !item.hidden && !item.done && item.type !== 'mission');
     const outlook = await planning.outlook(companyId, today);
+    const reserveView = reserve ? await reserve.compute(companyId, today) : null;
     // Part of the linked activities: collected per period from their monthly totals, late invoices from their detail.
     const linkedTotals = await planning.linkedRevenue(companyId, profile.currency, earliest);
     /**
@@ -373,6 +444,12 @@ export function planningRoutes(
         year: within(link.receipts, periods.year),
       })),
       outlook,
+      reserve: reserveView && {
+        currency: reserveView.currency,
+        reserveCents: reserveView.reserveCents,
+        maturity: reserveView.maturity,
+        warning: reserveView.warning,
+      },
     });
   });
 

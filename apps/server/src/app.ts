@@ -4,6 +4,7 @@ import { secureHeaders } from 'hono/secure-headers';
 import type { Config } from './config.ts';
 import type { Database } from './db/client.ts';
 import { activityRoutes } from './features/activities/activities.ts';
+import { mountAssistant } from './features/assistant.ts';
 import { accountRoutes } from './features/auth/account.routes.ts';
 import { authRoutes } from './features/auth/auth.routes.ts';
 import { requireUser, type SessionStore } from './features/auth/sessions.ts';
@@ -28,7 +29,7 @@ import { missionRoutes } from './features/missions/missions.routes.ts';
 import type { PackRegistry } from './features/packs/packs.ts';
 import { packAdminRoutes } from './features/packs/updates.routes.ts';
 import type { PackUpdates } from './features/packs/updates.ts';
-import { planningRoutes } from './features/planning/planning.routes.ts';
+import { instanceToday, planningRoutes } from './features/planning/planning.routes.ts';
 import type { PlanningService } from './features/planning/planning.service.ts';
 import type { ReminderJob } from './features/planning/reminders.ts';
 import { profileRoutes } from './features/profile/profile.routes.ts';
@@ -54,6 +55,7 @@ export interface AppDeps {
     | 'federation'
     | 'externalSources'
     | 'mcp'
+    | 'vaultQuotaBytes'
   >;
   install: InstallService;
   db: Database;
@@ -120,7 +122,11 @@ export function createApp(deps: AppDeps): Hono<AppEnv> {
     maxSize: 8 * 1024 * 1024,
     onError: (c) => c.json({ error: 'payload_too_large' }, 413),
   });
-  app.use('/api/*', (c, next) => (largePaths.has(c.req.path) ? largeBody(c, next) : tooLarge(c, next)));
+  // A vault file may weigh as much as the large bodies (8 MiB).
+  const vaultFile = /^\/api\/vault\/[0-9a-f-]{36}\/file$/;
+  app.use('/api/*', (c, next) =>
+    largePaths.has(c.req.path) || vaultFile.test(c.req.path) ? largeBody(c, next) : tooLarge(c, next),
+  );
   app.use('/api/*', sameOrigin(deps.config.trustProxy));
   app.use('/api/*', async (c, next) => {
     c.header('Cache-Control', 'no-store');
@@ -148,8 +154,18 @@ export function createApp(deps: AppDeps): Hono<AppEnv> {
     '/api/calendar',
     '/api/deadlines/*',
     '/api/custom-deadlines/*',
+    '/api/deadline-notices/*',
     '/api/outlook',
     '/api/dashboard',
+    '/api/reserve',
+    '/api/reserve/*',
+    '/api/review/*',
+    '/api/expenses',
+    '/api/expenses/*',
+    '/api/vault',
+    '/api/vault/*',
+    '/api/deals',
+    '/api/deals/*',
     '/api/notifications/*',
     '/api/settings/*',
     '/api/account',
@@ -181,7 +197,18 @@ export function createApp(deps: AppDeps): Hono<AppEnv> {
     await next();
   });
   const readOnly = readOnlyAfterCessation(deps.db);
-  for (const path of ['/api/clients/*', '/api/missions/*', '/api/documents/*', '/api/time/*']) {
+  for (const path of [
+    '/api/clients/*',
+    '/api/missions/*',
+    '/api/documents/*',
+    '/api/time/*',
+    '/api/expenses',
+    '/api/expenses/*',
+    '/api/vault',
+    '/api/vault/*',
+    '/api/deals',
+    '/api/deals/*',
+  ]) {
     app.use(path, readOnly);
   }
   app.route('/api/companies', companyRoutes(deps.db, deps.config.cookieSecure));
@@ -216,8 +243,18 @@ export function createApp(deps: AppDeps): Hono<AppEnv> {
   app.route('/api', profileRoutes(deps.db, deps.packs));
   app.route('/api/clients', clientRoutes(deps.db));
   app.route('/api/missions', missionRoutes(deps.db));
-  app.route('/api', documentRoutes(deps.db, deps.documents));
-  const planning = planningRoutes(deps.db, deps.planning, deps.packs, deps.reminders);
+  const { reserve, deals } = mountAssistant(app, deps);
+  app.route(
+    '/api',
+    documentRoutes(
+      deps.db,
+      deps.documents,
+      async (companyId, paymentId) => reserve.shareOf(companyId, paymentId, await instanceToday(deps.db)),
+      async (companyId, quoteId, event) =>
+        deals.onQuote(companyId, quoteId, event, await instanceToday(deps.db)),
+    ),
+  );
+  const planning = planningRoutes(deps.db, deps.planning, deps.packs, deps.reminders, reserve);
   app.route('/api', planning.api);
   app.route('/api/ical', planning.feed);
   app.all('/api/*', (c) => c.json({ error: 'not_found' }, 404));

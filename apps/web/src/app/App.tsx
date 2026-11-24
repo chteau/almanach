@@ -11,6 +11,7 @@ import { ClientsPage } from '../features/clients/ClientsPage.tsx';
 import { DocumentPage } from '../features/documents/DocumentPage.tsx';
 import { DocumentsPage } from '../features/documents/DocumentsPage.tsx';
 import { PaymentsPage } from '../features/documents/PaymentsPage.tsx';
+import { ExpensesPage } from '../features/expenses/ExpensesPage.tsx';
 import { InstallPage } from '../features/install/InstallPage.tsx';
 import { useInstallStatus } from '../features/install/useInstallStatus.ts';
 import { LinkedRecordPage } from '../features/linked/LinkedRecordPage.tsx';
@@ -18,6 +19,7 @@ import { MissionDetailPage } from '../features/missions/MissionDetailPage.tsx';
 import { MissionFormPage } from '../features/missions/MissionFormPage.tsx';
 import { MissionsPage } from '../features/missions/MissionsPage.tsx';
 import { OnboardingPage } from '../features/onboarding/OnboardingPage.tsx';
+import { PipelinePage } from '../features/pipeline/PipelinePage.tsx';
 import { CalendarPage } from '../features/planning/CalendarPage.tsx';
 import { CustomDeadlinePage } from '../features/planning/CustomDeadlinePage.tsx';
 import { DashboardPage } from '../features/planning/DashboardPage.tsx';
@@ -25,9 +27,12 @@ import { DeadlinePage } from '../features/planning/DeadlinePage.tsx';
 import { MenuPage } from '../features/planning/MenuPage.tsx';
 import { NotificationsPage } from '../features/planning/NotificationsPage.tsx';
 import { ThresholdsPage } from '../features/planning/ThresholdsPage.tsx';
+import { ReviewPage } from '../features/review/ReviewPage.tsx';
 import { SettingsPage } from '../features/settings/SettingsPage.tsx';
 import { ErrorPage, NotFoundPage } from '../features/system/SystemPages.tsx';
 import { TimePage } from '../features/time/TimePage.tsx';
+import { VaultItemPage } from '../features/vault/VaultItemPage.tsx';
+import { VaultPage } from '../features/vault/VaultPage.tsx';
 
 /**
  * Sends every visitor of a fresh instance to the installer before anything else
@@ -93,6 +98,11 @@ const router = createBrowserRouter([
           { path: '/documents/new', element: <DocumentPage /> },
           { path: '/documents/:id', element: <DocumentPage /> },
           { path: '/payments', element: <PaymentsPage /> },
+          { path: '/review', element: <ReviewPage /> },
+          { path: '/expenses', element: <ExpensesPage /> },
+          { path: '/pipeline', element: <PipelinePage /> },
+          { path: '/vault', element: <VaultPage /> },
+          { path: '/vault/:id', element: <VaultItemPage /> },
           { path: '/linked/:kind/:linkId/:id', element: <LinkedRecordPage /> },
         ],
       },

@@ -52,6 +52,9 @@ interface PackAdminData {
     active: boolean;
     pending: boolean;
     changes: RuleChange[] | null;
+    /** Why the bundle cannot be applied here, e.g. "app_too_old" with the version it needs. */
+    refused: string | null;
+    refusedMinAppVersion: string | null;
     installedAt: string;
     appliedAt: string | null;
     notes: string | null;
@@ -219,8 +222,15 @@ export function PackAdmin() {
               </ActionBar>
             }
           >
-            {bundle.changes === null ? (
-              <Notice tone="error">{t('packs.pending.invalid')}</Notice>
+            {bundle.refused === 'app_too_old' ? (
+              <Notice tone="error">
+                {t('packs.pending.tooOld', { version: bundle.refusedMinAppVersion ?? '?' })}
+              </Notice>
+            ) : bundle.changes === null ? (
+              <Notice tone="error">
+                {t('packs.pending.invalid')}
+                {bundle.refused && ` (${t('packs.pending.reason', { reason: bundle.refused })})`}
+              </Notice>
             ) : bundle.changes.length === 0 ? (
               <p className={text.text}>{t('packs.change.none')}</p>
             ) : (

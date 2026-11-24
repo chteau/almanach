@@ -15,6 +15,7 @@ import { useResource } from '../../lib/useResource.ts';
 import { ActivityBreakdown } from './ActivityBreakdown.tsx';
 import { LinkedActivities } from './LinkedActivities.tsx';
 import styles from './Planning.module.css';
+import { ReserveSection } from './Reserve.tsx';
 import { labelOf, type Outlook } from './types.ts';
 
 /**
@@ -72,6 +73,7 @@ export function ThresholdsPage() {
           {outlook.unconverted > 0 && (
             <Notice tone="info">{t('outlook.unconverted', { count: outlook.unconverted })}</Notice>
           )}
+          <ReserveSection />
           <section className={form.section} aria-labelledby="simulate-title">
             <h2 id="simulate-title" className={styles.sectionTitle}>
               {t('outlook.simulate')}

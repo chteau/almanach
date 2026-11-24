@@ -385,14 +385,19 @@ describe('France 2026', () => {
     test('BNC alone: unchanged results, one activity in the breakdown', () => {
       const receipts = [{ date: '2026-03-10', cents: 3_000_000 }];
       expect(estimates({ ...liberal, activities: [] }, receipts)).toEqual(estimates(liberal, receipts));
-      expect(estimates(liberal, receipts)).toEqual({ contributions_bnc: 768_000, cfp_liberal: 6_000 });
+      // Income tax at the scale: taxable 19 800 €, (19 800 − 11 600) × 11 % = 902 €, décote 897 − 408,16 €.
+      expect(estimates(liberal, receipts)).toEqual({
+        contributions_bnc: 768_000,
+        cfp_liberal: 6_000,
+        income_tax_bareme: 41_316,
+      });
       const [only, ...rest] = activityBreakdown(rules(), liberal, receipts);
       expect(rest).toEqual([]);
       expect(only).toMatchObject({
         status: 'micro_bnc',
         main: true,
         revenueCents: 3_000_000,
-        estimateCents: 774_000,
+        estimateCents: 774_000 + 41_316,
       });
       expect(only?.allowance).toMatchObject({
         id: 'allowance_bnc',
@@ -413,6 +418,8 @@ describe('France 2026', () => {
         contributions_bic_services: 424_000,
         cfp_liberal: 6_000,
         cfp_commercial: 2_000,
+        // Taxable 19 800 + 10 000 €: 17 979 × 11 % + 221 × 30 % = 2 043,99 €, once for the person.
+        income_tax_bareme: 204_399,
       });
       const [bnc, bic] = activityBreakdown(rules(), profile, mixed);
       expect(bnc).toMatchObject({
@@ -466,6 +473,8 @@ describe('France 2026', () => {
         contributions_sales: 1_230_000,
         cfp_liberal: 0,
         cfp_commercial: 10_000,
+        // Taxable 29 000 €: 17 400 × 11 % = 1 914 €, décote 897 − 866,09 = 30,91 €.
+        income_tax_bareme: 188_309,
       });
     });
 

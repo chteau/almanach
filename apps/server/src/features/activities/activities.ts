@@ -113,10 +113,13 @@ export function activityRoutes(db: Database, packs: PackRegistry): Hono<AppEnv> 
       .select({ status: profiles.status, country: profiles.country })
       .from(profiles)
       .where(eq(profiles.companyId, c.var.company.id));
+    const pack = profile && packs.get(profile.country);
     return c.json({
       activities: await listActivities(db, c.var.company.id, profile?.status ?? null),
       // Statuses of the country pack: the activities that can be added, with their labels.
-      statuses: (profile && packs.get(profile.country)?.statuses) ?? [],
+      statuses: pack?.statuses ?? [],
+      // False when the country pack cannot model several activities (e.g. the UK): adding one is refused.
+      canAdd: !pack || Boolean(packFeatures(pack).activities),
     });
   });
 

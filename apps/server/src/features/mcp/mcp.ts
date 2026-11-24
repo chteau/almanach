@@ -2,6 +2,9 @@ import {
   type ApiToken,
   apiTokenInputSchema,
   clientInputSchema,
+  DEAL_STAGES,
+  dealFollowUpSchema,
+  dealInputSchema,
   documentDraftSchema,
   idSchema,
   isoDateSchema,
@@ -20,11 +23,12 @@ import { type ActiveCompany, type AppEnv, requestContext, type SessionUser } fro
 import { sameOrigin } from '../../http/same-origin.ts';
 import { RateLimiter, rateLimit } from '../../security/rate-limit.ts';
 import { randomToken, sha256 } from '../../security/tokens.ts';
+import { mountAssistant } from '../assistant.ts';
 import { clientRoutes } from '../clients/clients.routes.ts';
 import { listCompanies } from '../companies/companies.ts';
 import { documentRoutes } from '../documents/documents.routes.ts';
 import { linkedRecords } from '../federation/linked.ts';
-import { planningRoutes } from '../planning/planning.routes.ts';
+import { instanceToday, planningRoutes } from '../planning/planning.routes.ts';
 import { readOnlyAfterCessation } from '../profile/situation.routes.ts';
 import { APP_VERSION } from '../system/system.ts';
 
@@ -143,7 +147,8 @@ interface Tool<S extends z.ZodObject = z.ZodObject> {
 }
 
 /** Calls an existing API route of the company, as the token owner. */
-type Api = (path: string, init?: { method?: string; body?: unknown }) => Promise<Json>;
+/** Calls the API as the token's owner, in the chosen company or in another company of the same account. */
+type Api = (path: string, init?: { method?: string; body?: unknown; company?: string }) => Promise<Json>;
 
 /**
  * Declares a tool with its argument types inferred
@@ -184,7 +189,10 @@ const DOCUMENT_TYPES: Record<string, string[]> = {
   credit_note: ['credit_note'],
 };
 
-/** Every tool, read-only first; tools with the read_drafts scope never issue, send, delete or change settings. */
+/**
+ * Every tool, read-only first; tools with a writing scope never issue, send, delete or change settings, and the
+ * pipeline tools never mark a quote accepted nor send a follow-up: the person does.
+ */
 const TOOLS = {
   list_companies: tool({
     scope: 'read',
@@ -344,6 +352,85 @@ const TOOLS = {
         .slice(0, 500);
     },
   }),
+  list_expenses: tool({
+    scope: 'read',
+    description:
+      'List the simple expenses recorded: date, amount before VAT and VAT in cents, category, activity, receipt in the vault. `note` says how the country uses them (deductible, or shown for information only as in a French micro-entreprise).',
+    input: z.object({ company, ...period }),
+    run: async ({ api, args }) => {
+      const result = (await api('/api/expenses')) as { expenses: { date: string }[] };
+      return {
+        ...result,
+        expenses: result.expenses.filter(
+          (item) => (!args.from || item.date >= args.from) && (!args.to || item.date <= args.to),
+        ),
+      };
+    },
+  }),
+  list_vault_items: tool({
+    scope: 'read',
+    description:
+      'List the documents of the vault (insurance certificates, registration extracts, contracts…): metadata only, never the file content. `status` is expired, expiring (within 60 days), valid or undated; `file` describes the current file (name, type, size, SHA-256) or is null.',
+    input: z.object({
+      company,
+      expiringWithinDays: z.number().int().min(0).max(366).optional(),
+      kind: z.string().max(40).optional(),
+      client: z.string().max(36).optional().describe('Client id.'),
+    }),
+    run: async ({ api, args }) => {
+      const { items } = (await api('/api/vault')) as {
+        items: { kind: string; clientId: string | null; expiresOn: string | null }[];
+      };
+      const limit =
+        args.expiringWithinDays === undefined
+          ? null
+          : new Date(Date.now() + args.expiringWithinDays * 86_400_000).toISOString().slice(0, 10);
+      return items.filter(
+        (item) =>
+          (!args.kind || item.kind === args.kind) &&
+          (!args.client || item.clientId === args.client) &&
+          (limit === null || (item.expiresOn !== null && item.expiresOn <= limit)),
+      );
+    },
+  }),
+  list_deals: tool({
+    scope: 'read',
+    description:
+      'List the deals of the pipeline (lead, quote_sent, follow_up, won, lost) with the client or prospect name (`name`), amount, linked quote and next action. `late` is true when the next action date is past. `dueOnly` keeps the open deals whose follow-up is due by today.',
+    input: z.object({ company, stage: z.enum(DEAL_STAGES).optional(), dueOnly: z.boolean().optional() }),
+    run: async ({ api, args }) => {
+      const query = new URLSearchParams();
+      if (args.stage) query.set('stage', args.stage);
+      if (args.dueOnly) query.set('dueOnly', 'true');
+      return ((await api(`/api/deals?${query}`)) as { deals: unknown[] }).deals;
+    },
+  }),
+  weekly_review: tool({
+    scope: 'read',
+    description:
+      'Weekly review (format weeklyReview/1) of the ISO week containing `date` (default today, instance time zone): start with `actions`, sorted by urgency, each self-contained with a link; then overdue and next 14 days deadlines with their prepared amount, cash collected this week and last week, overdue invoices and invoices due this week, quotes awaiting an answer, thresholds at 80 % or more, the tax reserve and its change this week, and notices. A section of a function the instance does not offer is absent. Amounts are in cents; test data is excluded. Present nothing as tax advice. `allCompanies: true` returns an array with one review per company of the account.',
+    input: z.object({
+      company,
+      date: isoDateSchema.optional().describe('Any day of the week, YYYY-MM-DD.'),
+      allCompanies: z.boolean().default(false),
+    }),
+    run: async ({ api, args }) => {
+      const query = args.date ? `?date=${args.date}` : '';
+      if (!args.allCompanies) return (await api(`/api/review/weekly${query}`)).review;
+      const companies = (await api('/api/companies')) as { id: string }[];
+      return Promise.all(
+        companies.map(async (item) => (await api(`/api/review/weekly${query}`, { company: item.id })).review),
+      );
+    },
+  }),
+  prepare_declaration: tool({
+    scope: 'read',
+    description:
+      'Prepare a declaration: for a deadline (`key` from list_deadlines, or by default the next one not done that has a prepared declaration), the figures to copy into each box of the official form (`prepared.lines`, null when Almanach does not track the figure) and the amount to pay (`prepared.amount`, with its method, steps and warning), plus `occurrence.link` to the official portal. Amounts in cents. Almanach never files anything: the person declares and pays on the portal. Not tax advice.',
+    input: z.object({ company, key: z.string().max(120).optional() }),
+    run: async ({ api, args }) =>
+      api(args.key ? `/api/deadlines/${encodeURIComponent(args.key)}` : '/api/deadlines/next-prepared'),
+  }),
   list_deadlines: tool({
     scope: 'read',
     description:
@@ -378,6 +465,13 @@ const TOOLS = {
       'Get the dashboard summary: revenue collected and invoiced this month, quarter and year, late invoices, overdue and upcoming deadlines, and the outlook with its per-activity breakdown (`outlook.activities`). Test data is never counted.',
     input: z.object({ company }),
     run: async ({ api }) => api('/api/dashboard'),
+  }),
+  get_reserve: tool({
+    scope: 'read',
+    description:
+      'Get the tax reserve: how much to keep aside now for the social contributions and taxes of the current fiscal year not paid yet (estimates of the year to date × (1 + prudent margin) + the personal extra − what was already paid at the deadlines that settle them; never below 0). `components` lists each estimate with its steps, source and verification date; `maturity` is the maturity of this function in the country pack (anything but "verified" is experimental). Amounts in cents. An indicative estimate, never tax advice: present `warning` with it. Fails with feature_unavailable when the country pack has no reserve rules.',
+    input: z.object({ company }),
+    run: async ({ api }) => api('/api/reserve'),
   }),
   list_linked_activities: tool({
     scope: 'read',
@@ -423,6 +517,53 @@ const TOOLS = {
       return api('/api/documents', { method: 'POST', body: args.document });
     },
   }),
+  create_deal: tool({
+    scope: 'read_pipeline',
+    description:
+      'Create a deal in the pipeline: a client (`clientId`) or a prospect (`prospectName`, required without client), a title, a stage (lead by default), an optional amount in cents, a linked quote and a next action date. Returns the deal.',
+    input: z.object({ company, deal: dealInputSchema }),
+    run: async ({ api, args }) => api('/api/deals', { method: 'POST', body: args.deal }),
+  }),
+  update_deal: tool({
+    scope: 'read_pipeline',
+    description:
+      'Change some fields of a deal (stage, next action, amount, linked quote, lost reason…); fields not given stay as they are. A stage change is recorded in its history. It never marks the quote accepted.',
+    input: z.object({
+      company,
+      id: idSchema,
+      changes: z
+        .object({
+          title: z.string().trim().min(1).max(200),
+          stage: z.enum(DEAL_STAGES),
+          clientId: z.uuid().nullable(),
+          prospectName: z.string().trim().max(160).nullable(),
+          prospectContact: z.string().trim().max(300).nullable(),
+          amountCents: z.number().int().min(0).nullable(),
+          currency: z.string().length(3).nullable(),
+          quoteId: z.uuid().nullable(),
+          missionId: z.uuid().nullable(),
+          nextActionOn: z.iso.date().nullable(),
+          nextAction: z.string().trim().max(300).nullable(),
+          lostReason: z.string().trim().max(300).nullable(),
+        })
+        .partial()
+        .strict(),
+    }),
+    run: async ({ api, args }) => {
+      const { deal } = (await api(`/api/deals/${args.id}`)) as { deal: Record<string, unknown> };
+      const keep = Object.keys(dealInputSchema.shape);
+      const current = Object.fromEntries(Object.entries(deal).filter(([key]) => keep.includes(key)));
+      return api(`/api/deals/${args.id}`, { method: 'PUT', body: { ...current, ...args.changes } });
+    },
+  }),
+  log_follow_up: tool({
+    scope: 'read_pipeline',
+    description:
+      'Record a follow-up the person has done on a deal (a note) and set the next action date. It sends nothing: write the message for the person to send.',
+    input: z.object({ company, id: idSchema, followUp: dealFollowUpSchema }),
+    run: async ({ api, args }) =>
+      api(`/api/deals/${args.id}/follow-up`, { method: 'POST', body: args.followUp }),
+  }),
 } satisfies Record<string, Tool<z.ZodObject>>;
 
 /**
@@ -458,8 +599,14 @@ export function mcpRoutes(deps: AppDeps): Hono<AppEnv> {
   internal.use('/api/clients/*', readOnly);
   internal.use('/api/documents/*', readOnly);
   internal.route('/api/clients', clientRoutes(db));
-  internal.route('/api', documentRoutes(db, deps.documents));
-  internal.route('/api', planningRoutes(db, deps.planning, deps.packs, deps.reminders).api);
+  const { reserve, deals } = mountAssistant(internal, deps);
+  internal.route(
+    '/api',
+    documentRoutes(db, deps.documents, undefined, async (companyId, quoteId, event) =>
+      deals.onQuote(companyId, quoteId, event, await instanceToday(db)),
+    ),
+  );
+  internal.route('/api', planningRoutes(db, deps.planning, deps.packs, deps.reminders, reserve).api);
 
   const byIp = new RateLimiter(120, 60_000);
   const byToken = new RateLimiter(120, 60_000);
@@ -548,7 +695,7 @@ export function mcpRoutes(deps: AppDeps): Hono<AppEnv> {
     const reply = (result: unknown) => ({ jsonrpc: '2.0', id, result });
     const fail = (code: number, text: string) => ({ jsonrpc: '2.0', id, error: { code, message: text } });
     const tools = Object.entries(TOOLS).filter(
-      ([, item]) => item.scope === 'read' || caller.scope === 'read_drafts',
+      ([, item]) => item.scope === 'read' || item.scope === caller.scope,
     );
     if (method === 'initialize') {
       const asked = String(params.protocolVersion ?? '');
@@ -592,7 +739,14 @@ export function mcpRoutes(deps: AppDeps): Hono<AppEnv> {
             headers: { 'content-type': 'application/json' },
             body: init.body === undefined ? undefined : JSON.stringify(init.body),
           },
-          { mcp: scope },
+          {
+            mcp: init.company
+              ? {
+                  user: caller.user,
+                  company: companies.find((item) => item.id === init.company) ?? scope.company,
+                }
+              : scope,
+          },
         );
         const text = await response.text();
         const json = text ? JSON.parse(text) : null;
@@ -600,7 +754,7 @@ export function mcpRoutes(deps: AppDeps): Hono<AppEnv> {
         return json;
       };
       const result = await entry.run({ api, args: args.data, records: () => linkedRecords(db, company.id) });
-      if (entry.scope === 'read_drafts')
+      if (entry.scope !== 'read')
         await db.insert(auditLog).values({
           userId: caller.user.id,
           action: 'mcp.write',

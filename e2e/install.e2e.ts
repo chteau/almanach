@@ -287,7 +287,7 @@ test('dashboard, calendar, deadline, thresholds, reminders and calendar feed (P0
   await page.getByLabel('Password').fill('une matinée calme au port');
   await page.getByRole('button', { name: 'Sign in' }).click();
   await expect(page.getByRole('heading', { name: 'Dashboard', exact: true })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'To set aside this year' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'To keep aside now' })).toBeVisible();
   await expect(page.getByRole('progressbar', { name: /Micro regime ceiling/ })).toBeVisible();
   await expectAccessible(page);
 

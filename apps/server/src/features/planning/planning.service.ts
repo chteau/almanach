@@ -2,15 +2,21 @@ import {
   activityBreakdown,
   addDays,
   computeEstimates,
+  type DeadlineNotice,
   type DeadlineOccurrence,
   type EstimateResult,
+  type ExpenseItem,
   expandDeadlines,
   fiscalYearOf,
+  type InvoicedItem,
   invoiceStatus,
   type Localized,
   measureThresholds,
   type PackMeta,
+  type PreparedDeclaration,
+  type PrepareMethod,
   packFeatures,
+  prepareDeclaration,
   type Receipt,
   type RuleProfile,
   type Situation,
@@ -24,7 +30,9 @@ import {
   companyActivities,
   customDeadlines,
   deadlineMarks,
+  deadlineNotices,
   documents,
+  expenses,
   externalRevenues,
   federationLinks,
   federationTotals,
@@ -32,6 +40,7 @@ import {
   missions,
   payments,
   profiles,
+  reserveSettings,
   situationChanges,
 } from '../../db/schema.ts';
 import type { PackRegistry } from '../packs/packs.ts';
@@ -92,15 +101,21 @@ export function situationPeriods(
  *
  * @param profile {ProfileRow} - stored profile
  * @param activities {string[]} - statuses of the secondary activities
- * @returns {RuleProfile} - status, options, period, activity start and secondary activities
+ * @param household {RuleProfile['household']} - tax household from the reserve settings, when known
+ * @returns {RuleProfile} - status, options, period, activity start, secondary activities and household
  */
-export function ruleProfile(profile: ProfileRow, activities: string[] = []): RuleProfile {
+export function ruleProfile(
+  profile: ProfileRow,
+  activities: string[] = [],
+  household?: RuleProfile['household'],
+): RuleProfile {
   return {
     status: profile.status,
     options: profile.options,
     declarationPeriod: profile.declarationPeriod,
     activityStart: profile.activityStart,
     activities,
+    ...(household && { household }),
   };
 }
 
@@ -126,7 +141,7 @@ export class PlanningService {
    */
   constructor(
     private readonly db: Database,
-    private readonly packs: PackRegistry,
+    readonly packs: PackRegistry,
     private readonly federationPreset = false,
   ) {}
 
@@ -165,6 +180,20 @@ export class PlanningService {
       .where(eq(companyActivities.companyId, companyId))
       .orderBy(asc(companyActivities.createdAt));
     return rows.map((row) => row.status);
+  }
+
+  /**
+   * Tax household of a company (French income tax parts), from its reserve settings
+   *
+   * @param companyId {string} - company
+   * @returns {Promise<NonNullable<RuleProfile['household']>>} - parts in quarters and joint taxation; one part by default
+   */
+  async household(companyId: string): Promise<NonNullable<RuleProfile['household']>> {
+    const [row] = await this.db
+      .select({ partsQuarters: reserveSettings.taxPartsQuarters, joint: reserveSettings.jointTaxation })
+      .from(reserveSettings)
+      .where(eq(reserveSettings.companyId, companyId));
+    return row ?? { partsQuarters: 4, joint: false };
   }
 
   /**
@@ -567,24 +596,218 @@ export class PlanningService {
       ).filter((receipt) => receipt.date <= periodEnd);
       revenue = { ...local, receipts: [...local.receipts, ...linked] };
       const rules = this.packs.rules(pack.country, fiscalYearOf(periodStart, pack.fiscalYearStart).year);
-      const facts = ruleProfile(profile, await this.activities(companyId));
+      const facts = {
+        ...ruleProfile(profile, await this.activities(companyId), await this.household(companyId)),
+        expensesCents: await this.expenseTotal(companyId, profile.currency, periodStart, periodEnd),
+      };
       if (rules && occurrence.estimates.length > 0) {
         estimates = computeEstimates(rules.rules, facts, revenue.receipts, occurrence.estimates);
         if (facts.activities?.length)
           activities = activityBreakdown(rules.rules, facts, revenue.receipts, occurrence.estimates);
       }
     }
+    const prepared = await this.prepared(companyId, occurrence, profile, pack, estimates);
     return {
       occurrence,
+      prepared,
       revenueCents: revenue ? revenue.receipts.reduce((sum, receipt) => sum + receipt.cents, 0) : null,
       unconverted: revenue?.unconverted ?? 0,
       estimates,
       activities,
       currency: profile.currency,
       mark: mark
-        ? { doneOn: mark.doneOn, note: mark.note, actualCents: mark.actualCents, hidden: mark.hidden }
+        ? {
+            doneOn: mark.doneOn,
+            note: mark.note,
+            actualCents: mark.actualCents,
+            declared: mark.declared,
+            hidden: mark.hidden,
+          }
         : null,
     };
+  }
+
+  /**
+   * Notice entered for a deadline rule and fiscal year
+   *
+   * @param companyId {string} - owner
+   * @param ruleId {string} - deadline rule
+   * @param fiscalYear {number} - fiscal year
+   * @returns {Promise<(DeadlineNotice & { note: string | null }) | null>} - the notice, null when none
+   */
+  async notice(
+    companyId: string,
+    ruleId: string,
+    fiscalYear: number,
+  ): Promise<(DeadlineNotice & { note: string | null }) | null> {
+    const [row] = await this.db
+      .select()
+      .from(deadlineNotices)
+      .where(
+        and(
+          eq(deadlineNotices.companyId, companyId),
+          eq(deadlineNotices.ruleId, ruleId),
+          eq(deadlineNotices.fiscalYear, fiscalYear),
+        ),
+      );
+    if (!row) return null;
+    return {
+      perOccurrenceCents: row.perOccurrenceCents,
+      priorYearTaxCents: row.priorYearTaxCents,
+      priorYearIncomeCents: row.priorYearIncomeCents,
+      method: row.method as PrepareMethod | null,
+      note: row.note,
+    };
+  }
+
+  /**
+   * Invoices and credit notes issued between two dates, in the main currency (other currencies are left out)
+   *
+   * @param companyId {string} - owner
+   * @param currency {string} - main currency
+   * @param from {string} - first day
+   * @param to {string} - last day
+   * @returns {Promise<InvoicedItem[]>} - credit notes negative; deposits left out (the final invoice counts)
+   */
+  async invoiced(companyId: string, currency: string, from: string, to: string): Promise<InvoicedItem[]> {
+    const rows = await this.db
+      .select({
+        date: documents.issueDate,
+        type: documents.type,
+        totals: documents.totals,
+        vatMode: documents.vatMode,
+        category: companyActivities.status,
+      })
+      .from(documents)
+      .leftJoin(companyActivities, eq(companyActivities.id, documents.activityId))
+      .where(
+        and(
+          eq(documents.companyId, companyId),
+          ne(documents.state, 'draft'),
+          inArray(documents.type, ['invoice', 'credit_note']),
+          eq(documents.currency, currency),
+          gte(documents.issueDate, from),
+          lte(documents.issueDate, to),
+        ),
+      );
+    return rows.map((row) => {
+      const sign = row.type === 'credit_note' ? -1 : 1;
+      return {
+        date: row.date,
+        netCents: sign * row.totals.netCents,
+        vatRateBp: row.totals.vatRateBp,
+        vatCents: sign * row.totals.vatCents,
+        vatMode: row.vatMode,
+        ...(row.category ? { category: row.category } : {}),
+      };
+    });
+  }
+
+  /**
+   * Prepared declaration of an occurrence whose rule has a prepare block
+   *
+   * @param companyId {string} - owner
+   * @param occurrence {DeadlineOccurrence} - the occurrence
+   * @param profile {ProfileRow} - profile in force for it
+   * @param pack {PackMeta} - country pack
+   * @param estimates {EstimateResult[]} - estimates of its period
+   * @returns {Promise<PreparedDeclaration | null>} - null when the rule prepares nothing
+   */
+  private async prepared(
+    companyId: string,
+    occurrence: DeadlineOccurrence,
+    profile: ProfileRow,
+    pack: PackMeta,
+    estimates: EstimateResult[],
+  ): Promise<PreparedDeclaration | null> {
+    const periodStart = occurrence.periodStart ?? occurrence.due;
+    const periodEnd = occurrence.periodEnd ?? occurrence.due;
+    const fiscal = fiscalYearOf(periodStart, pack.fiscalYearStart);
+    const found = this.packs.rules(pack.country, fiscal.year);
+    const prepare = found?.rules.deadlines.find((rule) => rule.id === occurrence.ruleId)?.prepare;
+    if (!found || !prepare || !packFeatures(pack).prepare) return null;
+    const local = await this.receipts(companyId, profile.currency, fiscal.start, periodEnd);
+    const linked = attachedReceipts(
+      await this.linkedRevenue(companyId, profile.currency, fiscal.start),
+    ).filter((receipt) => receipt.date <= periodEnd);
+    // Earlier occurrences of the same rule this fiscal year, for the annualized method.
+    const marks = await this.marks(companyId);
+    const paidBeforeCents = [...marks.values()]
+      .filter((mark) => {
+        const [rule, anchor = ''] = mark.key.split(':');
+        return rule === occurrence.ruleId && anchor >= fiscal.start && anchor < periodStart;
+      })
+      .reduce((sum, mark) => sum + (mark.actualCents ?? 0), 0);
+    return prepareDeclaration({
+      rules: found.rules,
+      prepare,
+      profile: ruleProfile(profile, await this.activities(companyId), await this.household(companyId)),
+      receipts: [...local.receipts, ...linked],
+      invoiced: await this.invoiced(companyId, profile.currency, fiscal.start, periodEnd),
+      expenses: await this.expenses(companyId, profile.currency, fiscal.start, periodEnd),
+      fiscalStart: fiscal.start,
+      fiscalYear: fiscal.year,
+      periodStart,
+      periodEnd,
+      estimatesCents: estimates.reduce((sum, item) => sum + item.cents, 0),
+      notice: await this.notice(companyId, occurrence.ruleId, fiscal.year),
+      paidBeforeCents,
+    });
+  }
+
+  /**
+   * Expenses recorded between two dates in the main currency; null when the country pack does not use expenses or
+   * none was ever recorded, so a form box shows "to enter" rather than 0
+   *
+   * @param companyId {string} - owner
+   * @param currency {string} - main currency
+   * @param from {string} - first day
+   * @param to {string} - last day
+   * @returns {Promise<ExpenseItem[] | null>} - expenses, or null when not tracked
+   */
+  async expenses(
+    companyId: string,
+    currency: string,
+    from: string,
+    to: string,
+  ): Promise<ExpenseItem[] | null> {
+    const profile = await this.profile(companyId);
+    const pack = profile && this.packs.get(profile.country);
+    if (!pack || !packFeatures(pack).expenses) return null;
+    const [any] = await this.db
+      .select({ id: expenses.id })
+      .from(expenses)
+      .where(eq(expenses.companyId, companyId))
+      .limit(1);
+    if (!any) return null;
+    const rows = await this.db
+      .select({ date: expenses.date, netCents: expenses.amountCents, vatCents: expenses.vatCents })
+      .from(expenses)
+      .where(
+        and(
+          eq(expenses.companyId, companyId),
+          eq(expenses.currency, currency),
+          gte(expenses.date, from),
+          lte(expenses.date, to),
+        ),
+      );
+    return rows;
+  }
+
+  /**
+   * Total of the expenses between two dates, before VAT, for the "profit" base of the estimates
+   *
+   * @param companyId {string} - owner
+   * @param currency {string} - main currency
+   * @param from {string} - first day
+   * @param to {string} - last day
+   * @returns {Promise<number>} - cents, 0 when expenses are not tracked
+   */
+  async expenseTotal(companyId: string, currency: string, from: string, to: string): Promise<number> {
+    return ((await this.expenses(companyId, currency, from, to)) ?? []).reduce(
+      (sum, item) => sum + item.netCents,
+      0,
+    );
   }
 
   /**
@@ -608,7 +831,7 @@ export class PlanningService {
     const set = await this.receipts(companyId, profile.currency, from, fiscal.end);
     const receipts =
       simulateCents > 0 ? [...set.receipts, { date: today, cents: simulateCents }] : set.receipts;
-    const facts = ruleProfile(profile, await this.activities(companyId));
+    const facts = ruleProfile(profile, await this.activities(companyId), await this.household(companyId));
     // Thresholds count the whole business, linked activities included; estimates count the local activities and
     // the links attached to one of them.
     const linked = await this.linkedRevenue(companyId, profile.currency, from);
@@ -623,7 +846,12 @@ export class PlanningService {
     const inYear = (receipt: Receipt) => receipt.date >= fiscal.start && receipt.date <= fiscal.end;
     const yearReceipts = receipts.filter(inYear);
     const estimated = [...yearReceipts, ...attachedReceipts(linked).filter(inYear)];
-    const toDate = computeEstimates(found.rules, facts, estimated);
+    // Expenses of the fiscal year lower the profit of the estimates to date; the projection keeps revenue only.
+    const withExpenses = {
+      ...facts,
+      expensesCents: await this.expenseTotal(companyId, profile.currency, fiscal.start, fiscal.end),
+    };
+    const toDate = computeEstimates(found.rules, withExpenses, estimated);
     const elapsed = Math.max(1, Math.round((Date.parse(today) - Date.parse(fiscal.start)) / 86_400_000) + 1);
     const length = Math.round((Date.parse(fiscal.end) - Date.parse(fiscal.start)) / 86_400_000) + 1;
     const collected = yearReceipts.reduce((sum, receipt) => sum + receipt.cents, 0);
@@ -646,7 +874,7 @@ export class PlanningService {
       projectedRevenueCents: projectedRevenue,
       unconverted: set.unconverted,
       thresholds,
-      activities: activityBreakdown(found.rules, facts, estimated),
+      activities: activityBreakdown(found.rules, withExpenses, estimated),
       linked: linked.map(({ receipts: list, id: _id, ...link }) => ({
         ...link,
         cents: list

@@ -199,10 +199,13 @@ export class PackUpdates {
       let changes: RuleChange[] | null = null;
       // Why a stored bundle cannot be applied on this instance, e.g. "app_too_old".
       let refused: string | null = null;
+      let refusedMinAppVersion: string | null = null;
       if (!row.appliedAt) {
         const parsed = this.parse({ payload: row.payload, signature: row.signature, keyId: row.keyId });
-        if ('error' in parsed) refused = parsed.error;
-        else changes = diffRules(this.packs.yearsOf(row.country), parsed.years);
+        if ('error' in parsed) {
+          refused = parsed.error;
+          refusedMinAppVersion = parsed.minAppVersion ?? null;
+        } else changes = diffRules(this.packs.yearsOf(row.country), parsed.years);
       }
       return {
         id: row.id,
@@ -213,6 +216,7 @@ export class PackUpdates {
         pending: row.appliedAt === null,
         changes,
         refused,
+        refusedMinAppVersion,
         installedAt: row.installedAt.toISOString(),
         appliedAt: row.appliedAt?.toISOString() ?? null,
         notes: payload.notes ?? null,

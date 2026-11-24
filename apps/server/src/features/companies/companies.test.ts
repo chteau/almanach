@@ -241,6 +241,10 @@ describe.skipIf(!url)('companies (database)', () => {
   test('secondary activities: added from the pack statuses, listed with the company, removed', async () => {
     const add = (status: string) =>
       call('a', '/api/profile/activities', { method: 'POST', company: ids.a, body: { status } });
+    const listed = (await json(call('a', '/api/profile/activities', { company: ids.a }))) as unknown as {
+      canAdd: boolean;
+    };
+    expect(listed.canAdd).toBe(true);
     const added = await add('micro_bic_services');
     expect(added.status).toBe(201);
     expect((await add('micro_bic_services')).status).toBe(409);

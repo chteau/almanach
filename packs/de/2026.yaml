@@ -96,6 +96,69 @@ deadlines:
     appliesTo: { periods: [monthly], withoutOptions: [kleinunternehmer] }
     schedule: { type: monthly, day: 10, monthOffset: 1 }
     declaresRevenue: true
+    # Voranmeldung vorbereitet: Soll-Versteuerung (Rechnungsdatum), keine Kennzahlen des Vordrucks (nicht geprüft).
+    # Zahllast = Umsatzsteuer minus erfasste Vorsteuer; ohne erfasste Ausgaben ist sie die ganze Umsatzsteuer.
+    prepare:
+      basis: invoiced
+      span: period
+      lines:
+        - id: base_19
+          label:
+            {
+              fr: "Base HT au taux de 19 %",
+              en: "Net sales at 19 %",
+              de: "Steuerpflichtige Umsätze 19 % (netto)",
+            }
+          measure: vat_base
+          vatRateBp: 1900
+        - id: base_7
+          label:
+            {
+              fr: "Base HT au taux de 7 %",
+              en: "Net sales at 7 %",
+              de: "Steuerpflichtige Umsätze 7 % (netto)",
+            }
+          measure: vat_base
+          vatRateBp: 700
+        - id: vat_collected
+          label: { fr: "TVA collectée", en: "VAT charged", de: "Umsatzsteuer" }
+          measure: vat_collected
+        - id: reverse_charge
+          label:
+            {
+              fr: "Prestations intra-UE en autoliquidation (base)",
+              en: "EU reverse-charge services (net)",
+              de: "Innergemeinschaftliche sonstige Leistungen, Reverse Charge (netto)",
+            }
+          measure: vat_mode_base
+          vatMode: reverse_charge
+        - id: export
+          label:
+            {
+              fr: "Exportations et opérations non imposables (base)",
+              en: "Exports and non-taxable supplies (net)",
+              de: "Ausfuhren und nicht steuerbare Umsätze (netto)",
+            }
+          measure: vat_mode_base
+          vatMode: export
+        - id: input_vat
+          label:
+            {
+              fr: "TVA déductible (dépenses saisies)",
+              en: "Input VAT (recorded expenses)",
+              de: "Vorsteuer (erfasste Ausgaben)",
+            }
+          measure: vat_deductible
+      amount:
+        method: lines
+        add: [vat_collected]
+        subtract: [input_vat]
+        warning:
+          fr: "Calculé sur les factures émises (imposition d'après les recettes convenues) et les dépenses saisies dans Almanach. Les numéros de case du formulaire ne sont pas indiqués."
+          en: "Based on invoices issued (accrual taxation) and the expenses recorded in Almanach. Form box numbers are not given."
+          de: "Berechnet aus ausgestellten Rechnungen (Soll-Versteuerung) und den in Almanach erfassten Ausgaben. Kennzahlen des Vordrucks werden nicht angegeben."
+      source: https://www.gesetze-im-internet.de/ustg_1980/__18.html
+      verified_on: "2026-11-24"
     link: https://www.elster.de
     source: https://www.gesetze-im-internet.de/ustg_1980/__18.html
     verified_on: "2026-11-18"
@@ -120,6 +183,69 @@ deadlines:
         - { due: "2026-10-10", periodStart: "2026-07-01", periodEnd: "2026-09-30" }
         - { due: "2027-01-10", periodStart: "2026-10-01", periodEnd: "2026-12-31" }
     declaresRevenue: true
+    # Voranmeldung vorbereitet: Soll-Versteuerung (Rechnungsdatum), keine Kennzahlen des Vordrucks (nicht geprüft).
+    # Zahllast = Umsatzsteuer minus erfasste Vorsteuer; ohne erfasste Ausgaben ist sie die ganze Umsatzsteuer.
+    prepare:
+      basis: invoiced
+      span: period
+      lines:
+        - id: base_19
+          label:
+            {
+              fr: "Base HT au taux de 19 %",
+              en: "Net sales at 19 %",
+              de: "Steuerpflichtige Umsätze 19 % (netto)",
+            }
+          measure: vat_base
+          vatRateBp: 1900
+        - id: base_7
+          label:
+            {
+              fr: "Base HT au taux de 7 %",
+              en: "Net sales at 7 %",
+              de: "Steuerpflichtige Umsätze 7 % (netto)",
+            }
+          measure: vat_base
+          vatRateBp: 700
+        - id: vat_collected
+          label: { fr: "TVA collectée", en: "VAT charged", de: "Umsatzsteuer" }
+          measure: vat_collected
+        - id: reverse_charge
+          label:
+            {
+              fr: "Prestations intra-UE en autoliquidation (base)",
+              en: "EU reverse-charge services (net)",
+              de: "Innergemeinschaftliche sonstige Leistungen, Reverse Charge (netto)",
+            }
+          measure: vat_mode_base
+          vatMode: reverse_charge
+        - id: export
+          label:
+            {
+              fr: "Exportations et opérations non imposables (base)",
+              en: "Exports and non-taxable supplies (net)",
+              de: "Ausfuhren und nicht steuerbare Umsätze (netto)",
+            }
+          measure: vat_mode_base
+          vatMode: export
+        - id: input_vat
+          label:
+            {
+              fr: "TVA déductible (dépenses saisies)",
+              en: "Input VAT (recorded expenses)",
+              de: "Vorsteuer (erfasste Ausgaben)",
+            }
+          measure: vat_deductible
+      amount:
+        method: lines
+        add: [vat_collected]
+        subtract: [input_vat]
+        warning:
+          fr: "Calculé sur les factures émises (imposition d'après les recettes convenues) et les dépenses saisies dans Almanach. Les numéros de case du formulaire ne sont pas indiqués."
+          en: "Based on invoices issued (accrual taxation) and the expenses recorded in Almanach. Form box numbers are not given."
+          de: "Berechnet aus ausgestellten Rechnungen (Soll-Versteuerung) und den in Almanach erfassten Ausgaben. Kennzahlen des Vordrucks werden nicht angegeben."
+      source: https://www.gesetze-im-internet.de/ustg_1980/__18.html
+      verified_on: "2026-11-24"
     link: https://www.elster.de
     source: https://www.gesetze-im-internet.de/ustg_1980/__18.html
     verified_on: "2026-11-18"
@@ -134,6 +260,17 @@ deadlines:
     schedule:
       type: dates
       dates: [{ due: "2026-03-10" }, { due: "2026-06-10" }, { due: "2026-09-10" }, { due: "2026-12-10" }]
+    prepare:
+      basis: collected
+      span: period
+      amount:
+        method: user_entered
+        warning:
+          fr: "Montant fixé par avis ; saisissez-le depuis votre avis pour le voir ici et dans la réserve."
+          en: "Amount set by notice; enter it from your notice to see it here."
+          de: "Betrag laut Bescheid; aus dem Bescheid eintragen, um ihn hier zu sehen."
+      source: https://www.gesetze-im-internet.de/estg/__37.html
+      verified_on: "2026-11-24"
     link: https://www.elster.de
     source: https://www.gesetze-im-internet.de/estg/__37.html
     verified_on: "2026-11-18"
@@ -153,6 +290,17 @@ deadlines:
     schedule:
       type: dates
       dates: [{ due: "2026-02-15" }, { due: "2026-05-15" }, { due: "2026-08-15" }, { due: "2026-11-15" }]
+    prepare:
+      basis: collected
+      span: period
+      amount:
+        method: user_entered
+        warning:
+          fr: "Montant fixé par avis ; saisissez-le depuis votre avis pour le voir ici et dans la réserve."
+          en: "Amount set by notice; enter it from your notice to see it here."
+          de: "Betrag laut Bescheid; aus dem Bescheid eintragen, um ihn hier zu sehen."
+      source: https://www.gesetze-im-internet.de/gewstg/__19.html
+      verified_on: "2026-11-24"
     link: https://www.gesetze-im-internet.de/gewstg/__19.html
     source: https://www.gesetze-im-internet.de/gewstg/__19.html
     verified_on: "2026-11-18"
@@ -175,3 +323,20 @@ deadlines:
     link: https://www.elster.de
     source: https://www.gesetze-im-internet.de/ao_1977/__149.html
     verified_on: "2026-11-18"
+
+# Rücklage: geschätzte Einkommensteuer des laufenden Jahres (Tarif § 32a EStG auf den Umsatz, da noch keine
+# Ausgaben erfasst werden: vorsichtige Überschätzung). Die Vorauszahlungen des Jahres (§ 37 EStG) mindern sie.
+# Nicht berücksichtigt: Solidaritätszuschlag, Kirchensteuer, Gewerbesteuer, Kranken- und Pflegeversicherung,
+# geschuldete Umsatzsteuer. Die Marge von 10 % ist eine Produktentscheidung, kein gesetzlicher Wert.
+reserve:
+  include: [income_tax]
+  settles:
+    - { deadline: est_vorauszahlung, fiscalYear: current }
+    - { deadline: annual_returns, fiscalYear: previous }
+  marginBp: 1000
+  warning:
+    fr: "Estimation indicative de l'impôt sur le revenu, calculée sur le chiffre d'affaires sans dépenses, pour une personne seule. Solidaritätszuschlag, impôt d'Église, Gewerbesteuer, assurance maladie et TVA due ne sont pas comptés : ajoutez-les en supplément personnel. Ne remplace pas un avis du Finanzamt."
+    en: "Indicative income tax estimate based on revenue without expenses, for a single person. Solidarity surcharge, church tax, trade tax, health insurance and VAT due are not included: add them as a personal extra. Not a notice from the tax office."
+    de: "Unverbindliche Schätzung der Einkommensteuer auf Basis des Umsatzes ohne Ausgaben, für eine Einzelperson. Solidaritätszuschlag, Kirchensteuer, Gewerbesteuer, Krankenversicherung und geschuldete Umsatzsteuer sind nicht enthalten: als persönlichen Zuschlag ergänzen. Kein Bescheid des Finanzamts."
+  source: https://www.gesetze-im-internet.de/estg/__32a.html
+  verified_on: "2026-11-24"

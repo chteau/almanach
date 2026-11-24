@@ -1,6 +1,16 @@
 import { addDays, daysBetween } from './documents.ts';
 import type { DeclarationPeriod } from './packs.ts';
-import type { AppliesTo, DeadlineRule, EstimateRule, Localized, ThresholdRule, YearRules } from './rules.ts';
+import type {
+  AppliesTo,
+  DeadlineRule,
+  EstimateRule,
+  Localized,
+  PrepareMethod,
+  PrepareRule,
+  ReserveRule,
+  ThresholdRule,
+  YearRules,
+} from './rules.ts';
 
 /** Profile facts the rules depend on. */
 export interface RuleProfile {
@@ -10,6 +20,13 @@ export interface RuleProfile {
   activityStart: string;
   /** Statuses of the secondary activities of the same business (mixed activity); none when absent. */
   activities?: string[];
+  /** Tax household for French income tax: parts in quarters (4 = one part) and joint taxation; one single part when absent. */
+  household?: { partsQuarters: number; joint: boolean };
+  /**
+   * Expenses recorded over the same dates as the receipts, before VAT. They lower the "profit" base; an allowance
+   * that deducts from profit (UK trading allowance) applies instead when it is larger, never on top.
+   */
+  expensesCents?: number;
 }
 
 /** Money received on a date, in the main currency. */
@@ -178,7 +195,15 @@ export interface EstimateResult {
   label: Localized;
   cents: number;
   /** Human-checkable steps, e.g. "12 000,00 × 26.1 %". Amounts in cents, rates in basis points. */
-  steps: { baseCents: number; rateBp: number; cents: number; from?: string; reducedShareBp?: number }[];
+  steps: {
+    baseCents: number;
+    rateBp: number;
+    cents: number;
+    from?: string;
+    reducedShareBp?: number;
+    /** Correction applied to the tax of the previous steps instead of a rate (cents is negative). */
+    adjustment?: 'qf_cap' | 'decote';
+  }[];
   source: string;
   verifiedOn: string;
 }
@@ -396,6 +421,111 @@ function deIncomeTax(rule: EstimateRule, baseCents: number): EstimateResult {
 }
 
 /**
+ * Tax of a scale per part applied to an income split over a number of parts (quotient familial)
+ *
+ * @param bands {{ upToCents: number | null; rateBp: number }[]} - bands of income per part
+ * @param incomeCents {number} - income of the household
+ * @param partsQuarters {number} - number of parts, in quarters
+ * @returns {{ cents: number; steps: EstimateResult['steps'] }} - tax and one step per band used, for the household
+ */
+function quotientTax(
+  bands: { upToCents: number | null; rateBp: number }[],
+  incomeCents: number,
+  partsQuarters: number,
+): { cents: number; steps: EstimateResult['steps'] } {
+  let rest = Math.floor((Math.max(0, incomeCents) * 4) / partsQuarters);
+  let previous = 0;
+  const steps: EstimateResult['steps'] = [];
+  for (const band of bands) {
+    if (rest <= 0) break;
+    const width = band.upToCents === null ? rest : Math.max(0, band.upToCents - previous);
+    const portion = Math.min(rest, width);
+    if (portion > 0 && band.rateBp > 0) {
+      const base = Math.round((portion * partsQuarters) / 4);
+      steps.push({ baseCents: base, rateBp: band.rateBp, cents: applyRate(base, band.rateBp) });
+    }
+    rest -= portion;
+    previous = band.upToCents ?? previous;
+  }
+  return { cents: steps.reduce((sum, step) => sum + step.cents, 0), steps };
+}
+
+/**
+ * French income tax: scale per part, cap on the benefit of the extra half-parts, then décote
+ *
+ * @param rule {EstimateRule} - estimate whose formula kind is "fr_income_tax"
+ * @param baseCents {number} - taxable income (revenue minus the micro allowances)
+ * @param household {RuleProfile['household']} - parts and joint taxation; one single part when absent
+ * @returns {EstimateResult} - amount with band steps and the adjustments applied
+ */
+function frIncomeTax(
+  rule: EstimateRule,
+  baseCents: number,
+  household: RuleProfile['household'],
+): EstimateResult {
+  if (rule.formula.kind !== 'fr_income_tax') throw new Error('not a French income tax estimate');
+  const { bands, decote, halfPartCapCents } = rule.formula;
+  const joint = household?.joint ?? false;
+  const baseQuarters = joint ? 8 : 4;
+  const quarters = Math.max(baseQuarters, household?.partsQuarters ?? baseQuarters);
+  const withParts = quotientTax(bands, baseCents, quarters);
+  const steps = [...withParts.steps];
+  let tax = withParts.cents;
+  if (quarters > baseQuarters) {
+    // Each extra half-part may lower the tax by at most the cap; a quarter part by half of it.
+    const capped =
+      quotientTax(bands, baseCents, baseQuarters).cents -
+      Math.round((halfPartCapCents * (quarters - baseQuarters)) / 2);
+    if (capped > tax) {
+      steps.push({ baseCents: tax, rateBp: 0, cents: capped - tax, adjustment: 'qf_cap' });
+      tax = capped;
+    }
+  }
+  const relief = joint ? decote.couple : decote.single;
+  if (tax > 0 && tax < relief.limitCents) {
+    const reduction = Math.min(tax, Math.max(0, relief.baseCents - applyRate(tax, relief.rateBp)));
+    if (reduction > 0) {
+      steps.push({ baseCents: tax, rateBp: relief.rateBp, cents: -reduction, adjustment: 'decote' });
+      tax -= reduction;
+    }
+  }
+  return {
+    id: rule.id,
+    label: rule.label,
+    cents: tax,
+    steps,
+    source: rule.source,
+    verifiedOn: rule.verified_on,
+  };
+}
+
+/**
+ * Taxable income of a micro business: each activity's revenue minus its own flat-rate allowance; the revenue
+ * itself for an activity without allowance
+ *
+ * @param rules {YearRules} - rules of the year
+ * @param profile {RuleProfile} - the person's situation
+ * @param receipts {Receipt[]} - money collected in the period
+ * @returns {number} - taxable income in cents
+ */
+function taxableIncome(rules: YearRules, profile: RuleProfile, receipts: Receipt[]): number {
+  const statuses = activityStatuses(profile);
+  return statuses.reduce((sum, status) => {
+    const own =
+      statuses.length === 1
+        ? receipts
+        : receipts.filter((receipt) => (receipt.category ?? profile.status ?? '') === status);
+    const revenue = own.reduce((total, receipt) => total + receipt.cents, 0);
+    const allowance = computeAllowance(
+      rules,
+      { ...profile, status: status || null, activities: [] },
+      revenue,
+    );
+    return sum + (allowance ? allowance.taxableCents : revenue);
+  }, 0);
+}
+
+/**
  * Computes the estimates of one activity, or of the whole person. Revenue-based estimates use the receipts given;
  * profit-based ones use their total, as Almanach does not track expenses yet, less an allowance the pack deducts
  * from profit first (UK trading allowance).
@@ -416,7 +546,11 @@ function activityEstimates(
 ): EstimateResult[] {
   const total = receipts.reduce((sum, receipt) => sum + receipt.cents, 0);
   const allowance = computeAllowance(rules, profile, total);
-  const profit = allowance?.deductsFromProfit ? allowance.taxableCents : total;
+  const expenses = Math.max(0, profile.expensesCents ?? 0);
+  const profit = Math.max(
+    0,
+    allowance?.deductsFromProfit ? total - Math.max(allowance.allowanceCents, expenses) : total - expenses,
+  );
   const results = new Map<string, EstimateResult>();
   const ordered = [...rules.estimates].sort(
     (a, b) => Number(a.formula.kind === 'brackets') - Number(b.formula.kind === 'brackets'),
@@ -424,7 +558,12 @@ function activityEstimates(
   for (const rule of ordered) {
     if (!applies(rule.appliesTo, profile) || (scope && rule.scope !== scope)) continue;
     const formula = rule.formula;
-    const base = rule.base === 'profit' ? profit : total;
+    const base =
+      rule.base === 'profit'
+        ? profit
+        : rule.base === 'taxable'
+          ? taxableIncome(rules, profile, receipts)
+          : total;
     let result: EstimateResult;
     if (formula.kind === 'flat') result = flat(rule, receipts, profile);
     else if (formula.kind === 'brackets') {
@@ -435,6 +574,7 @@ function activityEstimates(
       result = brackets(rule, base, deductions);
     } else if (formula.kind === 'profit_bands') result = profitBands(rule, base);
     else if (formula.kind === 'us_self_employment') result = usSelfEmployment(rule, base);
+    else if (formula.kind === 'fr_income_tax') result = frIncomeTax(rule, base, profile.household);
     else result = deIncomeTax(rule, base);
     results.set(rule.id, result);
   }
@@ -690,4 +830,272 @@ export function measureThresholds(
         verifiedOn: rule.verified_on,
       };
     });
+}
+
+/** Part of the reserve owed to one estimate. */
+export interface ReserveComponent extends EstimateResult {
+  /** Already paid at a deadline that settles it, for this fiscal year. */
+  paidCents: number;
+}
+
+/** What to keep aside now for the taxes and contributions of the fiscal year not paid yet. */
+export interface ReserveResult {
+  reserveCents: number;
+  /** Sum of the estimates included, before margin and payments. */
+  estimatedCents: number;
+  marginCents: number;
+  /** Personal extra: share of revenue and fixed monthly amount. */
+  extraCents: number;
+  paidCents: number;
+  revenueCents: number;
+  components: ReserveComponent[];
+}
+
+/**
+ * Computes the reserve: estimates of the fiscal year to date × (1 + margin) + personal extra − what was already
+ * paid for them, never below zero
+ *
+ * @param input {object} - rules, profile, receipts of the fiscal year to date, payments made per estimate,
+ * margin and personal extra
+ * @param input.rules {YearRules} - rules of the fiscal year, with a reserve block
+ * @param input.reserve {ReserveRule} - reserve block of the pack
+ * @param input.profile {RuleProfile} - the person's situation
+ * @param input.receipts {Receipt[]} - money collected in the fiscal year so far
+ * @param input.paid {Record<string, number>} - amount already paid this fiscal year per estimate id
+ * @param input.marginBp {number} - prudent margin
+ * @param input.extraRateBp {number} - personal extra as a share of revenue
+ * @param input.extraMonthlyCents {number} - personal extra per month elapsed
+ * @param input.monthsElapsed {number} - months of the fiscal year started so far
+ * @returns {ReserveResult} - reserve and its parts
+ */
+export function computeReserve(input: {
+  rules: YearRules;
+  reserve: ReserveRule;
+  profile: RuleProfile;
+  receipts: Receipt[];
+  paid: Record<string, number>;
+  marginBp: number;
+  extraRateBp: number;
+  extraMonthlyCents: number;
+  monthsElapsed: number;
+}): ReserveResult {
+  const estimates = computeEstimates(input.rules, input.profile, input.receipts, input.reserve.include);
+  const components = estimates.map((estimate) => ({ ...estimate, paidCents: input.paid[estimate.id] ?? 0 }));
+  const revenue = input.receipts.reduce((sum, receipt) => sum + receipt.cents, 0);
+  const estimated = components.reduce((sum, item) => sum + item.cents, 0);
+  const margin = applyRate(estimated, input.marginBp);
+  const extra = applyRate(revenue, input.extraRateBp) + input.extraMonthlyCents * input.monthsElapsed;
+  // A payment only offsets the estimate it settles; a surplus is not carried to other estimates.
+  const paid = components.reduce((sum, item) => sum + Math.min(item.paidCents, item.cents), 0);
+  return {
+    reserveCents: Math.max(0, estimated + margin + extra - paid),
+    estimatedCents: estimated,
+    marginCents: margin,
+    extraCents: extra,
+    paidCents: components.reduce((sum, item) => sum + item.paidCents, 0),
+    revenueCents: revenue,
+    components,
+  };
+}
+
+/** An issued invoice or credit note (negative), in the main currency, for invoiced revenue and VAT figures. */
+export interface InvoicedItem {
+  date: string;
+  netCents: number;
+  vatRateBp: number;
+  vatCents: number;
+  vatMode: string;
+  /** Activity status; the main activity when absent. */
+  category?: string;
+}
+
+/** An expense in the main currency: amount before VAT and deductible VAT. */
+export interface ExpenseItem {
+  date: string;
+  netCents: number;
+  vatCents: number;
+}
+
+/** Amounts read from a notice or entered by the person for one deadline rule and fiscal year. */
+export interface DeadlineNotice {
+  perOccurrenceCents: number | null;
+  priorYearTaxCents: number | null;
+  priorYearIncomeCents: number | null;
+  method: PrepareMethod | null;
+}
+
+/** Figures to copy into a form and amount to pay at one deadline occurrence. */
+export interface PreparedDeclaration {
+  fiscalYear: number;
+  basis: PrepareRule['basis'];
+  span: PrepareRule['span'];
+  periodStart: string;
+  periodEnd: string;
+  /** null for a figure Almanach does not track (expenses before any is recorded). */
+  lines: { id: string; label: Localized; measure: string; cents: number | null }[];
+  amount: {
+    method: PrepareMethod;
+    alternatives: PrepareMethod[];
+    cents: number | null;
+    steps: { kind: string; cents: number; rateBp?: number }[];
+    warning: Localized | null;
+    /** Whether the previous year's income matters (higher share above a limit). */
+    asksIncome: boolean;
+  } | null;
+  notice: DeadlineNotice | null;
+  note: Localized | null;
+  source: string;
+  verifiedOn: string;
+}
+
+/**
+ * Prepares a declaration: one figure per box of the form, from receipts, invoices and expenses of the span, and
+ * the amount to pay with the method the pack proposes or the person chose
+ *
+ * @param input {object} - rules, the deadline's prepare block, profile, figures, occurrence and notice
+ * @param input.rules {YearRules} - rules of the fiscal year
+ * @param input.prepare {PrepareRule} - prepare block of the deadline rule
+ * @param input.profile {RuleProfile} - the person's situation
+ * @param input.receipts {Receipt[]} - money collected from the start of the fiscal year to the end of the period
+ * @param input.invoiced {InvoicedItem[]} - invoices and credit notes issued over the same dates
+ * @param input.expenses {ExpenseItem[] | null} - expenses over the same dates; null when none are tracked
+ * @param input.fiscalStart {string} - first day of the fiscal year
+ * @param input.fiscalYear {number} - the fiscal year
+ * @param input.periodStart {string} - first day of the occurrence's period
+ * @param input.periodEnd {string} - last day of the occurrence's period
+ * @param input.estimatesCents {number} - sum of the occurrence's estimates (method "estimates")
+ * @param input.notice {DeadlineNotice | null} - amounts entered for this rule and fiscal year
+ * @param input.paidBeforeCents {number} - paid at earlier occurrences of the rule this fiscal year (annualized)
+ * @returns {PreparedDeclaration} - lines and amount
+ */
+export function prepareDeclaration(input: {
+  rules: YearRules;
+  prepare: PrepareRule;
+  profile: RuleProfile;
+  receipts: Receipt[];
+  invoiced: InvoicedItem[];
+  expenses: ExpenseItem[] | null;
+  fiscalStart: string;
+  fiscalYear: number;
+  periodStart: string;
+  periodEnd: string;
+  estimatesCents: number;
+  notice: DeadlineNotice | null;
+  paidBeforeCents: number;
+}): PreparedDeclaration {
+  const { prepare, notice } = input;
+  const from = prepare.span === 'period' ? input.periodStart : input.fiscalStart;
+  const within = (date: string) => date >= from && date <= input.periodEnd;
+  const statusOf = (category: string | undefined) => category ?? input.profile.status ?? '';
+  const invoiced = input.invoiced.filter((item) => within(item.date));
+  const expenses = input.expenses?.filter((item) => within(item.date)) ?? null;
+  const sum = (values: number[]) => values.reduce((total, value) => total + value, 0);
+
+  const own = activityStatuses(input.profile);
+  const lines = prepare.lines
+    .filter((line) => !line.statuses || line.statuses.some((status) => own.includes(status)))
+    .map((line) => {
+      const statuses = (category: string | undefined) =>
+        !line.statuses || line.statuses.includes(statusOf(category));
+      const standard = invoiced.filter(
+        (item) =>
+          item.vatMode === 'standard' && (line.vatRateBp === undefined || item.vatRateBp === line.vatRateBp),
+      );
+      let cents: number | null;
+      if (line.measure === 'revenue')
+        cents =
+          prepare.basis === 'collected'
+            ? sum(
+                input.receipts
+                  .filter((item) => within(item.date) && statuses(item.category))
+                  .map((item) => item.cents),
+              )
+            : sum(invoiced.filter((item) => statuses(item.category)).map((item) => item.netCents));
+      else if (line.measure === 'vat_base') cents = sum(standard.map((item) => item.netCents));
+      else if (line.measure === 'vat_collected') cents = sum(standard.map((item) => item.vatCents));
+      else if (line.measure === 'vat_mode_base')
+        cents = sum(invoiced.filter((item) => item.vatMode === line.vatMode).map((item) => item.netCents));
+      else if (line.measure === 'expenses') cents = expenses && sum(expenses.map((item) => item.netCents));
+      else cents = expenses && sum(expenses.map((item) => item.vatCents));
+      return { id: line.id, label: line.label, measure: line.measure, cents };
+    });
+
+  let amount: PreparedDeclaration['amount'] = null;
+  if (prepare.amount) {
+    const rule = prepare.amount;
+    const allowed = [rule.method, ...rule.alternatives];
+    const method = notice?.method && allowed.includes(notice.method) ? notice.method : rule.method;
+    const steps: NonNullable<PreparedDeclaration['amount']>['steps'] = [];
+    let cents: number | null = null;
+    if (method === 'estimates') cents = input.estimatesCents;
+    else if (method === 'lines') {
+      const value = (id: string) => lines.find((line) => line.id === id)?.cents ?? 0;
+      for (const id of rule.add) steps.push({ kind: id, cents: value(id) });
+      for (const id of rule.subtract) steps.push({ kind: id, cents: -value(id) });
+      cents = Math.max(0, sum(steps.map((step) => step.cents)));
+    } else if (method === 'user_entered') cents = notice?.perOccurrenceCents ?? null;
+    else if (
+      method === 'prior_year_share' &&
+      notice?.priorYearTaxCents != null &&
+      rule.shareBp !== undefined
+    ) {
+      const higher =
+        rule.higherIncome &&
+        notice.priorYearIncomeCents !== null &&
+        notice.priorYearIncomeCents > rule.higherIncome.aboveCents;
+      const shareBp = higher && rule.higherIncome ? rule.higherIncome.shareBp : rule.shareBp;
+      cents = applyRate(notice.priorYearTaxCents, shareBp);
+      steps.push({
+        kind: higher ? 'prior_year_tax_higher_income' : 'prior_year_tax',
+        cents,
+        rateBp: shareBp,
+      });
+    } else if (method === 'annualized') {
+      const period = rule.periods.find((item) => item.periodEnd === input.periodEnd.slice(5));
+      if (period) {
+        // Income from the start of the year annualized, tax of that income, cumulative share due, earlier
+        // payments deducted.
+        const toDate = input.receipts.filter(
+          (item) => item.date >= input.fiscalStart && item.date <= input.periodEnd,
+        );
+        const annualized = toDate.map((item) => ({ ...item, cents: applyRate(item.cents, period.factorBp) }));
+        const yearly = sum(
+          computeEstimates(input.rules, input.profile, annualized, rule.estimates).map((item) => item.cents),
+        );
+        const due = applyRate(yearly, period.shareBp);
+        steps.push(
+          {
+            kind: 'annualized_income',
+            cents: sum(annualized.map((item) => item.cents)),
+            rateBp: period.factorBp,
+          },
+          { kind: 'annualized_tax', cents: yearly },
+          { kind: 'cumulative_share', cents: due, rateBp: period.shareBp },
+          { kind: 'paid_before', cents: -input.paidBeforeCents },
+        );
+        cents = Math.max(0, due - input.paidBeforeCents);
+      }
+    }
+    amount = {
+      method,
+      alternatives: allowed,
+      cents,
+      steps,
+      warning: rule.warning ?? null,
+      asksIncome: Boolean(rule.higherIncome),
+    };
+  }
+  return {
+    fiscalYear: input.fiscalYear,
+    basis: prepare.basis,
+    span: prepare.span,
+    periodStart: from,
+    periodEnd: input.periodEnd,
+    lines,
+    amount,
+    notice,
+    note: prepare.note ?? null,
+    source: prepare.source,
+    verifiedOn: prepare.verified_on,
+  };
 }
