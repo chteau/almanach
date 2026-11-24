@@ -29,14 +29,14 @@ par défaut la première. Montants en centimes.
 
 | Outil | Portée | Rôle |
 |---|---|---|
-| `list_companies` | read | entreprises du compte |
+| `list_companies` | read | entreprises du compte et leurs activités (principale, secondaires) |
 | `search_clients` | read | recherche de clients, y compris ceux des instances liées et sources externes |
 | `list_documents` | read | devis, factures, avoirs : filtres type, statut, période, activité ; documents liés et externes avec leur `source` et `test` |
 | `get_document` | read | document détaillé (local ou en lecture seule) |
 | `list_payments` | read | paiements et recettes des instances liées |
 | `list_deadlines` | read | échéances à venir ou en retard |
-| `get_thresholds` | read | seuils, estimations de cotisations et d'impôt, simulation |
-| `get_dashboard` | read | résumé du tableau de bord |
+| `get_thresholds` | read | seuils, estimations de cotisations et d'impôt, ventilation par activité, simulation |
+| `get_dashboard` | read | résumé du tableau de bord, dont la ventilation par activité |
 | `list_linked_activities` | read | instances liées et sources externes |
 | `create_client`, `update_client` | read_drafts | créer ou modifier un client |
 | `create_draft_document` | read_drafts | créer un **brouillon** de devis ou de facture |

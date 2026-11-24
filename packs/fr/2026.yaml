@@ -25,7 +25,9 @@ holidays:
 # Activité mixte (art. 50-0 et 293 B du CGI) : le plafond « ventes » s'applique au chiffre d'affaires global,
 # le plafond « services » à la seule part des prestations de services (BIC services et BNC). `counts` liste
 # les statuts dont le chiffre d'affaires compte pour chaque seuil, quand des instances liées suivent les
-# autres activités de la même micro-entreprise.
+# autres activités de la même micro-entreprise (activités secondaires ou instances liées). Toutes en services
+# (BNC + BIC services) : seul le plafond services s'applique, sur le cumul (83 600 €, franchise 37 500 €).
+# Vérifié le 2026-11-24 sur impots.gouv.fr (plafonds) et le BOFiP BOI-TVA-DECLA-40-10-10 (franchise).
 thresholds:
   - id: micro_ceiling_services
     label:
@@ -98,6 +100,9 @@ thresholds:
     source: https://bofip.impots.gouv.fr/bofip/849-PGP.html/identifiant=BOI-TVA-DECLA-40-10-10-20260701
     verified_on: "2026-11-18"
 
+# Activité mixte : une seule déclaration Urssaf, une ligne par activité, chacune à son propre taux
+# (autoentrepreneur.urssaf.fr, questions fréquentes). Le moteur calcule chaque estimation sur le chiffre
+# d'affaires de son activité, puis les additionne.
 estimates:
   - id: contributions_bnc
     label:
@@ -239,6 +244,47 @@ estimates:
     formula: { kind: flat, rates: [{ from: "2026-01-01", rateBp: 30 }] }
     source: https://entreprendre.service-public.gouv.fr/vosdroits/F23459
     verified_on: "2026-11-18"
+
+# Abattements forfaitaires du régime micro-fiscal (art. 50-0 et 102 ter du CGI), appliqués quand le versement
+# libératoire n'est pas choisi. Activité mixte : l'abattement propre à chaque activité s'applique à la part de
+# chiffre d'affaires correspondante, le minimum de 305 € par activité (610 € pour deux activités).
+allowances:
+  - id: allowance_bnc
+    label:
+      {
+        fr: "Abattement forfaitaire (BNC, 34 %)",
+        en: "Flat-rate allowance (BNC, 34 %)",
+        de: "Pauschalabzug (BNC, 34 %)",
+      }
+    appliesTo: { statuses: [micro_bnc], withoutOptions: [versement_liberatoire] }
+    rateBp: 3400
+    minimumCents: 30500
+    source: https://entreprendre.service-public.gouv.fr/vosdroits/F23267
+    verified_on: "2026-11-24"
+  - id: allowance_bic_services
+    label:
+      {
+        fr: "Abattement forfaitaire (BIC services, 50 %)",
+        en: "Flat-rate allowance (BIC services, 50 %)",
+        de: "Pauschalabzug (BIC-Dienstleistungen, 50 %)",
+      }
+    appliesTo: { statuses: [micro_bic_services], withoutOptions: [versement_liberatoire] }
+    rateBp: 5000
+    minimumCents: 30500
+    source: https://entreprendre.service-public.gouv.fr/vosdroits/F23267
+    verified_on: "2026-11-24"
+  - id: allowance_sales
+    label:
+      {
+        fr: "Abattement forfaitaire (vente, 71 %)",
+        en: "Flat-rate allowance (sales, 71 %)",
+        de: "Pauschalabzug (Warenverkauf, 71 %)",
+      }
+    appliesTo: { statuses: [micro_bic_sales], withoutOptions: [versement_liberatoire] }
+    rateBp: 7100
+    minimumCents: 30500
+    source: https://entreprendre.service-public.gouv.fr/vosdroits/F23267
+    verified_on: "2026-11-24"
 
 deadlines:
   - id: urssaf_monthly

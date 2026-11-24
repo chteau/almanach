@@ -16,6 +16,7 @@ import type { Database } from '../../db/client.ts';
 import { auditLog, clients, documents, missions, payments, timeEntries } from '../../db/schema.ts';
 import { parseBody } from '../../http/errors.ts';
 import type { AppEnv } from '../../http/request.ts';
+import { ownsActivity } from '../activities/activities.ts';
 import { loadBilling } from '../billing/billing.ts';
 import type { DocumentService } from './documents.service.ts';
 import { type PdfStyle, renderPdf } from './pdf.ts';
@@ -83,6 +84,7 @@ export function documentRoutes(db: Database, service: DocumentService): Hono<App
     const client = await service.client(companyId, draft.clientId);
     if (!profile) return { error: 'no_profile' };
     if (!client) return { error: 'unknown_client' };
+    if (!(await ownsActivity(db, companyId, draft.activityId))) return { error: 'unknown_activity' };
     if (draft.missionId) {
       const [mission] = await db
         .select({ id: missions.id })
@@ -338,6 +340,7 @@ export function documentRoutes(db: Database, service: DocumentService): Hono<App
       discountBp: data.as === 'deposit' ? 0 : existing.discountBp,
       note: existing.note,
       depositIds: [],
+      activityId: existing.activityId,
     } satisfies z.output<typeof documentDraftSchema>;
     const prepared = await prepare(c.var.company.id, draft);
     if ('error' in prepared) return c.json({ error: prepared.error }, 422);
@@ -389,6 +392,18 @@ export function documentRoutes(db: Database, service: DocumentService): Hono<App
     });
   });
 
+  // The activity is no legal mention: it may change after issue, e.g. to sort records made before it existed.
+  router.put('/documents/:id/activity', async (c) => {
+    const existing = await owned(c.var.company.id, c.req.param('id'));
+    if (!existing) return c.json({ error: 'not_found' }, 404);
+    const { data, response } = await parseBody(c, z.object({ activityId: idSchema.nullable() }).strict());
+    if (response) return response;
+    if (!(await ownsActivity(db, c.var.company.id, data.activityId)))
+      return c.json({ error: 'unknown_activity' }, 422);
+    await db.update(documents).set({ activityId: data.activityId }).where(eq(documents.id, existing.id));
+    return c.body(null, 204);
+  });
+
   router.post('/documents/:id/payments', async (c) => {
     const existing = await owned(c.var.company.id, c.req.param('id'));
     if (existing?.state !== 'issued' || existing.type === 'quote' || existing.type === 'credit_note') {
@@ -398,6 +413,8 @@ export function documentRoutes(db: Database, service: DocumentService): Hono<App
     if (response) return response;
     if (data.date < existing.issueDate)
       return c.json({ error: 'validation_failed', issues: [{ path: 'date', message: 'before_issue' }] }, 422);
+    if (!(await ownsActivity(db, c.var.company.id, data.activityId)))
+      return c.json({ error: 'unknown_activity' }, 422);
     const [row] = await db
       .insert(payments)
       .values({ ...data, companyId: c.var.company.id, documentId: existing.id })
@@ -430,6 +447,7 @@ export function documentRoutes(db: Database, service: DocumentService): Hono<App
       feesCents: payment.feesCents,
       method: payment.method as PaymentView['method'],
       reference: payment.reference,
+      activityId: payment.activityId,
       documentNumber,
       clientName,
       currency,

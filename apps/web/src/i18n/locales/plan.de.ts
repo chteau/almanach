@@ -684,4 +684,32 @@ export const planDe: Record<keyof typeof planEn, string> = {
   'tokens.revoke': 'Widerrufen',
   'tokens.name': 'Name',
   'tokens.create': 'Token erstellen',
+  'activities.title': 'Tätigkeiten',
+  'activities.body':
+    'Ein Unternehmen kann mehrere Tätigkeiten ausüben (zum Beispiel freier Beruf BNC und gewerbliche Dienstleistungen BIC): Jede hat eigene Beitragssätze und einen eigenen Pauschalabzug, die Obergrenzen zählen sie zusammen. Einträge einer entfernten Tätigkeit fallen an die Haupttätigkeit zurück.',
+  'activities.main': 'Haupttätigkeit',
+  'activities.secondary': 'Nebentätigkeit',
+  'activities.fromLink': 'automatisch über die Verknüpfung {label} hinzugefügt',
+  'activities.remove': 'Entfernen',
+  'activities.add': 'Nebentätigkeit hinzufügen',
+  'activities.addButton': 'Hinzufügen',
+  'activities.field': 'Tätigkeit',
+  'activities.mainOption': '{activity} (Haupttätigkeit)',
+  'activities.inherit': 'Wie die Rechnung',
+  'activities.breakdown': 'Nach Tätigkeit',
+  'activities.revenue': 'Vereinnahmt',
+  'activities.setAside': 'Zurückzulegen',
+  'activities.taxable': 'Steuerpflichtig nach Pauschalabzug',
+  'activities.linkedPart': 'davon {amount} aus verknüpften Instanzen',
+  'activities.allowance': 'Pauschalabzug {rate}',
+  'outlook.linkedAttached':
+    'Andere Tätigkeit ({label}): {amount} vereinnahmt, in den Schätzungen oben enthalten.',
+  'federation.activity': 'Umsatz dieser Verknüpfung zählt als',
+  'federation.activity.hint':
+    '„Automatisch“ folgt der Tätigkeit, die die andere Instanz meldet, und legt sie bei Bedarf als Nebentätigkeit an. „Nur Schwellen“ überlässt ihre Beiträge der anderen Instanz.',
+  'federation.activity.auto': 'Automatisch: {activity}',
+  'federation.activity.autoUnknown': 'Automatisch (von der anderen Instanz nicht gemeldet)',
+  'federation.activity.none': 'Nur Schwellen',
+  'federation.activity.created':
+    'Die von {label} gemeldete Tätigkeit „{activity}“ wurde als Nebentätigkeit dieses Unternehmens hinzugefügt.',
 };

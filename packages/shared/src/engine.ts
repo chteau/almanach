@@ -8,20 +8,32 @@ export interface RuleProfile {
   options: string[];
   declarationPeriod: DeclarationPeriod | null;
   activityStart: string;
+  /** Statuses of the secondary activities of the same business (mixed activity); none when absent. */
+  activities?: string[];
 }
 
 /** Money received on a date, in the main currency. */
 export interface Receipt {
   date: string;
   cents: number;
-  /** Status of the activity that collected it; the profile status when absent. */
+  /** Status of the activity that collected it; the main status (profile status) when absent. */
   category?: string;
   /** Collected by another activity of the same business, tracked in a linked instance. */
   linked?: boolean;
 }
 
 /**
- * Tells whether a rule concerns a profile
+ * Lists the statuses of every activity of a profile, the main one first, without duplicates
+ *
+ * @param profile {RuleProfile} - the person's situation
+ * @returns {string[]} - main status (empty string when generic) then the secondary ones
+ */
+export function activityStatuses(profile: RuleProfile): string[] {
+  return [...new Set([profile.status ?? '', ...(profile.activities ?? [])])];
+}
+
+/**
+ * Tells whether a rule concerns a profile; a status condition holds when any activity has a listed status
  *
  * @param appliesTo {AppliesTo | undefined} - rule conditions
  * @param profile {RuleProfile} - the person's situation
@@ -29,7 +41,8 @@ export interface Receipt {
  */
 export function applies(appliesTo: AppliesTo | undefined, profile: RuleProfile): boolean {
   if (!appliesTo) return true;
-  if (appliesTo.statuses && !appliesTo.statuses.includes(profile.status ?? '')) return false;
+  const statuses = appliesTo.statuses;
+  if (statuses && !activityStatuses(profile).some((status) => statuses.includes(status))) return false;
   if (appliesTo.options?.some((option) => !profile.options.includes(option))) return false;
   if (appliesTo.withoutOptions?.some((option) => profile.options.includes(option))) return false;
   if (appliesTo.periods && !appliesTo.periods.includes(profile.declarationPeriod ?? 'yearly')) return false;
@@ -383,16 +396,16 @@ function deIncomeTax(rule: EstimateRule, baseCents: number): EstimateResult {
 }
 
 /**
- * Computes every estimate of the year that concerns a profile. Revenue-based estimates use the receipts
- * given; profit-based ones use their total, as Almanach does not track expenses yet.
+ * Computes the estimates of one activity. Revenue-based estimates use the receipts given; profit-based ones
+ * use their total, as Almanach does not track expenses yet.
  *
  * @param rules {YearRules} - rules of the year
- * @param profile {RuleProfile} - the person's situation
- * @param receipts {Receipt[]} - money collected in the period of interest
+ * @param profile {RuleProfile} - situation with the status of that activity only
+ * @param receipts {Receipt[]} - money collected by that activity in the period of interest
  * @param only {string[] | undefined} - restrict to these estimate ids
  * @returns {EstimateResult[]} - results in rule order
  */
-export function computeEstimates(
+function activityEstimates(
   rules: YearRules,
   profile: RuleProfile,
   receipts: Receipt[],
@@ -426,6 +439,128 @@ export function computeEstimates(
     );
 }
 
+/** Flat-rate allowance of one activity and the taxable income left (micro tax regime). */
+export interface AllowanceResult {
+  id: string;
+  label: Localized;
+  rateBp: number;
+  allowanceCents: number;
+  taxableCents: number;
+  source: string;
+  verifiedOn: string;
+}
+
+/** Revenue, estimates and allowance of one activity of the business. */
+export interface ActivityBreakdown {
+  status: string;
+  /** The activity of the profile status; the others are secondary. */
+  main: boolean;
+  revenueCents: number;
+  /** Part of revenueCents received from linked instances attached to this activity. */
+  linkedCents: number;
+  estimates: EstimateResult[];
+  estimateCents: number;
+  allowance: AllowanceResult | null;
+}
+
+/**
+ * Applies the flat-rate allowance of an activity to its revenue: its own rate, at least the minimum amount,
+ * never more than the revenue
+ *
+ * @param rules {YearRules} - rules of the year
+ * @param profile {RuleProfile} - situation with the status of that activity only
+ * @param revenueCents {number} - revenue of that activity
+ * @returns {AllowanceResult | null} - allowance, or null when the pack has none for this situation
+ */
+export function computeAllowance(
+  rules: YearRules,
+  profile: RuleProfile,
+  revenueCents: number,
+): AllowanceResult | null {
+  const rule = rules.allowances.find((candidate) => applies(candidate.appliesTo, profile));
+  if (!rule) return null;
+  const base = Math.max(0, revenueCents);
+  const allowance = Math.min(base, Math.max(applyRate(base, rule.rateBp), rule.minimumCents));
+  return {
+    id: rule.id,
+    label: rule.label,
+    rateBp: rule.rateBp,
+    allowanceCents: allowance,
+    taxableCents: base - allowance,
+    source: rule.source,
+    verifiedOn: rule.verified_on,
+  };
+}
+
+/**
+ * Splits receipts by activity and computes each activity's estimates and allowance at its own rates
+ * (mixed activity: one declaration, one line and one rate per activity)
+ *
+ * @param rules {YearRules} - rules of the year
+ * @param profile {RuleProfile} - the person's situation, with its secondary activities
+ * @param receipts {Receipt[]} - money collected in the period; a receipt without category is the main activity's
+ * @param only {string[] | undefined} - restrict to these estimate ids
+ * @returns {ActivityBreakdown[]} - one entry per activity, the main one first
+ */
+export function activityBreakdown(
+  rules: YearRules,
+  profile: RuleProfile,
+  receipts: Receipt[],
+  only?: string[],
+): ActivityBreakdown[] {
+  const statuses = activityStatuses(profile);
+  return statuses.map((status, index) => {
+    const own =
+      statuses.length === 1
+        ? receipts
+        : receipts.filter((receipt) => (receipt.category ?? profile.status ?? '') === status);
+    const single = { ...profile, status: status || null, activities: [] };
+    const estimates = activityEstimates(rules, single, own, only);
+    const revenue = own.reduce((sum, receipt) => sum + receipt.cents, 0);
+    return {
+      status,
+      main: index === 0,
+      revenueCents: revenue,
+      linkedCents: own.filter((receipt) => receipt.linked).reduce((sum, receipt) => sum + receipt.cents, 0),
+      estimates,
+      estimateCents: estimates.reduce((sum, item) => sum + item.cents, 0),
+      allowance: computeAllowance(rules, single, revenue),
+    };
+  });
+}
+
+/**
+ * Computes every estimate of the year that concerns a profile. With secondary activities, each activity's
+ * estimates use its own receipts and rates, and the results of a rule shared by several activities are added.
+ *
+ * @param rules {YearRules} - rules of the year
+ * @param profile {RuleProfile} - the person's situation
+ * @param receipts {Receipt[]} - money collected in the period of interest
+ * @param only {string[] | undefined} - restrict to these estimate ids
+ * @returns {EstimateResult[]} - results in rule order
+ */
+export function computeEstimates(
+  rules: YearRules,
+  profile: RuleProfile,
+  receipts: Receipt[],
+  only?: string[],
+): EstimateResult[] {
+  if (activityStatuses(profile).length === 1) return activityEstimates(rules, profile, receipts, only);
+  const merged = new Map<string, EstimateResult>();
+  for (const result of activityBreakdown(rules, profile, receipts, only).flatMap((item) => item.estimates)) {
+    const known = merged.get(result.id);
+    merged.set(
+      result.id,
+      known
+        ? { ...known, cents: known.cents + result.cents, steps: [...known.steps, ...result.steps] }
+        : result,
+    );
+  }
+  return rules.estimates
+    .map((rule) => merged.get(rule.id))
+    .filter((result): result is EstimateResult => result !== undefined);
+}
+
 /** Progress towards a revenue ceiling (S-044, S-211, S-212). */
 export interface ThresholdProgress {
   id: string;
@@ -453,8 +588,8 @@ export interface ThresholdProgress {
 }
 
 /**
- * Measures each threshold that concerns a profile. When receipts of other activities of the same business
- * are given (linked instances), a threshold applies if any activity matches it, and only counts the
+ * Measures each threshold that concerns a profile. With several activities of the same business (secondary
+ * activities, linked instances), a threshold applies if any activity matches it, and only counts the
  * revenue of the statuses it lists (mixed activity: global ceiling on everything, sub-ceiling on services).
  *
  * @param rules {YearRules} - rules of the current fiscal year
@@ -474,10 +609,10 @@ export function measureThresholds(
   priorYearCents: number | null,
 ): ThresholdProgress[] {
   const statusOf = (receipt: Receipt) => receipt.category ?? profile.status ?? '';
-  const statuses = new Set([profile.status ?? '', ...receipts.map(statusOf)]);
+  const business = { ...profile, activities: [...(profile.activities ?? []), ...receipts.map(statusOf)] };
   const sum = (list: Receipt[]) => list.reduce((total, receipt) => total + receipt.cents, 0);
   return rules.thresholds
-    .filter((rule) => [...statuses].some((status) => applies(rule.appliesTo, { ...profile, status })))
+    .filter((rule) => applies(rule.appliesTo, business))
     .map((rule) => {
       let start = fiscalYear.start;
       let end = fiscalYear.end;

@@ -14,6 +14,7 @@ import { useI18n } from '../../i18n/I18nProvider.tsx';
 import { formatDate, formatMoney } from '../../lib/format.ts';
 import { useResource } from '../../lib/useResource.ts';
 import { linkedPath } from '../linked/activity.ts';
+import { ActivityBreakdown } from './ActivityBreakdown.tsx';
 import { LinkedActivities } from './LinkedActivities.tsx';
 import styles from './Planning.module.css';
 import { type CalendarItem, labelOf, type Outlook, TYPE_STYLE } from './types.ts';
@@ -342,6 +343,7 @@ export function DashboardPage() {
               ))}
             </ul>
             <LinkedActivities outlook={outlook} money={money} />
+            <ActivityBreakdown activities={outlook.activities} money={money} />
             <p className={styles.caption}>{t('outlook.disclaimer')}</p>
           </section>
         </div>

@@ -1,4 +1,5 @@
 import {
+  activityRefSchema,
   addDays,
   fiscalYearOf,
   idSchema,
@@ -24,6 +25,7 @@ import {
 import { parseBody } from '../../http/errors.ts';
 import type { AppEnv } from '../../http/request.ts';
 import { randomToken, sha256 } from '../../security/tokens.ts';
+import { ownsActivity } from '../activities/activities.ts';
 import { linkedOverdue, linkedRecords } from '../federation/linked.ts';
 import type { PackRegistry } from '../packs/packs.ts';
 import { renderIcal } from './ical.ts';
@@ -39,6 +41,7 @@ const customSchema = z
     recurrence: z.enum(['none', 'monthly', 'quarterly', 'yearly']),
     until: isoDateSchema.nullable(),
     notes: optionalText(1000),
+    activityId: activityRefSchema,
   })
   .strict()
   .refine((value) => !value.until || value.until >= value.date, {
@@ -210,6 +213,8 @@ export function planningRoutes(
   api.post('/custom-deadlines', async (c) => {
     const { data, response } = await parseBody(c, customSchema);
     if (response) return response;
+    if (!(await ownsActivity(db, c.var.company.id, data.activityId)))
+      return c.json({ error: 'unknown_activity' }, 422);
     const [row] = await db
       .insert(customDeadlines)
       .values({ ...data, companyId: c.var.company.id })
@@ -222,6 +227,8 @@ export function planningRoutes(
     if (!idSchema.safeParse(id).success) return c.json({ error: 'not_found' }, 404);
     const { data, response } = await parseBody(c, customSchema);
     if (response) return response;
+    if (!(await ownsActivity(db, c.var.company.id, data.activityId)))
+      return c.json({ error: 'unknown_activity' }, 422);
     const updated = await db
       .update(customDeadlines)
       .set(data)
@@ -360,6 +367,7 @@ export function planningRoutes(
       ],
       linkedRevenue: linkedTotals.map((link) => ({
         label: link.label,
+        activity: link.activity,
         month: within(link.receipts, periods.month),
         quarter: within(link.receipts, periods.quarter),
         year: within(link.receipts, periods.year),

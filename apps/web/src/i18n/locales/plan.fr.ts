@@ -682,4 +682,32 @@ export const planFr: Record<keyof typeof planEn, string> = {
   'tokens.revoke': 'Révoquer',
   'tokens.name': 'Nom',
   'tokens.create': 'Créer un jeton',
+  'activities.title': 'Activités',
+  'activities.body':
+    'Une même entreprise peut exercer plusieurs activités (par exemple libéral BNC et BIC prestations de services) : chacune a ses taux de cotisations et son abattement, les plafonds les cumulent. Les enregistrements d’une activité retirée reviennent à l’activité principale.',
+  'activities.main': 'Principale',
+  'activities.secondary': 'Secondaire',
+  'activities.fromLink': 'ajoutée automatiquement par la liaison {label}',
+  'activities.remove': 'Retirer',
+  'activities.add': 'Ajouter une activité secondaire',
+  'activities.addButton': 'Ajouter',
+  'activities.field': 'Activité',
+  'activities.mainOption': '{activity} (principale)',
+  'activities.inherit': 'Comme la facture',
+  'activities.breakdown': 'Par activité',
+  'activities.revenue': 'Encaissé',
+  'activities.setAside': 'À mettre de côté',
+  'activities.taxable': 'Imposable après abattement',
+  'activities.linkedPart': 'dont {amount} d’instances liées',
+  'activities.allowance': 'abattement de {rate}',
+  'outlook.linkedAttached':
+    'Autre activité ({label}) : {amount} encaissés, comptés dans les estimations ci-dessus.',
+  'federation.activity': 'Le chiffre d’affaires de cette liaison compte comme',
+  'federation.activity.hint':
+    '« Automatique » suit l’activité annoncée par l’autre instance, ajoutée comme activité secondaire si elle manque. « Seuils seulement » laisse ses cotisations à l’autre instance.',
+  'federation.activity.auto': 'Automatique : {activity}',
+  'federation.activity.autoUnknown': 'Automatique (non annoncée par l’autre instance)',
+  'federation.activity.none': 'Seuils seulement',
+  'federation.activity.created':
+    'L’activité « {activity} » annoncée par {label} a été ajoutée comme activité secondaire de cette entreprise.',
 };

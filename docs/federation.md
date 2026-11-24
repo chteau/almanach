@@ -7,11 +7,22 @@ franchise de TVA et leurs alertes se calculent sur le **cumul** des activités. 
 deux instances Almanach de se transmettre ce cumul et, seulement si vous l'activez, le détail en lecture
 seule (clients, factures, devis, avoirs, paiements) pour tout voir depuis une seule instance.
 
-Chaque instance garde ses factures, clients, paiements, cotisations et impôt. Les cotisations et le
-versement libératoire restent estimés sur l'activité locale ; une ligne rappelle « autre activité :
-X € encaissés, cotisations gérées par l'autre instance ». L'ACRE dépend de la date de début
-d'activité, commune aux deux, et réduit le taux de chaque activité sur son propre chiffre
-d'affaires : il n'y a rien à cumuler.
+Chaque instance garde ses factures, clients et paiements. Chaque liaison est **rattachée à une activité**
+de l'entreprise (Réglages → Instances liées, « Le chiffre d'affaires de cette liaison compte comme ») :
+
+- **Automatique** (par défaut) : l'activité que l'autre instance annonce (son statut principal). Si
+  l'entreprise ne l'a pas encore, elle est ajoutée comme activité secondaire (Réglages → Profil), avec la
+  mention « ajoutée automatiquement par la liaison … ».
+- **Une activité choisie** (principale ou secondaire) : les totaux reçus comptent comme elle.
+- **Seuils seulement** : le comportement d'avant, pour une autre instance qui déclare elle-même ses
+  cotisations ; c'est aussi le cas d'une liaison avec une instance d'une version antérieure, qui n'annonce
+  rien.
+
+Une liaison rattachée compte dans les cotisations, la CFP, le versement libératoire et l'abattement de son
+activité, à ses propres taux (une seule déclaration Urssaf, une ligne par activité). Sinon une ligne
+rappelle « autre activité : X € encaissés, cotisations gérées par l'autre instance ». L'ACRE dépend de
+la date de début d'activité, commune aux deux, et réduit le taux de chaque activité sur son propre
+chiffre d'affaires.
 
 ## Activer
 
@@ -76,6 +87,11 @@ le nom de l'activité et la devise :
 { "label": "SEKLYR", "currency": "EUR", "months": [{ "month": "2026-11", "category": "micro_bic_services", "cents": 200000 }] }
 ```
 
+L'échange porte aussi, à côté des totaux, `activity` : le statut de l'activité principale de l'instance
+qui partage (`null` si elle ne partage pas). Une instance d'une version antérieure refuse ce champ :
+l'appelante refait alors l'échange sans lui, et l'instance appelée ne le renvoie que si la requête le
+contenait. Sans `activity`, rien ne change.
+
 Sans partage détaillé, jamais de facture, de client, de montant unitaire, de nom ou d'identifiant. Des
 totaux reçus dans une autre devise sont refusés.
 
@@ -117,7 +133,9 @@ deux côtés décoche, à la révocation ou à la suppression de la liaison.
 
 ## Calcul des seuils
 
-Le pack (`packs/fr/2026.yaml`, champ `counts`) indique quels statuts comptent pour chaque seuil.
+Le pack (`packs/fr/2026.yaml`, champ `counts`) indique quels statuts comptent pour chaque seuil, que
+l'activité soit suivie localement (activité secondaire, choisie sur chaque devis, facture, paiement ou
+échéance) ou par une instance liée.
 En activité mixte, le plafond « ventes » (203 100 €, franchise 85 000 €) s'applique au chiffre
 d'affaires global et le plafond « services » (83 600 €, franchise 37 500 €) à la seule part des
 services (BIC services et BNC). BNC + BIC services : un seul jeu de plafonds, sur le cumul. Les

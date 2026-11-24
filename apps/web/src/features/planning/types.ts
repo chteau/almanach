@@ -1,4 +1,10 @@
-import type { DeadlineOccurrence, EstimateResult, Localized, ThresholdProgress } from '@almanach/shared';
+import type {
+  ActivityBreakdown,
+  DeadlineOccurrence,
+  EstimateResult,
+  Localized,
+  ThresholdProgress,
+} from '@almanach/shared';
 
 /** Calendar entry as returned by GET /api/calendar. */
 export interface CalendarItem {
@@ -24,8 +30,19 @@ export interface Outlook {
   projectedRevenueCents: number;
   unconverted: number;
   thresholds: ThresholdProgress[];
-  /** Other activities of the same business, from linked instances: revenue of the fiscal year. */
-  linked: { label: string; cents: number; receivedAt: string | null; error: string | null }[];
+  /** Revenue, estimates and allowance per activity, the main one first. */
+  activities: ActivityBreakdown[];
+  /**
+   * Other activities of the same business, from linked instances: revenue of the fiscal year and the activity it
+   * counts as ("main" or a status), null when it only counts in the thresholds.
+   */
+  linked: {
+    label: string;
+    cents: number;
+    receivedAt: string | null;
+    error: string | null;
+    activity: string | null;
+  }[];
   estimates: EstimateResult[];
   projection: EstimateResult[];
   months: { month: string; revenueCents: number; estimateCents: number }[];
@@ -37,6 +54,8 @@ export interface DeadlineDetail {
   revenueCents: number | null;
   unconverted: number;
   estimates: EstimateResult[];
+  /** Per activity, when the business has several. */
+  activities: ActivityBreakdown[];
   currency: string;
   mark: { doneOn: string | null; note: string | null; actualCents: number | null; hidden: boolean } | null;
 }

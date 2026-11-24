@@ -3,6 +3,7 @@ import { bodyLimit } from 'hono/body-limit';
 import { secureHeaders } from 'hono/secure-headers';
 import type { Config } from './config.ts';
 import type { Database } from './db/client.ts';
+import { activityRoutes } from './features/activities/activities.ts';
 import { accountRoutes } from './features/auth/account.routes.ts';
 import { authRoutes } from './features/auth/auth.routes.ts';
 import { requireUser, type SessionStore } from './features/auth/sessions.ts';
@@ -134,6 +135,7 @@ export function createApp(deps: AppDeps): Hono<AppEnv> {
     '/api/companies/*',
     '/api/packs',
     '/api/profile',
+    '/api/profile/*',
     '/api/onboarding',
     '/api/clients/*',
     '/api/missions/*',
@@ -169,6 +171,7 @@ export function createApp(deps: AppDeps): Hono<AppEnv> {
   };
   app.use('/api/documents/*', changed);
   app.use('/api/payments/*', changed);
+  app.use('/api/profile/*', changed);
   app.use('/api/dashboard', async (c, next) => {
     deps.federation.refresh(c.var.company.id);
     await next();
@@ -204,6 +207,7 @@ export function createApp(deps: AppDeps): Hono<AppEnv> {
   );
   app.route('/api/situation', situationRoutes(deps.db, deps.packs));
   app.route('/api/admin/packs', packAdminRoutes(deps.packs, deps.packUpdates));
+  app.route('/api/profile/activities', activityRoutes(deps.db, deps.packs));
   app.route('/api', profileRoutes(deps.db, deps.packs));
   app.route('/api/clients', clientRoutes(deps.db));
   app.route('/api/missions', missionRoutes(deps.db));

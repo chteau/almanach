@@ -1,4 +1,5 @@
 import {
+  activityBreakdown,
   addDays,
   computeEstimates,
   type DeadlineOccurrence,
@@ -19,6 +20,7 @@ import type { Database } from '../../db/client.ts';
 import {
   clients,
   companies,
+  companyActivities,
   customDeadlines,
   deadlineMarks,
   documents,
@@ -88,15 +90,28 @@ export function situationPeriods(
  * Turns a person's profile into the facts rules depend on
  *
  * @param profile {ProfileRow} - stored profile
- * @returns {RuleProfile} - status, options, period and activity start
+ * @param activities {string[]} - statuses of the secondary activities
+ * @returns {RuleProfile} - status, options, period, activity start and secondary activities
  */
-export function ruleProfile(profile: ProfileRow): RuleProfile {
+export function ruleProfile(profile: ProfileRow, activities: string[] = []): RuleProfile {
   return {
     status: profile.status,
     options: profile.options,
     declarationPeriod: profile.declarationPeriod,
     activityStart: profile.activityStart,
+    activities,
   };
+}
+
+/** Revenue of a linked instance, attached or not to an activity of the company. */
+export interface LinkedRevenue {
+  id: string;
+  label: string;
+  receivedAt: string | null;
+  error: string | null;
+  /** Activity the revenue counts as ("main" or a secondary status); null: thresholds only, by category. */
+  activity: string | null;
+  receipts: Receipt[];
 }
 
 /** Deadlines, revenue, estimates and thresholds for one person (P04, P05, P06, P18). */
@@ -126,13 +141,40 @@ export class PlanningService {
   }
 
   /**
+   * Tells whether a status exists in the pack of a country
+   *
+   * @param country {string} - country code
+   * @param status {string} - status id
+   * @returns {boolean} - true when the pack lists it
+   */
+  knownStatus(country: string, status: string): boolean {
+    return this.packs.get(country)?.statuses.some((item) => item.id === status) ?? false;
+  }
+
+  /**
+   * Statuses of the secondary activities of a company
+   *
+   * @param companyId {string} - company
+   * @returns {Promise<string[]>} - statuses, oldest first
+   */
+  async activities(companyId: string): Promise<string[]> {
+    const rows = await this.db
+      .select({ status: companyActivities.status })
+      .from(companyActivities)
+      .where(eq(companyActivities.companyId, companyId))
+      .orderBy(asc(companyActivities.createdAt));
+    return rows.map((row) => row.status);
+  }
+
+  /**
    * Money collected between two dates, in the main currency
    *
    * @param companyId {string} - owner
    * @param mainCurrency {string} - profile currency
    * @param from {string} - first day, inclusive
    * @param to {string} - last day, inclusive
-   * @returns {Promise<ReceiptSet>} - receipts and the count of payments that could not be converted
+   * @returns {Promise<ReceiptSet>} - receipts, with the status of their secondary activity, and the count of
+   * payments that could not be converted
    */
   async receipts(companyId: string, mainCurrency: string, from: string, to: string): Promise<ReceiptSet> {
     const rows = await this.db
@@ -141,9 +183,15 @@ export class PlanningService {
         amount: payments.amountCents,
         received: payments.receivedCents,
         currency: documents.currency,
+        category: companyActivities.status,
       })
       .from(payments)
       .innerJoin(documents, eq(documents.id, payments.documentId))
+      // A payment without activity follows its document; a document without activity is the main one's.
+      .leftJoin(
+        companyActivities,
+        eq(companyActivities.id, sql`coalesce(${payments.activityId}, ${documents.activityId})`),
+      )
       .where(and(eq(payments.companyId, companyId), gte(payments.date, from), lte(payments.date, to)));
     const external = await this.db
       .select({
@@ -151,6 +199,7 @@ export class PlanningService {
         amount: externalRevenues.amountCents,
         received: externalRevenues.receivedCents,
         currency: externalRevenues.currency,
+        category: sql<string | null>`null`,
       })
       .from(externalRevenues)
       .where(
@@ -165,8 +214,9 @@ export class PlanningService {
     const receipts: Receipt[] = [];
     let unconverted = 0;
     for (const row of [...rows, ...external]) {
-      if (row.currency === mainCurrency) receipts.push({ date: row.date, cents: row.amount });
-      else if (row.received !== null) receipts.push({ date: row.date, cents: row.received });
+      const category = row.category ? { category: row.category } : {};
+      if (row.currency === mainCurrency) receipts.push({ date: row.date, cents: row.amount, ...category });
+      else if (row.received !== null) receipts.push({ date: row.date, cents: row.received, ...category });
       else unconverted += 1;
     }
     return { receipts, unconverted };
@@ -179,9 +229,9 @@ export class PlanningService {
    * @param companyId {string} - owner
    * @param mainCurrency {string} - profile currency; totals in another currency are never stored
    * @param from {string} - first day; totals are monthly, dated on the first of their month
-   * @returns {Promise<{ label: string; receivedAt: string | null; error: string | null; receipts: Receipt[] }[]>} - one entry per link
+   * @returns {Promise<LinkedRevenue[]>} - one entry per link; an attached link's receipts take its activity's status
    */
-  async linkedRevenue(companyId: string, mainCurrency: string, from: string) {
+  async linkedRevenue(companyId: string, mainCurrency: string, from: string): Promise<LinkedRevenue[]> {
     if (!this.federationPreset) {
       const [row] = await this.db.select({ on: instance.federation }).from(instance).limit(1);
       if (!row?.on) return [];
@@ -192,6 +242,8 @@ export class PlanningService {
         label: federationLinks.peerLabel,
         receivedAt: federationLinks.receivedAt,
         error: federationLinks.error,
+        activityMain: federationLinks.activityMain,
+        activityStatus: companyActivities.status,
         month: federationTotals.month,
         category: federationTotals.category,
         cents: federationTotals.cents,
@@ -199,6 +251,7 @@ export class PlanningService {
       .from(federationLinks)
       .innerJoin(companies, and(eq(companies.id, federationLinks.companyId), eq(companies.federation, true)))
       .innerJoin(federationTotals, eq(federationTotals.linkId, federationLinks.id))
+      .leftJoin(companyActivities, eq(companyActivities.id, federationLinks.activityId))
       .where(
         and(
           eq(federationLinks.companyId, companyId),
@@ -208,18 +261,19 @@ export class PlanningService {
           gte(federationTotals.month, from.slice(0, 7)),
         ),
       );
-    const links = new Map<
-      string,
-      { label: string; receivedAt: string | null; error: string | null; receipts: Receipt[] }
-    >();
+    const links = new Map<string, LinkedRevenue>();
     for (const row of rows) {
       const link = links.get(row.id) ?? {
+        id: row.id,
         label: row.label ?? '',
         receivedAt: row.receivedAt?.toISOString() ?? null,
         error: row.error,
+        activity: row.activityMain ? 'main' : row.activityStatus,
         receipts: [],
       };
-      link.receipts.push({ date: `${row.month}-01`, cents: row.cents, category: row.category, linked: true });
+      // Attached to the main activity: no category, as for local receipts.
+      const category = row.activityMain ? {} : { category: row.activityStatus ?? row.category };
+      link.receipts.push({ date: `${row.month}-01`, cents: row.cents, ...category, linked: true });
       links.set(row.id, link);
     }
     return [...links.values()];
@@ -232,11 +286,18 @@ export class PlanningService {
    * @param pack {PackMeta} - country pack
    * @param from {string} - first day
    * @param to {string} - last day
+   * @param activities {string[]} - statuses of the secondary activities
    * @returns {DeadlineOccurrence[]} - occurrences due within the range
    */
-  packDeadlines(profile: ProfileRow, pack: PackMeta, from: string, to: string): DeadlineOccurrence[] {
+  packDeadlines(
+    profile: ProfileRow,
+    pack: PackMeta,
+    from: string,
+    to: string,
+    activities: string[] = [],
+  ): DeadlineOccurrence[] {
     const holidays = this.packs.holidays(pack.country);
-    const facts = ruleProfile(profile);
+    const facts = ruleProfile(profile, activities);
     const first = fiscalYearOf(from, pack.fiscalYearStart).year - 1;
     const last = fiscalYearOf(to, pack.fiscalYearStart).year;
     const out: DeadlineOccurrence[] = [];
@@ -280,12 +341,13 @@ export class PlanningService {
     to: string,
   ): Promise<{ occurrence: DeadlineOccurrence; profile: ProfileRow; pack: PackMeta }[]> {
     const out: { occurrence: DeadlineOccurrence; profile: ProfileRow; pack: PackMeta }[] = [];
+    const activities = await this.activities(profile.companyId);
     for (const [index, segment] of (await this.segments(profile)).entries()) {
       const pack = this.packs.get(segment.profile.country);
       // The first situation keeps every obligation due after the start, as before any change existed.
       const lower = index === 0 ? '' : segment.from;
       if (!pack || (segment.to !== null && segment.to < segment.from)) continue;
-      for (const occurrence of this.packDeadlines(segment.profile, pack, from, to)) {
+      for (const occurrence of this.packDeadlines(segment.profile, pack, from, to, activities)) {
         // A declaration belongs to the situation of the period it covers, even when due after a change.
         const anchor = occurrence.periodStart ?? occurrence.due;
         if (anchor >= lower && (segment.to === null || anchor <= segment.to)) {
@@ -494,24 +556,21 @@ export class PlanningService {
       .limit(1);
     let revenue: ReceiptSet | null = null;
     let estimates: EstimateResult[] = [];
+    let activities: ReturnType<typeof activityBreakdown> = [];
     if (occurrence.periodStart && occurrence.periodEnd) {
-      revenue = await this.receipts(
-        companyId,
-        profile.currency,
-        occurrence.periodStart,
-        occurrence.periodEnd,
-      );
-      const rules = this.packs.rules(
-        pack.country,
-        fiscalYearOf(occurrence.periodStart, pack.fiscalYearStart).year,
-      );
+      const { periodStart, periodEnd } = occurrence;
+      const local = await this.receipts(companyId, profile.currency, periodStart, periodEnd);
+      // One declaration covers every activity of the business, linked ones attached to an activity included.
+      const linked = attachedReceipts(
+        await this.linkedRevenue(companyId, profile.currency, periodStart),
+      ).filter((receipt) => receipt.date <= periodEnd);
+      revenue = { ...local, receipts: [...local.receipts, ...linked] };
+      const rules = this.packs.rules(pack.country, fiscalYearOf(periodStart, pack.fiscalYearStart).year);
+      const facts = ruleProfile(profile, await this.activities(companyId));
       if (rules && occurrence.estimates.length > 0) {
-        estimates = computeEstimates(
-          rules.rules,
-          ruleProfile(profile),
-          revenue.receipts,
-          occurrence.estimates,
-        );
+        estimates = computeEstimates(rules.rules, facts, revenue.receipts, occurrence.estimates);
+        if (facts.activities?.length)
+          activities = activityBreakdown(rules.rules, facts, revenue.receipts, occurrence.estimates);
       }
     }
     return {
@@ -519,6 +578,7 @@ export class PlanningService {
       revenueCents: revenue ? revenue.receipts.reduce((sum, receipt) => sum + receipt.cents, 0) : null,
       unconverted: revenue?.unconverted ?? 0,
       estimates,
+      activities,
       currency: profile.currency,
       mark: mark
         ? { doneOn: mark.doneOn, note: mark.note, actualCents: mark.actualCents, hidden: mark.hidden }
@@ -547,8 +607,9 @@ export class PlanningService {
     const set = await this.receipts(companyId, profile.currency, from, fiscal.end);
     const receipts =
       simulateCents > 0 ? [...set.receipts, { date: today, cents: simulateCents }] : set.receipts;
-    const facts = ruleProfile(profile);
-    // Thresholds count the whole business, linked activities included; estimates stay local.
+    const facts = ruleProfile(profile, await this.activities(companyId));
+    // Thresholds count the whole business, linked activities included; estimates count the local activities and
+    // the links attached to one of them.
     const linked = await this.linkedRevenue(companyId, profile.currency, from);
     const thresholds: ThresholdProgress[] = measureThresholds(
       found.rules,
@@ -558,10 +619,10 @@ export class PlanningService {
       today,
       profile.priorRevenueCents,
     );
-    const yearReceipts = receipts.filter(
-      (receipt) => receipt.date >= fiscal.start && receipt.date <= fiscal.end,
-    );
-    const toDate = computeEstimates(found.rules, facts, yearReceipts);
+    const inYear = (receipt: Receipt) => receipt.date >= fiscal.start && receipt.date <= fiscal.end;
+    const yearReceipts = receipts.filter(inYear);
+    const estimated = [...yearReceipts, ...attachedReceipts(linked).filter(inYear)];
+    const toDate = computeEstimates(found.rules, facts, estimated);
     const elapsed = Math.max(1, Math.round((Date.parse(today) - Date.parse(fiscal.start)) / 86_400_000) + 1);
     const length = Math.round((Date.parse(fiscal.end) - Date.parse(fiscal.start)) / 86_400_000) + 1;
     const collected = yearReceipts.reduce((sum, receipt) => sum + receipt.cents, 0);
@@ -569,9 +630,9 @@ export class PlanningService {
     const projection = computeEstimates(
       found.rules,
       facts,
-      scaleReceipts(yearReceipts, projectedRevenue, today),
+      scaleReceipts(estimated, length / elapsed, today),
     );
-    const months = monthlyEstimates(found.rules, facts, yearReceipts, fiscal.start);
+    const months = monthlyEstimates(found.rules, facts, estimated, fiscal.start);
     return {
       year: fiscal.year,
       fiscalYear: fiscal,
@@ -582,7 +643,8 @@ export class PlanningService {
       projectedRevenueCents: projectedRevenue,
       unconverted: set.unconverted,
       thresholds,
-      linked: linked.map(({ receipts: list, ...link }) => ({
+      activities: activityBreakdown(found.rules, facts, estimated),
+      linked: linked.map(({ receipts: list, id: _id, ...link }) => ({
         ...link,
         cents: list
           .filter((receipt) => receipt.date >= fiscal.start && receipt.date <= fiscal.end)
@@ -624,17 +686,35 @@ export function occurrencesOf(
 }
 
 /**
- * Spreads a projected yearly revenue over the receipts so flat-rate segments keep their dates
+ * Receipts of the links attached to an activity of the company, the only linked revenue estimates count
+ *
+ * @param links {LinkedRevenue[]} - revenue of the linked instances
+ * @returns {Receipt[]} - their receipts, with the status of the activity they are attached to
+ */
+export function attachedReceipts(links: LinkedRevenue[]): Receipt[] {
+  return links.filter((link) => link.activity !== null).flatMap((link) => link.receipts);
+}
+
+/**
+ * Projects each activity's revenue over the whole year at its current pace, so flat-rate segments keep their
+ * dates and every activity its own rates
  *
  * @param receipts {Receipt[]} - receipts so far
- * @param projectedCents {number} - projected revenue for the whole year
+ * @param factor {number} - length of the year divided by the days elapsed
  * @param today {string} - date the rest is assumed to arrive from
- * @returns {Receipt[]} - receipts plus one for the remainder
+ * @returns {Receipt[]} - receipts plus one remainder per activity
  */
-function scaleReceipts(receipts: Receipt[], projectedCents: number, today: string): Receipt[] {
-  const collected = receipts.reduce((sum, receipt) => sum + receipt.cents, 0);
-  const rest = projectedCents - collected;
-  return rest > 0 ? [...receipts, { date: today, cents: rest }] : receipts;
+function scaleReceipts(receipts: Receipt[], factor: number, today: string): Receipt[] {
+  const totals = new Map<string | undefined, number>();
+  for (const receipt of receipts)
+    totals.set(receipt.category, (totals.get(receipt.category) ?? 0) + receipt.cents);
+  const rest = [...totals].flatMap(([category, cents]) => {
+    const remainder = Math.round(cents * factor) - cents;
+    return remainder > 0
+      ? [{ date: today, cents: remainder, ...(category === undefined ? {} : { category }) }]
+      : [];
+  });
+  return [...receipts, ...rest];
 }
 
 /**

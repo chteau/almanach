@@ -2,7 +2,7 @@ import { onboardingDraftSchema, type Profile, profileSchema } from '@almanach/sh
 import { asc, eq } from 'drizzle-orm';
 import { Hono } from 'hono';
 import type { Database } from '../../db/client.ts';
-import { auditLog, onboardingDrafts, profiles, situationChanges } from '../../db/schema.ts';
+import { auditLog, companies, onboardingDrafts, profiles, situationChanges } from '../../db/schema.ts';
 import { parseBody } from '../../http/errors.ts';
 import type { AppEnv } from '../../http/request.ts';
 import { pinNumbering } from '../billing/billing.ts';
@@ -87,6 +87,8 @@ export function profileRoutes(db: Database, packs: PackRegistry): Hono<AppEnv> {
         .insert(profiles)
         .values(values)
         .onConflictDoUpdate({ target: profiles.companyId, set: values });
+      // The company is named after the trade name of the profile, so every list shows the same name.
+      await tx.update(companies).set({ name: data.company.name }).where(eq(companies.id, companyId));
       await tx.delete(onboardingDrafts).where(eq(onboardingDrafts.companyId, companyId));
       await tx
         .insert(auditLog)

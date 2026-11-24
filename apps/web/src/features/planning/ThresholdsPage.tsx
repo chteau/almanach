@@ -11,6 +11,7 @@ import { TextField } from '../../components/TextField/TextField.tsx';
 import { useI18n } from '../../i18n/I18nProvider.tsx';
 import { formatDate, formatMoney } from '../../lib/format.ts';
 import { useResource } from '../../lib/useResource.ts';
+import { ActivityBreakdown } from './ActivityBreakdown.tsx';
 import { LinkedActivities } from './LinkedActivities.tsx';
 import styles from './Planning.module.css';
 import { labelOf, type Outlook } from './types.ts';
@@ -154,6 +155,7 @@ export function ThresholdsPage() {
               </div>
             </dl>
             <LinkedActivities outlook={outlook} money={money} />
+            <ActivityBreakdown activities={outlook.activities} money={money} />
             <TableScroll>
               <table className={styles.table}>
                 <caption className="visually-hidden">{t('outlook.estimates')}</caption>

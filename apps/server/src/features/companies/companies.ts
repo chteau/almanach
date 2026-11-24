@@ -6,6 +6,7 @@ import type { Database } from '../../db/client.ts';
 import { auditLog, companies, profiles } from '../../db/schema.ts';
 import { parseBody } from '../../http/errors.ts';
 import type { AppEnv } from '../../http/request.ts';
+import { listActivities } from '../activities/activities.ts';
 
 /** Cookie remembering the active company, so plain links (PDF, export) work on it too. */
 export const COMPANY_COOKIE = 'almanach_company';
@@ -21,14 +22,14 @@ export function ownerOf(companyId: string): SQL {
 }
 
 /**
- * Lists the companies of a person, oldest first, with the profile facts the interface needs
+ * Lists the companies of a person, oldest first, with the profile facts and activities the interface needs
  *
  * @param db {Database} - Drizzle database
  * @param userId {string} - owner
  * @returns {Promise<Company[]>} - the companies
  */
 export async function listCompanies(db: Database, userId: string): Promise<Company[]> {
-  return db
+  const rows = await db
     .select({
       id: companies.id,
       name: companies.name,
@@ -41,6 +42,12 @@ export async function listCompanies(db: Database, userId: string): Promise<Compa
     .leftJoin(profiles, eq(profiles.companyId, companies.id))
     .where(eq(companies.userId, userId))
     .orderBy(asc(companies.createdAt), asc(companies.id));
+  return Promise.all(
+    rows.map(async (row) => ({
+      ...row,
+      activities: row.country ? await listActivities(db, row.id, row.status) : [],
+    })),
+  );
 }
 
 /**
@@ -129,11 +136,22 @@ export function companyRoutes(db: Database, cookieSecure: boolean): Hono<AppEnv>
     const { data, response } = await parseBody(c, companyInputSchema);
     if (response) return response;
     if (!idSchema.safeParse(id).success) return c.json({ error: 'not_found' }, 404);
-    const updated = await db
-      .update(companies)
-      .set({ name: data.name })
-      .where(and(eq(companies.id, id), eq(companies.userId, c.var.user.id)))
-      .returning({ id: companies.id });
+    const updated = await db.transaction(async (tx) => {
+      const rows = await tx
+        .update(companies)
+        .set({ name: data.name })
+        .where(and(eq(companies.id, id), eq(companies.userId, c.var.user.id)))
+        .returning({ id: companies.id });
+      // The trade name of the profile is the same name: both stay in step.
+      const [profile] =
+        rows.length > 0 ? await tx.select().from(profiles).where(eq(profiles.companyId, id)) : [];
+      if (profile)
+        await tx
+          .update(profiles)
+          .set({ company: { ...profile.company, name: data.name } })
+          .where(eq(profiles.companyId, id));
+      return rows;
+    });
     return updated.length > 0 ? c.body(null, 204) : c.json({ error: 'not_found' }, 404);
   });
 

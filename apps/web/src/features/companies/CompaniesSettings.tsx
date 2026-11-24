@@ -63,7 +63,7 @@ export function CompaniesSettings() {
               <TextField
                 label={t('companies.name')}
                 value={names[company.id] ?? company.name}
-                maxLength={120}
+                maxLength={160}
                 required
                 onChange={(event) => setNames({ ...names, [company.id]: event.target.value })}
               />
@@ -98,7 +98,7 @@ export function CompaniesSettings() {
         <TextField
           label={t('companies.new')}
           value={name}
-          maxLength={120}
+          maxLength={160}
           required
           onChange={(event) => setName(event.target.value)}
         />

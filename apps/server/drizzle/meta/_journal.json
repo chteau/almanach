@@ -113,6 +113,20 @@
       "when": 1795448102166,
       "tag": "0015_mcp_tokens",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1795478335648,
+      "tag": "0016_company_activities",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1795478342528,
+      "tag": "0017_company_name_from_profile",
+      "breakpoints": true
     }
   ]
 }

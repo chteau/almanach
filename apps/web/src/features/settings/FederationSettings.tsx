@@ -6,12 +6,14 @@ import { ConfirmDialog } from '../../components/ConfirmDialog/ConfirmDialog.tsx'
 import form from '../../components/FormPage/FormPage.module.css';
 import { Notice } from '../../components/Notice/Notice.tsx';
 import list from '../../components/RowList/RowList.module.css';
+import { SelectField } from '../../components/SelectField/SelectField.tsx';
 import { TextField } from '../../components/TextField/TextField.tsx';
 import { useI18n } from '../../i18n/I18nProvider.tsx';
 import type { MessageKey } from '../../i18n/messages.ts';
 import { ApiError, api } from '../../lib/api.ts';
 import { formatDate } from '../../lib/format.ts';
 import { useResource } from '../../lib/useResource.ts';
+import { statusLabel, useActivities } from '../activities/useActivities.ts';
 import { describeError } from '../install/errors.ts';
 import styles from '../planning/Planning.module.css';
 import local from './FederationSettings.module.css';
@@ -60,6 +62,7 @@ const grouped = (value: string | null): string => value?.match(/.{1,4}/g)?.join(
 export function FederationSettings() {
   const { t, locale } = useI18n();
   const { data, reload } = useResource<FederationStatus>('/api/settings/federation');
+  const activities = useActivities();
   const [issued, setIssued] = useState<{ code: string; expiresAt: string; fingerprint: string }>();
   const [code, setCode] = useState('');
   const [mode, setMode] = useState<'issue' | 'join'>('issue');
@@ -92,6 +95,7 @@ export function FederationSettings() {
       setMessage({ tone: 'error', text: explain(error, problem) });
     }
     reload();
+    activities.reload();
   }
 
   /**
@@ -108,6 +112,8 @@ export function FederationSettings() {
   const time = (value: string) =>
     new Date(value).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
   const ready = data.allowed && data.enabled && data.secretsKey;
+  const statuses = activities.data?.statuses ?? [];
+  const activityName = (status: string) => statusLabel(statuses, status, locale);
 
   return (
     <section className={form.section} aria-labelledby="federation-title">
@@ -248,6 +254,47 @@ export function FederationSettings() {
                       )}
                       <p className={styles.caption}>{t('federation.detail.hint')}</p>
                     </div>
+                    {activities.data && activities.data.activities.length > 0 && (
+                      <SelectField
+                        label={t('federation.activity')}
+                        hint={t('federation.activity.hint')}
+                        value={link.activityAuto ? 'auto' : (link.activity ?? 'none')}
+                        disabled={!ready}
+                        onChange={(event) =>
+                          void run(async () => {
+                            await api(`/api/settings/federation/links/${link.id}/activity`, {
+                              method: 'PUT',
+                              body: { activity: event.target.value },
+                            });
+                            return undefined;
+                          })
+                        }
+                      >
+                        <option value="auto">
+                          {link.peerActivity
+                            ? t('federation.activity.auto', { activity: activityName(link.peerActivity) })
+                            : t('federation.activity.autoUnknown')}
+                        </option>
+                        {activities.data.activities.map((activity) => (
+                          <option key={activity.id ?? 'main'} value={activity.id ?? 'main'}>
+                            {activity.main
+                              ? t('activities.mainOption', { activity: activityName(activity.status) })
+                              : activityName(activity.status)}
+                          </option>
+                        ))}
+                        <option value="none">{t('federation.activity.none')}</option>
+                      </SelectField>
+                    )}
+                    {activities.data?.activities
+                      .filter((activity) => activity.linkId === link.id)
+                      .map((activity) => (
+                        <Notice key={activity.id} tone="info">
+                          {t('federation.activity.created', {
+                            activity: activityName(activity.status),
+                            label: link.peerLabel ?? '',
+                          })}
+                        </Notice>
+                      ))}
                   </>
                 )}
               </li>

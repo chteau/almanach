@@ -15,6 +15,7 @@ import { ApiError, api } from '../../lib/api.ts';
 import { today } from '../../lib/format.ts';
 import { useResource } from '../../lib/useResource.ts';
 import { useUnsavedGuard } from '../../lib/useUnsavedGuard.ts';
+import { ActivitySelect } from '../activities/ActivitySelect.tsx';
 import { describeError } from '../install/errors.ts';
 
 interface Custom {
@@ -24,6 +25,7 @@ interface Custom {
   recurrence: 'none' | 'monthly' | 'quarterly' | 'yearly';
   until: string | null;
   notes: string | null;
+  activityId: string | null;
 }
 
 /**
@@ -54,6 +56,7 @@ function CustomForm({ existing }: { existing: Custom | null }) {
   const [recurrence, setRecurrence] = useState<Custom['recurrence']>(existing?.recurrence ?? 'none');
   const [until, setUntil] = useState(existing?.until ?? '');
   const [notes, setNotes] = useState(existing?.notes ?? '');
+  const [activityId, setActivityId] = useState(existing?.activityId ?? null);
   const [dirty, setDirty] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [failure, setFailure] = useState<string>();
@@ -86,7 +89,14 @@ function CustomForm({ existing }: { existing: Custom | null }) {
     if (recurrence !== 'none' && until && until < date) found.until = t('custom.until.before');
     setErrors(found);
     if (Object.keys(found).length > 0) return;
-    const body = { title, date, recurrence, until: recurrence === 'none' || !until ? null : until, notes };
+    const body = {
+      title,
+      date,
+      recurrence,
+      until: recurrence === 'none' || !until ? null : until,
+      notes,
+      activityId,
+    };
     try {
       if (existing) await api(`/api/custom-deadlines/${existing.id}`, { method: 'PUT', body });
       else await api('/api/custom-deadlines', { method: 'POST', body });
@@ -159,6 +169,7 @@ function CustomForm({ existing }: { existing: Custom | null }) {
           maxLength={1000}
           onChange={(event) => edit(setNotes)(event.target.value)}
         />
+        <ActivitySelect value={activityId} onChange={edit(setActivityId)} />
         <div className={form.actions}>
           {existing && (
             <Button variant="ghost" onClick={() => setConfirmDelete(true)}>

@@ -28,6 +28,7 @@ import type { MessageKey } from '../../i18n/messages.ts';
 import { ApiError, api } from '../../lib/api.ts';
 import { centsToInput, formatDate, formatMoney, today } from '../../lib/format.ts';
 import { useUnsavedGuard } from '../../lib/useUnsavedGuard.ts';
+import { ActivitySelect } from '../activities/ActivitySelect.tsx';
 import { describeError } from '../install/errors.ts';
 import { CURRENCIES } from '../onboarding/form.ts';
 import styles from './DocumentEditor.module.css';
@@ -55,6 +56,7 @@ interface Draft {
   discount: string;
   note: string;
   depositIds: string[];
+  activityId: string | null;
 }
 
 let nextLineKey = 0;
@@ -127,6 +129,7 @@ function toPayload(draft: Draft): { payload: DocumentDraft | null; lineErrors: R
     discountBp,
     note: draft.note,
     depositIds: draft.depositIds,
+    activityId: draft.activityId,
   };
   return documentDraftSchema.safeParse(payload).success
     ? { payload, lineErrors }
@@ -179,6 +182,7 @@ export function DocumentEditor(props: EditorProps) {
           discount: initial.discountBp ? String(initial.discountBp / 100) : '',
           note: initial.note ?? '',
           depositIds: initial.depositIds,
+          activityId: initial.activityId,
         }
       : {
           type,
@@ -204,6 +208,7 @@ export function DocumentEditor(props: EditorProps) {
           discount: '',
           note: props.defaultNote,
           depositIds: [],
+          activityId: null,
         },
   );
   const [id, setId] = useState(initial?.id ?? null);
@@ -407,6 +412,7 @@ export function DocumentEditor(props: EditorProps) {
                 </option>
               ))}
             </SelectField>
+            <ActivitySelect value={draft.activityId} onChange={(activityId) => change({ activityId })} />
           </div>
           {client && !client.address && <Notice tone="warn">{t('documents.clientNoAddress')}</Notice>}
           <div className={form.grid}>

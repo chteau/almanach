@@ -1,6 +1,8 @@
 import { z } from 'zod';
+import type { CompanyActivity } from './activities.ts';
 
-export const companyInputSchema = z.object({ name: z.string().trim().min(1).max(120) }).strict();
+/** Same bounds as the trade name of the profile, which the company name mirrors. */
+export const companyInputSchema = z.object({ name: z.string().trim().min(1).max(160) }).strict();
 
 /** A read-only Stripe key, restricted (`rk_`) so Almanach can never move money. */
 export const stripeSettingsSchema = z
@@ -22,6 +24,8 @@ export interface Company {
   status: string | null;
   activityStart: string | null;
   ceasedOn: string | null;
+  /** Main activity first, then the secondary ones; empty before onboarding. */
+  activities: CompanyActivity[];
 }
 
 /**

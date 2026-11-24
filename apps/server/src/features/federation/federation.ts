@@ -1,4 +1,5 @@
 import {
+  activityStatusSchema,
   DETAIL_LIMITS,
   type FederationLink,
   federationCreateSchema,
@@ -6,6 +7,7 @@ import {
   federationLinkOptionsSchema,
   federationSettingsSchema,
   type LinkedDetail,
+  linkActivitySchema,
   linkedDetailSchema,
   type MonthlyTotals,
   monthlyTotalsSchema,
@@ -34,6 +36,7 @@ import { type AppEnv, requestContext } from '../../http/request.ts';
 import { RateLimiter, rateLimit } from '../../security/rate-limit.ts';
 import { decryptSecret, encryptSecret } from '../../security/secrets.ts';
 import { randomToken, sha256 } from '../../security/tokens.ts';
+import { ensureActivity, ownsActivity } from '../activities/activities.ts';
 import { ownerOf } from '../companies/companies.ts';
 import type { DocumentService } from '../documents/documents.service.ts';
 import { generateSigningKeys, keyIdOf } from '../packs/signing.ts';
@@ -79,10 +82,14 @@ const pairRequestSchema = z
   .strict();
 const pairAnswerSchema = z.object({ publicKey: publicKeySchema }).strict();
 // The detail fields are optional and only sent when used, so peers running an older version keep exchanging totals.
+// `activity` is the status of the sender's main activity, null when it does not share its totals. An instance of
+// an older version refuses it: the caller then sends again without it, and the other side only answers with it
+// when the request carried it.
 const exchangeRequestSchema = z
   .object({
     receive: z.boolean(),
     totals: monthlyTotalsSchema.nullable(),
+    activity: activityStatusSchema.nullable().optional(),
     receiveDetail: z.literal(true).optional(),
     detail: linkedDetailSchema.optional(),
   })
@@ -90,6 +97,7 @@ const exchangeRequestSchema = z
 const exchangeAnswerSchema = z
   .object({
     totals: monthlyTotalsSchema.nullable(),
+    activity: activityStatusSchema.nullable().optional(),
     receiveDetail: z.literal(true).optional(),
     detail: linkedDetailSchema.optional(),
   })
@@ -112,8 +120,8 @@ function parseJson(text: string): unknown {
 /**
  * Sums receipts per calendar month and fiscal category: the only figures a link ever shares
  *
- * @param receipts {Receipt[]} - receipts in the company currency
- * @param statusOn {(date: string) => string} - status of the activity on a date
+ * @param receipts {Receipt[]} - receipts in the company currency; those of a secondary activity carry its status
+ * @param statusOn {(date: string) => string} - status of the main activity on a date
  * @returns {MonthlyTotals['months']} - totals in month order, without any client, invoice or unit amount
  */
 export function monthlyTotals(
@@ -122,7 +130,7 @@ export function monthlyTotals(
 ): MonthlyTotals['months'] {
   const sums = new Map<string, number>();
   for (const receipt of receipts) {
-    const key = `${receipt.date.slice(0, 7)}|${statusOn(receipt.date)}`;
+    const key = `${receipt.date.slice(0, 7)}|${receipt.category ?? statusOn(receipt.date)}`;
     sums.set(key, (sums.get(key) ?? 0) + receipt.cents);
   }
   return [...sums.keys()].sort().map((key) => {
@@ -383,6 +391,9 @@ export class Federation {
       receivedAt: row.receivedAt?.toISOString() ?? null,
       error: row.error,
       codeExpiresAt: row.codeExpiresAt?.toISOString() ?? null,
+      peerActivity: row.peerActivity,
+      activityAuto: row.activityAuto,
+      activity: row.activityMain ? 'main' : row.activityId,
     }));
   }
 
@@ -544,6 +555,47 @@ export class Federation {
   }
 
   /**
+   * Status of the main activity of a company, announced to its links with the totals
+   *
+   * @param companyId {string} - company
+   * @returns {Promise<string | null>} - profile status, null before onboarding or for a generic profile
+   */
+  async ownActivity(companyId: string): Promise<string | null> {
+    return (await this.planning.profile(companyId))?.status ?? null;
+  }
+
+  /**
+   * Chooses the activity a link's revenue counts as: "auto" follows the announced one, "main", "none" (thresholds
+   * only) or a secondary activity of the company
+   *
+   * @param link {LinkRow} - link of the company
+   * @param choice {z.infer<typeof linkActivitySchema>['activity']} - wanted attachment
+   * @returns {Promise<boolean>} - false when the secondary activity is not the company's
+   */
+  async attach(link: LinkRow, choice: z.infer<typeof linkActivitySchema>['activity']): Promise<boolean> {
+    if (choice === 'auto') {
+      const profile = await this.planning.profile(link.companyId);
+      const status = link.peerActivity;
+      const target =
+        status && profile && this.planning.knownStatus(profile.country, status)
+          ? await ensureActivity(this.db, link.companyId, status, link.id)
+          : { main: false, id: null };
+      await this.db
+        .update(federationLinks)
+        .set({ activityAuto: true, activityMain: target.main, activityId: target.id })
+        .where(eq(federationLinks.id, link.id));
+      return true;
+    }
+    const secondary = choice !== 'main' && choice !== 'none' ? choice : null;
+    if (!(await ownsActivity(this.db, link.companyId, secondary))) return false;
+    await this.db
+      .update(federationLinks)
+      .set({ activityAuto: false, activityMain: choice === 'main', activityId: secondary })
+      .where(eq(federationLinks.id, link.id));
+    return true;
+  }
+
+  /**
    * Read-only detail of a company for its links: active clients, issued documents and payments (invoice
    * payments and Stripe receipts) of the current and previous calendar years, newest first and bounded by
    * DETAIL_LIMITS; document lines are left out when the snapshot would be too large
@@ -674,6 +726,7 @@ export class Federation {
    * @param link {LinkRow} - link
    * @param totals {MonthlyTotals | null} - totals received
    * @param detail {LinkedDetail | null} - detail received, kept only when this side receives it
+   * @param activity {string | null | undefined} - main activity the peer announces; undefined from an older peer
    * @returns {Promise<void>} - resolves once stored
    * @throws {FederationError} - currency_mismatch when the peer counts in another currency
    */
@@ -681,10 +734,13 @@ export class Federation {
     link: LinkRow,
     totals: MonthlyTotals | null,
     detail: LinkedDetail | null = null,
+    activity?: string | null,
   ): Promise<void> {
-    if (totals && totals.currency !== (await this.planning.profile(link.companyId))?.currency) {
+    const profile = await this.planning.profile(link.companyId);
+    if (totals && totals.currency !== profile?.currency) {
       throw new FederationError('currency_mismatch');
     }
+    const announced = totals && activity && profile && this.planning.knownStatus(profile.country, activity);
     const sums = new Map<string, MonthlyTotals['months'][number]>();
     for (const item of totals?.months ?? []) {
       const key = `${item.month}|${item.category}`;
@@ -701,10 +757,23 @@ export class Federation {
         .update(federationLinks)
         .set(
           totals
-            ? { peerLabel: totals.label, peerCurrency: totals.currency, receivedAt: new Date() }
+            ? {
+                peerLabel: totals.label,
+                peerCurrency: totals.currency,
+                receivedAt: new Date(),
+                peerActivity: announced ? activity : null,
+              }
             : { receivedAt: null },
         )
         .where(eq(federationLinks.id, link.id));
+      // By default the link counts as the activity its peer announces, created as a secondary one when missing.
+      if (announced && link.activityAuto) {
+        const target = await ensureActivity(tx, link.companyId, activity, link.id);
+        await tx
+          .update(federationLinks)
+          .set({ activityMain: target.main, activityId: target.id })
+          .where(eq(federationLinks.id, link.id));
+      }
     });
   }
 
@@ -806,24 +875,28 @@ export class Federation {
     try {
       const totals = link.share ? await this.ownTotals(link.companyId) : null;
       const detail = sendsDetail(link, link.peerReceivesDetail) ? await this.ownDetail(link.companyId) : null;
-      const sent = await this.post(
-        link.peerUrl,
-        'exchange',
-        {
-          receive: link.receive,
-          totals,
-          ...(keepsDetail(link) && { receiveDetail: true }),
-          ...(detail && { detail }),
-        },
-        this.keys(link),
-      );
+      const request = {
+        receive: link.receive,
+        totals,
+        ...(keepsDetail(link) && { receiveDetail: true }),
+        ...(detail && { detail }),
+      };
+      const activity = totals ? await this.ownActivity(link.companyId) : null;
+      let sent = await this.post(link.peerUrl, 'exchange', { ...request, activity }, this.keys(link));
+      // A peer of an older version refuses the unknown field: same exchange without it.
+      if (sent.status === 422) sent = await this.post(link.peerUrl, 'exchange', request, this.keys(link));
       if (sent.status === 401 || sent.status === 404) throw new FederationError('peer_refused');
       if (sent.status !== 200) throw new FederationError('peer_failed');
       if (!verifyResponse(sent.nonce, sent.text, sent.signature, link.peerPublicKey))
         throw new FederationError('peer_bad_signature');
       const answer = exchangeAnswerSchema.safeParse(parseJson(sent.text));
       if (!answer.success) throw new FederationError('peer_invalid');
-      await this.store(link, link.receive ? answer.data.totals : null, answer.data.detail ?? null);
+      await this.store(
+        link,
+        link.receive ? answer.data.totals : null,
+        answer.data.detail ?? null,
+        answer.data.activity,
+      );
       const peerReceivesDetail = answer.data.receiveDetail === true;
       await this.db
         .update(federationLinks)
@@ -848,15 +921,19 @@ export class Federation {
    * @throws {FederationError} - currency_mismatch
    */
   async answer(link: LinkRow, request: z.infer<typeof exchangeRequestSchema>): Promise<string> {
-    await this.store(link, link.receive ? request.totals : null, request.detail ?? null);
+    await this.store(link, link.receive ? request.totals : null, request.detail ?? null, request.activity);
     const peerReceivesDetail = request.receiveDetail === true;
     await this.db
       .update(federationLinks)
       .set({ syncedAt: new Date(), error: null, peerReceivesDetail })
       .where(eq(federationLinks.id, link.id));
     const detail = sendsDetail(link, peerReceivesDetail) ? await this.ownDetail(link.companyId) : null;
+    const totals = link.share && request.receive ? await this.ownTotals(link.companyId) : null;
+    // Only a caller that announced its own activity reads this field; an older one would refuse the answer.
+    const activity = request.activity !== undefined && totals ? await this.ownActivity(link.companyId) : null;
     return JSON.stringify({
-      totals: link.share && request.receive ? await this.ownTotals(link.companyId) : null,
+      totals,
+      ...(activity && { activity }),
       ...(keepsDetail(link) && { receiveDetail: true }),
       ...(detail && { detail }),
     });
@@ -1109,6 +1186,16 @@ export function federationSettingsRoutes(
     await db.update(federationLinks).set(data).where(eq(federationLinks.id, id));
     if (!data.receive) await db.delete(federationTotals).where(eq(federationTotals.linkId, id));
     if (!(data.receive && data.receiveDetail)) await storeDetail(db, id, null);
+    return c.body(null, 204);
+  });
+
+  router.put('/links/:id/activity', async (c) => {
+    const { data, response } = await parseBody(c, linkActivitySchema);
+    if (response) return response;
+    const id = await ownedLink(c);
+    const [link] = id ? await db.select().from(federationLinks).where(eq(federationLinks.id, id)) : [];
+    if (!link) return c.json({ error: 'not_found' }, 404);
+    if (!(await federation.attach(link, data.activity))) return c.json({ error: 'unknown_activity' }, 422);
     return c.body(null, 204);
   });
 

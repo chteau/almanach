@@ -247,6 +247,7 @@ export class DocumentService {
         discountBp: doc.discountBp,
         note: doc.note,
         depositIds: doc.depositIds,
+        activityId: doc.activityId,
       };
       const derived = await this.derive(companyId, draft, profile, client);
 
@@ -404,6 +405,7 @@ export class DocumentService {
         paidCents,
         creditedCents,
         depositIds: doc.depositIds,
+        activityId: doc.activityId,
         sentAt: doc.sentAt?.toISOString() ?? null,
         createdAt: doc.createdAt.toISOString(),
       };

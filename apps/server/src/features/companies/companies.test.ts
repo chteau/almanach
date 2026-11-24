@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
+import { eq } from 'drizzle-orm';
 import { createApp } from '../../app.ts';
 import { loadConfig } from '../../config.ts';
 import { createDatabase, type Database, runMigrations } from '../../db/client.ts';
@@ -44,9 +45,10 @@ const stripeFetch = (async (input: string | URL | Request) => {
 
 /** The parts of API answers the assertions read. */
 interface Body {
+  id: string;
   active: string;
   company: { id: string };
-  companies: { id: string; name: string; data: { externalRevenues: unknown[] } }[];
+  companies: { id: string; name: string; activities: unknown[]; data: { externalRevenues: unknown[] } }[];
   clients: { id: string; name: string }[];
   format: string;
 }
@@ -213,10 +215,54 @@ describe.skipIf(!url)('companies (database)', () => {
     expect(other).toMatchObject({ keySet: false, imported: 0 });
   });
 
+  test('the company takes the trade name of the profile, and both stay in step', async () => {
+    const name = async () =>
+      (await json(call('a', '/api/companies'))).companies.find((row) => row.id === ids.a)?.name;
+    // Created before onboarding, the company was named after the e-mail: migration 0017 repairs it.
+    expect(await name()).toBe('a');
+    await db.$client.unsafe(
+      await Bun.file(new URL('../../../drizzle/0017_company_name_from_profile.sql', import.meta.url)).text(),
+    );
+    expect(await name()).toBe('Studio');
+    const renamed = await call('a', `/api/companies/${ids.a}`, {
+      method: 'PATCH',
+      body: { name: 'Studio EI' },
+    });
+    expect(renamed.status).toBe(204);
+    const [profile] = await db.select().from(profiles).where(eq(profiles.companyId, ids.a));
+    expect(profile?.company.name).toBe('Studio EI');
+    // A name chosen by the person is never replaced by the migration.
+    await db.$client.unsafe(
+      await Bun.file(new URL('../../../drizzle/0017_company_name_from_profile.sql', import.meta.url)).text(),
+    );
+    expect(await name()).toBe('Studio EI');
+  });
+
+  test('secondary activities: added from the pack statuses, listed with the company, removed', async () => {
+    const add = (status: string) =>
+      call('a', '/api/profile/activities', { method: 'POST', company: ids.a, body: { status } });
+    const added = await add('micro_bic_services');
+    expect(added.status).toBe(201);
+    expect((await add('micro_bic_services')).status).toBe(409);
+    expect((await add('micro_bnc')).status).toBe(409);
+    expect((await add('unknown_status')).status).toBe(422);
+    const { id } = await json(added);
+    const company = (await json(call('a', '/api/companies'))).companies.find((row) => row.id === ids.a);
+    expect(company?.activities).toEqual([
+      { id: null, status: 'micro_bnc', main: true, linkId: null, linkLabel: null },
+      { id, status: 'micro_bic_services', main: false, linkId: null, linkLabel: null },
+    ]);
+    // Someone else cannot use or remove it.
+    expect((await call('b', `/api/profile/activities/${id}`, { method: 'DELETE' })).status).toBe(404);
+    expect(
+      (await call('a', `/api/profile/activities/${id}`, { method: 'DELETE', company: ids.a })).status,
+    ).toBe(204);
+  });
+
   test('the export carries every company and never the Stripe key', async () => {
     const file = await json(call('a', '/api/account/export'));
     expect(file.format).toBe('almanach-export/2');
-    expect(file.companies.map((row: { name: string }) => row.name)).toEqual(['a', 'SASU']);
+    expect(file.companies.map((row: { name: string }) => row.name)).toEqual(['Studio EI', 'SASU']);
     expect(file.companies[0]?.data.externalRevenues).toHaveLength(1);
     expect(JSON.stringify(file)).not.toContain('stripeKey');
   });

@@ -56,6 +56,8 @@ type Body = any;
 describe.skipIf(!url)('linked instances (two databases)', () => {
   const sides = {} as Record<Who, Side>;
   const down: Record<Who, boolean> = { a: false, b: false };
+  /** Instances answering as a version without the announced activity, whose strict schema refuses the field. */
+  const legacy: Record<Who, boolean> = { a: false, b: false };
   const databases = SIDES.map((who) => `almanach_federation_${who}_${process.pid}`);
   let admin: SQL;
   let last: { side: Who; path: string; init: RequestInit; answer: string } | undefined;
@@ -68,6 +70,8 @@ describe.skipIf(!url)('linked instances (two databases)', () => {
     const who = target.hostname.split('.')[0] as Who;
     if (!sides[who] || down[who]) throw new TypeError('unreachable');
     if (target.pathname.endsWith('/exchange')) exchanges += 1;
+    if (legacy[who] && target.pathname.endsWith('/exchange') && 'activity' in JSON.parse(String(init?.body)))
+      return Response.json({ error: 'validation_failed' }, { status: 422 });
     const response = await sides[who].app.request(target.pathname, init);
     last = { side: who, path: target.pathname, init: init ?? {}, answer: await response.clone().text() };
     return response;
@@ -272,10 +276,10 @@ describe.skipIf(!url)('linked instances (two databases)', () => {
     await sides.a.db.delete(federationLinks).where(eq(federationLinks.state, 'pending'));
   });
 
-  test('thresholds count both activities; estimates stay local', async () => {
-    for (const [who, own, other, label] of [
-      ['a', 3_000_000, 2_000_000, 'SEKLYR'],
-      ['b', 2_000_000, 3_000_000, 'Freelance'],
+  test('thresholds count both activities; the link counts as the activity its peer announces', async () => {
+    for (const [who, own, other, label, status] of [
+      ['a', 3_000_000, 2_000_000, 'SEKLYR', 'micro_bic_services'],
+      ['b', 2_000_000, 3_000_000, 'Freelance', 'micro_bnc'],
     ] as const) {
       const { outlook } = await get(who, '/api/outlook');
       const ceiling = outlook.thresholds.find((item: Body) => item.id === 'micro_ceiling_services');
@@ -284,9 +288,28 @@ describe.skipIf(!url)('linked instances (two databases)', () => {
       expect(outlook.thresholds.find((item: Body) => item.id === 'vat_franchise_services')).toMatchObject({
         toleranceExceeded: true,
       });
-      expect(outlook.linked).toEqual([{ label, cents: other, receivedAt: expect.any(String), error: null }]);
+      expect(outlook.linked).toEqual([
+        { label, cents: other, receivedAt: expect.any(String), error: null, activity: status },
+      ]);
       expect(outlook.collectedCents).toBe(own);
-      for (const estimate of outlook.estimates) expect(estimate.steps[0].baseCents).toBe(own);
+      // The announced activity was added as a secondary one, flagged with the link that brought it.
+      const { companies: list } = await get(who, '/api/companies');
+      expect(list[0].activities[1]).toMatchObject({ status, main: false, linkLabel: label });
+      const [link] = (await get(who, '/api/settings/federation')).links;
+      expect(link).toMatchObject({
+        peerActivity: status,
+        activityAuto: true,
+        activity: list[0].activities[1].id,
+      });
+      // Each activity is estimated on its own revenue, at its own rates.
+      expect(
+        outlook.activities.map((item: Body) => [item.status, item.revenueCents, item.linkedCents]),
+      ).toEqual([
+        [who === 'a' ? 'micro_bnc' : 'micro_bic_services', own, 0],
+        [status, other, other],
+      ]);
+      const bnc = outlook.estimates.find((item: Body) => item.id === 'contributions_bnc');
+      expect(bnc.steps[0].baseCents).toBe(3_000_000);
     }
     const simulated = (await get('a', '/api/outlook?simulate=1000000')).outlook;
     expect(simulated.thresholds[0]).toMatchObject({ reachedCents: 6_000_000, linkedCents: 2_000_000 });
@@ -305,7 +328,8 @@ describe.skipIf(!url)('linked instances (two databases)', () => {
     if (!sent) throw new Error('no request recorded');
     expect(sent.path).toBe('/api/federation/exchange');
     const answer = JSON.parse(sent.answer);
-    expect(Object.keys(answer)).toEqual(['totals']);
+    expect(Object.keys(answer)).toEqual(['totals', 'activity']);
+    expect(answer.activity).toBe('micro_bnc');
     expect(Object.keys(answer.totals).sort()).toEqual(['currency', 'label', 'months']);
     expect(answer.totals.months).toEqual([{ month, category: 'micro_bnc', cents: 3_000_000 }]);
     expect(JSON.stringify(sent.init.body) + sent.answer).not.toMatch(/Secret Client|INV-PRIVATE|in_a|in_b/);
@@ -333,8 +357,59 @@ describe.skipIf(!url)('linked instances (two databases)', () => {
     expect(await failed.json()).toEqual({ error: 'peer_unreachable' });
     const { outlook } = await get('b', '/api/outlook');
     expect(outlook.linked).toEqual([
-      { label: 'Freelance', cents: 3_000_000, receivedAt: link.receivedAt, error: 'peer_unreachable' },
+      {
+        label: 'Freelance',
+        cents: 3_000_000,
+        receivedAt: link.receivedAt,
+        error: 'peer_unreachable',
+        activity: 'micro_bnc',
+      },
     ]);
+  });
+
+  test('a peer of an older version keeps exchanging totals, without the activity', async () => {
+    const [link] = (await get('b', '/api/settings/federation')).links;
+    // As a link paired with an older peer: never attached to an activity.
+    await sides.b.db
+      .update(federationLinks)
+      .set({ peerActivity: null, activityMain: false, activityId: null })
+      .where(eq(federationLinks.id, link.id));
+    legacy.a = true;
+    const before = exchanges;
+    const synced = await call('b', `/api/settings/federation/links/${link.id}/sync`, { method: 'POST' });
+    legacy.a = false;
+    expect(synced.status).toBe(200);
+    // Refused once with the field, accepted without it; the answer then leaves it out too.
+    expect(exchanges - before).toBe(2);
+    expect('activity' in JSON.parse(String(last?.init.body))).toBe(false);
+    expect('activity' in JSON.parse(last?.answer ?? '{}')).toBe(false);
+    const [after] = (await get('b', '/api/settings/federation')).links;
+    expect(after).toMatchObject({ peerActivity: null, activity: null, error: null });
+    // Absent activity: thresholds count the totals by category, estimates stay local, as before.
+    const { outlook } = await get('b', '/api/outlook');
+    expect(outlook.thresholds[0]).toMatchObject({ reachedCents: 5_000_000, linkedCents: 3_000_000 });
+    expect(outlook.linked[0]).toMatchObject({ cents: 3_000_000, activity: null });
+    expect(outlook.estimates.find((item: Body) => item.id === 'contributions_bnc').cents).toBe(0);
+    // Chosen by hand, then back to following the peer, which announces its activity again.
+    const manual = await call('b', `/api/settings/federation/links/${link.id}/activity`, {
+      method: 'PUT',
+      body: { activity: 'main' },
+    });
+    expect(manual.status).toBe(204);
+    expect((await get('b', '/api/settings/federation')).links[0]).toMatchObject({
+      activityAuto: false,
+      activity: 'main',
+    });
+    await call('b', `/api/settings/federation/links/${link.id}/activity`, {
+      method: 'PUT',
+      body: { activity: 'auto' },
+    });
+    await call('b', `/api/settings/federation/links/${link.id}/sync`, { method: 'POST' });
+    expect((await get('b', '/api/settings/federation')).links[0]).toMatchObject({
+      activityAuto: true,
+      peerActivity: 'micro_bnc',
+      activity: expect.stringMatching(/^[0-9a-f-]{36}$/),
+    });
   });
 
   test('the export keeps the link settings without keys; an import leaves them to pair again', async () => {

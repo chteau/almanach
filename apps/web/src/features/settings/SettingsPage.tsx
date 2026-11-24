@@ -9,6 +9,7 @@ import { Skeleton } from '../../components/Skeleton/Skeleton.tsx';
 import { useI18n } from '../../i18n/I18nProvider.tsx';
 import { formatDate } from '../../lib/format.ts';
 import { useResource } from '../../lib/useResource.ts';
+import { ActivitiesSettings } from '../activities/ActivitiesSettings.tsx';
 import { useMe } from '../auth/AuthProvider.tsx';
 import { CompaniesSettings } from '../companies/CompaniesSettings.tsx';
 import styles from '../planning/Planning.module.css';
@@ -75,6 +76,7 @@ export function SettingsPage() {
                 <dd>{data.profile.currency}</dd>
               </div>
             </dl>
+            <ActivitiesSettings />
           </section>
         )}
         {data?.profile && <SituationSettings />}

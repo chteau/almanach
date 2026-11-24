@@ -186,4 +186,10 @@ export interface FederationLink {
   receivedAt: string | null;
   error: string | null;
   codeExpiresAt: string | null;
+  /** Status of the main activity the peer announces; null for a peer of an older version. */
+  peerActivity: string | null;
+  /** Follows the announced activity, or was chosen by hand. */
+  activityAuto: boolean;
+  /** Activity its revenue counts as: "main", a secondary activity id, or null (thresholds only). */
+  activity: string | null;
 }

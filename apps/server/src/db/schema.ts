@@ -15,6 +15,7 @@ import type {
 } from '@almanach/shared';
 import { sql } from 'drizzle-orm';
 import {
+  type AnyPgColumn,
   bigint,
   bigserial,
   boolean,
@@ -97,6 +98,29 @@ export const companies = pgTable(
   },
   (table) => [index('companies_user_idx').on(table.userId)],
 );
+
+/**
+ * Secondary activities of a company (mixed activity under one business, e.g. BNC + BIC services); the main
+ * activity is the profile status. Records without an activity belong to the main one.
+ */
+export const companyActivities = pgTable(
+  'company_activities',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    companyId: uuid('company_id')
+      .notNull()
+      .references(() => companies.id, { onDelete: 'cascade' }),
+    status: text('status').notNull(),
+    /** Link whose announced activity created this one automatically. */
+    linkId: uuid('link_id').references((): AnyPgColumn => federationLinks.id, { onDelete: 'set null' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [uniqueIndex('company_activities_status_idx').on(table.companyId, table.status)],
+);
+
+/** Activity a record belongs to; null is the main activity. */
+const activityColumn = () =>
+  uuid('activity_id').references((): AnyPgColumn => companyActivities.id, { onDelete: 'set null' });
 
 /** Personal access tokens for /mcp (docs/mcp.md); only the SHA-256 of the token is stored. */
 export const apiTokens = pgTable(
@@ -275,6 +299,7 @@ export const documents = pgTable(
     discountBp: integer('discount_bp').notNull(),
     note: text('note'),
     depositIds: jsonb('deposit_ids').$type<string[]>().notNull(),
+    activityId: activityColumn(),
     vatMode: text('vat_mode').$type<VatMode>().notNull(),
     mentions: jsonb('mentions').$type<string[]>().notNull(),
     totals: jsonb('totals').$type<Totals>().notNull(),
@@ -321,6 +346,8 @@ export const payments = pgTable(
     feesCents: bigint('fees_cents', { mode: 'number' }).notNull(),
     method: text('method').notNull(),
     reference: text('reference'),
+    /** Null follows the activity of the document. */
+    activityId: activityColumn(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
@@ -359,6 +386,7 @@ export const customDeadlines = pgTable(
     recurrence: text('recurrence').$type<'none' | 'monthly' | 'quarterly' | 'yearly'>().notNull(),
     until: date('until'),
     notes: text('notes'),
+    activityId: activityColumn(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [index('custom_deadlines_user_idx').on(table.companyId)],
@@ -553,6 +581,14 @@ export const federationLinks = pgTable(
     peerReceivesDetail: boolean('peer_receives_detail').notNull().default(false),
     peerLabel: text('peer_label'),
     peerCurrency: text('peer_currency'),
+    /** Status of the main activity the peer announces in its exchanges; null for an older peer. */
+    peerActivity: text('peer_activity'),
+    /** Whether the attachment follows the announced activity; false once chosen by hand. */
+    activityAuto: boolean('activity_auto').notNull().default(true),
+    /** The received revenue counts as the main activity. */
+    activityMain: boolean('activity_main').notNull().default(false),
+    /** The received revenue counts as this secondary activity. Neither: thresholds only, by category. */
+    activityId: activityColumn(),
     /** Last exchange, whichever side called. */
     syncedAt: timestamp('synced_at', { withTimezone: true }),
     /** When the totals kept below were received. */

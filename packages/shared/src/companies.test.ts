@@ -8,6 +8,7 @@ const micro: Company = {
   status: 'micro_bnc',
   activityStart: '2024-01-01',
   ceasedOn: null,
+  activities: [],
 };
 
 test('a second active French micro-entreprise conflicts', () => {

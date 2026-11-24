@@ -14,6 +14,7 @@ import {
   billingSettings,
   clients,
   companies,
+  companyActivities,
   customDeadlines,
   deadlineMarks,
   documents,
@@ -39,6 +40,7 @@ const LEGACY_FORMAT = 'almanach-export/1';
  */
 const TABLES = {
   profiles,
+  companyActivities,
   clients,
   missions,
   documents,
@@ -102,6 +104,8 @@ export async function exportData(db: Database, userId: string): Promise<ExportFi
       const rows = (await db.select().from(table).where(eq(table.companyId, company.id))) as Row[];
       data[name] = rows.map(({ companyId: _owner, ...row }) => row);
     }
+    // Links are paired again after an import: the one that created an activity is not kept.
+    data.companyActivities = data.companyActivities.map((row) => ({ ...row, linkId: null }));
     data.federationLinks = await db
       .select({
         peerUrl: federationLinks.peerUrl,
@@ -156,8 +160,14 @@ export function referenceProblem(data: CompanyData): string | null {
   const clientIds = ids('clients');
   const missionIds = ids('missions');
   const documentIds = ids('documents');
+  const activityIds = ids('companyActivities');
   const optional = (value: unknown, known: Set<unknown>) =>
     value === null || value === undefined || known.has(value);
+  for (const row of data.companyActivities)
+    if (typeof row.status !== 'string' || !/^[a-z0-9_]{1,40}$/.test(row.status) || row.linkId)
+      return 'companyActivities.status';
+  for (const name of ['documents', 'payments', 'customDeadlines'] as const)
+    for (const row of data[name]) if (!optional(row.activityId, activityIds)) return `${name}.activityId`;
   for (const mission of data.missions) if (!clientIds.has(mission.clientId)) return 'missions.clientId';
   for (const doc of data.documents) {
     if (!clientIds.has(doc.clientId)) return 'documents.clientId';
@@ -258,7 +268,7 @@ function readExport(
     settings = file.userSettings ?? [];
     raw = (file.companies as unknown[]).map((item) => {
       const company = (typeof item === 'object' && item !== null ? item : {}) as Record<string, unknown>;
-      const name = typeof company.name === 'string' ? company.name.trim().slice(0, 120) : '';
+      const name = typeof company.name === 'string' ? company.name.trim().slice(0, 160) : '';
       return { name: name || null, data: company.data };
     });
   } else {
@@ -334,6 +344,7 @@ export async function importData(
         }
         // Onboarding may already have created a profile and settings: the export replaces them.
         await tx.delete(profiles).where(eq(profiles.companyId, companyId));
+        await tx.delete(companyActivities).where(eq(companyActivities.companyId, companyId));
         await tx.delete(billingSettings).where(eq(billingSettings.companyId, companyId));
         await tx.delete(situationChanges).where(eq(situationChanges.companyId, companyId));
         await tx.delete(numberSequences).where(eq(numberSequences.companyId, companyId));

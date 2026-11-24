@@ -1,3 +1,4 @@
+export * from './activities.ts';
 export * from './auth.ts';
 export * from './billing.ts';
 export * from './clients.ts';

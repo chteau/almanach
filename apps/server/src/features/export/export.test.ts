@@ -3,6 +3,7 @@ import { referenceProblem } from './export.ts';
 
 const empty = {
   profiles: [],
+  companyActivities: [],
   clients: [],
   missions: [],
   documents: [],

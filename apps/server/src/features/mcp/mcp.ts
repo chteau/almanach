@@ -189,7 +189,7 @@ const TOOLS = {
   list_companies: tool({
     scope: 'read',
     description:
-      'List the companies (business structures) of the account. Other tools take one as `company`.',
+      'List the companies (business structures) of the account, each with its `activities`: the main one (`main: true`, the profile status) and the secondary ones of a mixed activity (e.g. BNC + BIC services), with the linked instance that created them. Other tools take one as `company`.',
     input: z.object({}),
     run: async ({ api }) => api('/api/companies'),
   }),
@@ -368,14 +368,14 @@ const TOOLS = {
   get_thresholds: tool({
     scope: 'read',
     description:
-      'Get revenue thresholds (micro-enterprise ceilings, VAT exemption), how far the company is from them, and the estimated social contributions and income tax. `simulateCents` adds a hypothetical amount ("what if I invoice X").',
+      'Get revenue thresholds (micro-enterprise ceilings, VAT exemption, counted on every activity of the business), how far the company is from them, and the estimated social contributions and income tax. `activities` breaks revenue, estimates and the flat-rate tax allowance down per activity, each at its own rates. `simulateCents` adds a hypothetical amount ("what if I invoice X").',
     input: z.object({ company, simulateCents: z.number().int().min(0).max(100_000_000_000).default(0) }),
     run: async ({ api, args }) => api(`/api/outlook?simulate=${args.simulateCents}`),
   }),
   get_dashboard: tool({
     scope: 'read',
     description:
-      'Get the dashboard summary: revenue collected and invoiced this month, quarter and year, late invoices, overdue and upcoming deadlines. Test data is never counted.',
+      'Get the dashboard summary: revenue collected and invoiced this month, quarter and year, late invoices, overdue and upcoming deadlines, and the outlook with its per-activity breakdown (`outlook.activities`). Test data is never counted.',
     input: z.object({ company }),
     run: async ({ api }) => api('/api/dashboard'),
   }),

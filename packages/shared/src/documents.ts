@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { activityRefSchema } from './activities.ts';
 import { centsSchema, currencySchema, idSchema, isoDateSchema, optionalText } from './common.ts';
 import { LOCALES } from './install.ts';
 
@@ -45,6 +46,7 @@ export const documentDraftSchema = z
     discountBp: z.number().int().min(0).max(PERCENT_SCALE),
     note: optionalText(2000),
     depositIds: z.array(idSchema).max(20),
+    activityId: activityRefSchema,
   })
   .strict();
 
@@ -58,6 +60,8 @@ export const paymentInputSchema = z
     feesCents: centsSchema,
     method: z.enum(PAYMENT_METHODS),
     reference: optionalText(120),
+    /** Null follows the activity of the invoice. */
+    activityId: activityRefSchema,
   })
   .strict();
 
@@ -216,6 +220,7 @@ export interface DocumentView {
   paidCents: number;
   creditedCents: number;
   depositIds: string[];
+  activityId: string | null;
   sentAt: string | null;
   createdAt: string;
 }

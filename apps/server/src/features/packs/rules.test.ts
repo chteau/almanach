@@ -1,5 +1,12 @@
 import { describe, expect, test } from 'bun:test';
-import { computeEstimates, expandDeadlines, measureThresholds, type RuleProfile } from '@almanach/shared';
+import {
+  activityBreakdown,
+  computeEstimates,
+  expandDeadlines,
+  measureThresholds,
+  type Receipt,
+  type RuleProfile,
+} from '@almanach/shared';
 import { PackRegistry } from './packs.ts';
 
 const packs = await PackRegistry.load();
@@ -339,6 +346,150 @@ describe('France 2026', () => {
       // 90,000 € of services is above 83,600 € even though 140,000 € in total stays below 203,100 €.
       expect(services.micro_ceiling_services).toMatchObject({ reachedCents: 9_000_000, exceeded: true });
       expect(services.micro_ceiling_sales).toMatchObject({ reachedCents: 14_000_000, exceeded: false });
+    });
+  });
+
+  describe('one micro-entreprise with secondary activities', () => {
+    const year = { start: '2026-01-01', end: '2026-12-31' };
+    const rules = () => rulesOf('FR', 2026);
+    /** 30,000 € of BNC (main activity, no category) and 20,000 € of BIC services. */
+    const mixed: Receipt[] = [
+      { date: '2026-03-10', cents: 3_000_000 },
+      { date: '2026-04-10', cents: 2_000_000, category: 'micro_bic_services' },
+    ];
+    /**
+     * Estimates by id
+     *
+     * @param profile {RuleProfile} - situation
+     * @param receipts {Receipt[]} - revenue
+     * @returns {Record<string, number>} - estimate id → cents
+     */
+    const estimates = (profile: RuleProfile, receipts: Receipt[]) =>
+      Object.fromEntries(computeEstimates(rules(), profile, receipts).map((item) => [item.id, item.cents]));
+    /**
+     * Threshold ids and amounts reached
+     *
+     * @param profile {RuleProfile} - situation
+     * @param receipts {Receipt[]} - revenue
+     * @returns {Record<string, { reachedCents: number; exceeded: boolean }>} - thresholds by id
+     */
+    const thresholds = (profile: RuleProfile, receipts: Receipt[]) =>
+      Object.fromEntries(
+        measureThresholds(rules(), profile, receipts, year, '2026-11-18', null).map((item) => [
+          item.id,
+          { reachedCents: item.reachedCents, exceeded: item.exceeded },
+        ]),
+      );
+
+    test('BNC alone: unchanged results, one activity in the breakdown', () => {
+      const receipts = [{ date: '2026-03-10', cents: 3_000_000 }];
+      expect(estimates({ ...liberal, activities: [] }, receipts)).toEqual(estimates(liberal, receipts));
+      expect(estimates(liberal, receipts)).toEqual({ contributions_bnc: 768_000, cfp_liberal: 6_000 });
+      const [only, ...rest] = activityBreakdown(rules(), liberal, receipts);
+      expect(rest).toEqual([]);
+      expect(only).toMatchObject({
+        status: 'micro_bnc',
+        main: true,
+        revenueCents: 3_000_000,
+        estimateCents: 774_000,
+      });
+      expect(only?.allowance).toMatchObject({
+        id: 'allowance_bnc',
+        allowanceCents: 1_020_000,
+        taxableCents: 1_980_000,
+      });
+    });
+
+    test('BNC + BIC services: one services ceiling on the total, each activity at its own rates', () => {
+      const profile = { ...liberal, activities: ['micro_bic_services'] };
+      expect(thresholds(profile, mixed)).toEqual({
+        micro_ceiling_services: { reachedCents: 5_000_000, exceeded: false },
+        vat_franchise_services: { reachedCents: 5_000_000, exceeded: true },
+      });
+      // 25.6 % + 0.2 % CFP on the BNC part, 21.2 % + 0.1 % CFP on the BIC part, instead of 25.8 % on everything.
+      expect(estimates(profile, mixed)).toEqual({
+        contributions_bnc: 768_000,
+        contributions_bic_services: 424_000,
+        cfp_liberal: 6_000,
+        cfp_commercial: 2_000,
+      });
+      const [bnc, bic] = activityBreakdown(rules(), profile, mixed);
+      expect(bnc).toMatchObject({
+        status: 'micro_bnc',
+        main: true,
+        revenueCents: 3_000_000,
+        estimateCents: 774_000,
+      });
+      expect(bic).toMatchObject({
+        status: 'micro_bic_services',
+        main: false,
+        revenueCents: 2_000_000,
+        estimateCents: 426_000,
+        allowance: {
+          id: 'allowance_bic_services',
+          rateBp: 5000,
+          allowanceCents: 1_000_000,
+          taxableCents: 1_000_000,
+        },
+      });
+    });
+
+    test('versement libératoire: each activity pays its own rate, no allowance', () => {
+      const profile = { ...liberal, options: ['versement_liberatoire'], activities: ['micro_bic_services'] };
+      expect(estimates(profile, mixed)).toMatchObject({
+        income_tax_bnc: 66_000,
+        income_tax_bic_services: 34_000,
+      });
+      for (const item of activityBreakdown(rules(), profile, mixed)) expect(item.allowance).toBeNull();
+    });
+
+    test('BNC + sales: total under the sales ceiling, services part under the services ceiling', () => {
+      const profile = { ...liberal, activities: ['micro_bic_sales'] };
+      // A declared sales activity brings its ceilings before its first sale.
+      expect(Object.keys(thresholds(profile, [{ date: '2026-03-10', cents: 1_000_000 }])).sort()).toEqual([
+        'micro_ceiling_sales',
+        'micro_ceiling_services',
+        'vat_franchise_sales',
+        'vat_franchise_services',
+      ]);
+      const reached = thresholds(profile, [
+        { date: '2026-03-10', cents: 9_000_000 },
+        { date: '2026-04-10', cents: 10_000_000, category: 'micro_bic_sales' },
+      ]);
+      expect(reached.micro_ceiling_sales).toEqual({ reachedCents: 19_000_000, exceeded: false });
+      expect(reached.micro_ceiling_services).toEqual({ reachedCents: 9_000_000, exceeded: true });
+      expect(
+        estimates(profile, [{ date: '2026-04-10', cents: 10_000_000, category: 'micro_bic_sales' }]),
+      ).toEqual({
+        contributions_bnc: 0,
+        contributions_sales: 1_230_000,
+        cfp_liberal: 0,
+        cfp_commercial: 10_000,
+      });
+    });
+
+    test('revenue of a link attached to the BIC services activity counts at the BIC rates', () => {
+      const profile = { ...liberal, activities: ['micro_bic_services'] };
+      const receipts: Receipt[] = [
+        { date: '2026-03-10', cents: 3_000_000 },
+        { date: '2026-04-01', cents: 2_000_000, category: 'micro_bic_services', linked: true },
+      ];
+      expect(estimates(profile, receipts).contributions_bic_services).toBe(424_000);
+      expect(activityBreakdown(rules(), profile, receipts)[1]).toMatchObject({
+        revenueCents: 2_000_000,
+        linkedCents: 2_000_000,
+      });
+      expect(thresholds(profile, receipts).micro_ceiling_services?.reachedCents).toBe(5_000_000);
+    });
+
+    test('allowance: at least 305 € per activity, never above the revenue', () => {
+      const profile = { ...liberal, activities: ['micro_bic_services'] };
+      const [bnc, bic] = activityBreakdown(rules(), profile, [
+        { date: '2026-03-10', cents: 40_000 },
+        { date: '2026-03-10', cents: 10_000, category: 'micro_bic_services' },
+      ]);
+      expect(bnc?.allowance).toMatchObject({ allowanceCents: 30_500, taxableCents: 9_500 });
+      expect(bic?.allowance).toMatchObject({ allowanceCents: 10_000, taxableCents: 0 });
     });
   });
 });

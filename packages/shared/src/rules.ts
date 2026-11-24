@@ -144,6 +144,21 @@ export const estimateSchema = z
   })
   .strict();
 
+/**
+ * Flat-rate allowance of a micro tax regime: share of revenue deemed to be expenses, with a minimum amount.
+ * With several activities, each one applies its own rate to its own revenue.
+ */
+export const allowanceSchema = z
+  .object({
+    id: ruleId,
+    label: localized,
+    appliesTo: appliesToSchema.default({}),
+    rateBp: basisPoints,
+    minimumCents: cents,
+    ...sourced,
+  })
+  .strict();
+
 /** When an obligation falls due. */
 const scheduleSchema = z.discriminatedUnion('type', [
   /** One occurrence per month: due on `day` (or the last day) of the month `monthOffset` after the period. */
@@ -210,6 +225,7 @@ export const yearRulesSchema = z
     holidaysSource: z.url({ protocol: /^https$/ }),
     thresholds: z.array(thresholdSchema).default([]),
     estimates: z.array(estimateSchema).default([]),
+    allowances: z.array(allowanceSchema).default([]),
     deadlines: z.array(deadlineRuleSchema).default([]),
   })
   .strict();
@@ -217,5 +233,6 @@ export const yearRulesSchema = z
 export type YearRules = z.infer<typeof yearRulesSchema>;
 export type ThresholdRule = z.infer<typeof thresholdSchema>;
 export type EstimateRule = z.infer<typeof estimateSchema>;
+export type AllowanceRule = z.infer<typeof allowanceSchema>;
 export type DeadlineRule = z.infer<typeof deadlineRuleSchema>;
 export type Localized = z.infer<typeof localized>;

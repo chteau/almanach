@@ -13,6 +13,7 @@ import { useI18n } from '../../i18n/I18nProvider.tsx';
 import { api } from '../../lib/api.ts';
 import { centsToInput, formatDate, formatMoney, today } from '../../lib/format.ts';
 import { useResource } from '../../lib/useResource.ts';
+import { ActivitySelect } from '../activities/ActivitySelect.tsx';
 import { describeError } from '../install/errors.ts';
 import { useProfile } from '../profile/useProfile.ts';
 import styles from './DocumentEditor.module.css';
@@ -153,6 +154,14 @@ export function DocumentDetail({
               {mention}
             </p>
           ))}
+          <ActivitySelect
+            value={doc.activityId}
+            onChange={(activityId) =>
+              void api(`/api/documents/${doc.id}/activity`, { method: 'PUT', body: { activityId } })
+                .then(onChange)
+                .catch((problem: unknown) => setFailure(describeError(problem, t)))
+            }
+          />
         </section>
 
         <div className={form.actions}>
@@ -295,6 +304,7 @@ function PaymentForm({ document: doc, dueCents, mainCurrency, onSaved }: Payment
   const [fees, setFees] = useState('');
   const [method, setMethod] = useState<(typeof PAYMENT_METHODS)[number]>('transfer');
   const [reference, setReference] = useState('');
+  const [activityId, setActivityId] = useState<string | null>(null);
   const [error, setError] = useState<string>();
   const foreign = doc.currency !== mainCurrency;
   const amountCents = parseAmount(amount);
@@ -316,7 +326,7 @@ function PaymentForm({ document: doc, dueCents, mainCurrency, onSaved }: Payment
     try {
       await api(`/api/documents/${doc.id}/payments`, {
         method: 'POST',
-        body: { date, amountCents, receivedCents, feesCents, method, reference },
+        body: { date, amountCents, receivedCents, feesCents, method, reference, activityId },
       });
       setError(undefined);
       onSaved();
@@ -367,6 +377,7 @@ function PaymentForm({ document: doc, dueCents, mainCurrency, onSaved }: Payment
             </option>
           ))}
         </SelectField>
+        <ActivitySelect value={activityId} onChange={setActivityId} inheritLabel={t('activities.inherit')} />
         <TextField
           label={`${t('payments.reference')} ${t('common.optional')}`}
           value={reference}
