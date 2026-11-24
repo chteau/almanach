@@ -1,5 +1,5 @@
 import { SQL } from 'bun';
-import { INSTALL_TOKEN, PACK_TEST_KEYS } from './fixtures.ts';
+import { E2E_SECRETS_KEY, INSTALL_TOKEN, PACK_TEST_KEYS } from './fixtures.ts';
 
 /**
  * Test-only launcher: recreates an empty database for one Playwright project, then starts the real
@@ -28,6 +28,7 @@ async function serve(): Promise<void> {
     ALMANACH_INSTALL_TOKEN: INSTALL_TOKEN,
     REMINDERS: 'false',
     PACK_PUBLIC_KEYS: PACK_TEST_KEYS.publicKey,
+    SECRETS_KEY: E2E_SECRETS_KEY,
   });
   await import('../apps/server/src/index.ts');
 }

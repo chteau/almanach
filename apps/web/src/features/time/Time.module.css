@@ -9,7 +9,7 @@
   display: flex;
   flex-wrap: wrap;
   align-items: flex-end;
-  gap: 12px;
+  gap: var(--space-3);
 }
 
 .timerBar > :first-child {
@@ -18,7 +18,7 @@
 
 .weekNav {
   display: flex;
-  gap: 4px;
+  gap: var(--space-1);
 }
 
 .today {
@@ -30,5 +30,5 @@
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: var(--space-2);
 }

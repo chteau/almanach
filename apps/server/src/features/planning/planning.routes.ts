@@ -458,7 +458,7 @@ export function planningRoutes(
     const locale = LOCALES.find((code) => code === row.locale) ?? 'en';
     return c.json({
       result: await reminders.test(row.email, row.ntfy ?? null, locale),
-      smtp: reminders.hasMail,
+      smtp: await reminders.hasMail(),
     });
   });
 

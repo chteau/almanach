@@ -1,109 +1,164 @@
-import { useState } from 'react';
+import { type SyntheticEvent, useState } from 'react';
+import { ActionBar } from '../../components/ActionBar/ActionBar.tsx';
 import { Badge } from '../../components/Badge/Badge.tsx';
 import { Button } from '../../components/Button/Button.tsx';
-import form from '../../components/FormPage/FormPage.module.css';
+import { LoadError } from '../../components/LoadError/LoadError.tsx';
 import { Notice } from '../../components/Notice/Notice.tsx';
+import { Row } from '../../components/Row/Row.tsx';
 import list from '../../components/RowList/RowList.module.css';
+import { SettingsSection } from '../../components/SettingsSection/SettingsSection.tsx';
+import { Skeleton } from '../../components/Skeleton/Skeleton.tsx';
 import { TextField } from '../../components/TextField/TextField.tsx';
 import { useI18n } from '../../i18n/I18nProvider.tsx';
 import { api } from '../../lib/api.ts';
 import { describeError } from '../install/errors.ts';
-import styles from '../planning/Planning.module.css';
-import local from './CompaniesSettings.module.css';
+import { useAction } from '../settings/useAction.ts';
 import { activateCompany, useCompanies } from './useCompanies.ts';
 
 /**
- * Settings section listing the person's companies, to rename, switch or add one
+ * Companies of the account: rename, switch to, and add one (several legal entities)
  *
- * @returns {JSX.Element | null} - the section, once loaded
+ * @returns {JSX.Element} - the sections
  */
 export function CompaniesSettings() {
   const { t } = useI18n();
-  const { data, reload } = useCompanies();
-  const [names, setNames] = useState<Record<string, string>>({});
+  const { data, error, reload } = useCompanies();
+  const [editing, setEditing] = useState<{ id: string; name: string }>();
   const [name, setName] = useState('');
   const [failure, setFailure] = useState<string>();
-  if (!data) return null;
+  const add = useAction();
+  if (error !== undefined) return <LoadError error={error} onRetry={reload} />;
+  if (!data) return <Skeleton rows={2} />;
 
   /**
-   * Runs a request, then reloads the list or shows the failure
+   * Runs a call on a company and reports a failure in the list
    *
-   * @param request {Promise<unknown>} - API call
-   * @returns {Promise<void>} - resolves once handled
+   * @param request {Promise<unknown>} - call
+   * @returns {Promise<void>} - resolves when done
    */
   async function run(request: Promise<unknown>): Promise<void> {
     try {
       await request;
       setFailure(undefined);
+      setEditing(undefined);
       reload();
     } catch (problem) {
       setFailure(describeError(problem, t));
     }
   }
 
+  /**
+   * Creates a company and switches to it
+   *
+   * @param event {SyntheticEvent} - submission
+   * @returns {Promise<void>} - resolves when done
+   */
+  async function submit(event: SyntheticEvent): Promise<void> {
+    event.preventDefault();
+    await add.run(async () => {
+      const { company } = await api<{ company: { id: string } }>('/api/companies', {
+        method: 'POST',
+        body: { name: name.trim() },
+      });
+      await activateCompany(company.id);
+    });
+  }
+
   return (
-    <section className={form.section} aria-labelledby="companies-title">
-      <h2 id="companies-title" className={styles.sectionTitle}>
-        {t('companies.title')}
-      </h2>
-      <p className={styles.text}>{t('companies.body')}</p>
-      {failure && <Notice tone="error">{failure}</Notice>}
-      <ul className={list.list}>
-        {data.companies.map((company) => (
-          <li key={company.id} className={`${list.item} ${list.panel}`}>
-            <form
-              className={local.row}
-              onSubmit={(event) => {
-                event.preventDefault();
-                void run(
-                  api(`/api/companies/${company.id}`, { method: 'PATCH', body: { name: names[company.id] } }),
-                );
-              }}
-            >
-              <TextField
-                label={t('companies.name')}
-                value={names[company.id] ?? company.name}
-                maxLength={160}
-                required
-                onChange={(event) => setNames({ ...names, [company.id]: event.target.value })}
-              />
-              {names[company.id] !== undefined && names[company.id] !== company.name && (
-                <Button type="submit" variant="ghost">
-                  {t('companies.rename')}
-                </Button>
-              )}
-              {company.id === data.active ? (
-                <Badge tone="ok">{t('companies.active')}</Badge>
-              ) : (
-                <Button variant="ghost" onClick={() => void run(activateCompany(company.id))}>
-                  {t('companies.activate')}
-                </Button>
-              )}
-            </form>
-          </li>
-        ))}
-      </ul>
-      <Notice tone="info">{t('companies.legal')}</Notice>
-      <form
-        className={local.row}
-        onSubmit={(event) => {
-          event.preventDefault();
-          void run(
-            api<{ company: { id: string } }>('/api/companies', { method: 'POST', body: { name } }).then(
-              ({ company }) => activateCompany(company.id),
+    <>
+      <SettingsSection title={t('companies.title')} description={t('companies.body')}>
+        {failure && (
+          <Notice tone="error" live>
+            {failure}
+          </Notice>
+        )}
+        <ul className={list.list}>
+          {data.companies.map((company) =>
+            editing?.id === company.id ? (
+              <li key={company.id} className={list.item}>
+                <form
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    void run(
+                      api(`/api/companies/${company.id}`, { method: 'PATCH', body: { name: editing.name } }),
+                    );
+                  }}
+                >
+                  <Row
+                    primary={
+                      <TextField
+                        label={t('companies.name')}
+                        value={editing.name}
+                        maxLength={160}
+                        required
+                        onChange={(event) => setEditing({ id: company.id, name: event.target.value })}
+                      />
+                    }
+                    actions={
+                      <>
+                        <Button variant="ghost" onClick={() => setEditing(undefined)}>
+                          {t('common.cancel')}
+                        </Button>
+                        <Button type="submit" disabled={!editing.name.trim()}>
+                          {t('common.save')}
+                        </Button>
+                      </>
+                    }
+                  />
+                </form>
+              </li>
+            ) : (
+              <li key={company.id} className={list.item}>
+                <Row
+                  primary={
+                    <>
+                      <strong>{company.name}</strong>{' '}
+                      {company.id === data.active && <Badge tone="ok">{t('companies.active')}</Badge>}
+                    </>
+                  }
+                  actions={
+                    <>
+                      <Button
+                        variant="subtle"
+                        onClick={() => setEditing({ id: company.id, name: company.name })}
+                      >
+                        {t('companies.rename')}
+                      </Button>
+                      {company.id !== data.active && (
+                        <Button variant="ghost" onClick={() => void run(activateCompany(company.id))}>
+                          {t('companies.activate')}
+                        </Button>
+                      )}
+                    </>
+                  }
+                />
+              </li>
             ),
-          );
-        }}
-      >
-        <TextField
-          label={t('companies.new')}
-          value={name}
-          maxLength={160}
-          required
-          onChange={(event) => setName(event.target.value)}
-        />
-        <Button type="submit">{t('companies.add')}</Button>
+          )}
+        </ul>
+      </SettingsSection>
+      <form onSubmit={(event) => void submit(event)} noValidate>
+        <SettingsSection
+          title={t('companies.new')}
+          description={t('companies.legal')}
+          footer={
+            <ActionBar
+              primaryLabel={t('companies.add')}
+              busy={add.busy}
+              disabled={!name.trim()}
+              feedback={add.feedback?.tone === 'error' ? add.feedback : null}
+            />
+          }
+        >
+          <TextField
+            label={t('companies.name')}
+            value={name}
+            maxLength={160}
+            required
+            onChange={(event) => setName(event.target.value)}
+          />
+        </SettingsSection>
       </form>
-    </section>
+    </>
   );
 }

@@ -11,14 +11,25 @@ import { SearchDialog } from '../SearchDialog/SearchDialog.tsx';
 import { UpdateBanner } from '../UpdateBanner/UpdateBanner.tsx';
 import styles from './AppShell.module.css';
 
+const SETTINGS_ICON =
+  'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6M19 12l2-1-2-4-2 1-2-2V4h-4v2L9 7 7 6 5 10l2 1v2l-2 1 2 4 2-1 2 2v2h4v-2l2-1 2 1 2-4-2-1z';
+
 /**
  * Main navigation. Every entry is in the desktop sidebar; on phones only `primary` entries are tabs and
  * the rest are reached from the menu page.
  */
-export const NAV_ITEMS: { to: string; label: MessageKey; icon: string; primary?: boolean }[] = [
+export const NAV_ITEMS: {
+  to: string;
+  label: MessageKey;
+  /** Shorter label for the phone tab bar. */
+  short?: MessageKey;
+  icon: string;
+  primary?: boolean;
+}[] = [
   {
     to: '/',
     label: 'nav.dashboard',
+    short: 'nav.home',
     icon: 'M4 13h6V4H4zM14 20h6v-9h-6zM4 20h6v-3H4zM14 7h6V4h-6z',
     primary: true,
   },
@@ -43,7 +54,7 @@ export const NAV_ITEMS: { to: string; label: MessageKey; icon: string; primary?:
   {
     to: '/settings',
     label: 'nav.settings',
-    icon: 'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6M19 12l2-1-2-4-2 1-2-2V4h-4v2L9 7 7 6 5 10l2 1v2l-2 1 2 4 2-1 2 2v2h4v-2l2-1 2 1 2-4-2-1z',
+    icon: SETTINGS_ICON,
   },
 ];
 
@@ -106,7 +117,14 @@ export function AppShell() {
               <svg viewBox="0 0 24 24" aria-hidden="true" className={styles.icon}>
                 <path d={item.icon} />
               </svg>
-              <span>{t(item.label)}</span>
+              {item.short ? (
+                <>
+                  <span className={styles.full}>{t(item.label)}</span>
+                  <span className={styles.short}>{t(item.short)}</span>
+                </>
+              ) : (
+                <span>{t(item.label)}</span>
+              )}
             </NavLink>
           ))}
           <NavLink to="/menu" className={`${styles.link} ${styles.menuLink}`}>
@@ -141,6 +159,15 @@ export function AppShell() {
             </svg>
             <span className={styles.bellLabel}>{t('nav.notifications')}</span>
             {unread > 0 && <span className={styles.count}>{unread > 99 ? '99+' : unread}</span>}
+          </NavLink>
+          <NavLink
+            to="/settings"
+            className={`${styles.bell} ${styles.settingsShortcut}`}
+            aria-label={t('nav.settings')}
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true" className={styles.icon}>
+              <path d={SETTINGS_ICON} />
+            </svg>
           </NavLink>
           {companies && companies.companies.length > 1 && (
             <label className={styles.language}>

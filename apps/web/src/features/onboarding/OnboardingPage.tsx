@@ -1,10 +1,4 @@
-import {
-  ONBOARDING_STEPS,
-  type OnboardingStep,
-  type PackMeta,
-  type Profile,
-  profileSchema,
-} from '@almanach/shared';
+import { ONBOARDING_STEPS, type OnboardingStep, type PackMeta, profileSchema } from '@almanach/shared';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { Logo } from '../../components/Logo/Logo.tsx';
@@ -13,7 +7,7 @@ import { useI18n } from '../../i18n/I18nProvider.tsx';
 import { api } from '../../lib/api.ts';
 import { useAuth, useMe } from '../auth/AuthProvider.tsx';
 import wizard from '../install/InstallWizard.module.css';
-import { emptyForm, fromProfile, type OnboardingForm, toProfile } from './form.ts';
+import { emptyForm, type OnboardingForm, toProfile } from './form.ts';
 import { BankStep, CountryStep, IdentityStep, RevenueStep, StatusStep, SummaryStep } from './steps.tsx';
 
 export interface OnboardingStepProps {
@@ -28,13 +22,12 @@ export interface OnboardingStepProps {
 /**
  * Onboarding wizard (P03): country pack, status, identity, bank, revenue already earned, summary.
  * Progress is saved on the server after each step so the person resumes where they stopped (S-032).
- * With `edit`, the same steps change the saved profile from the settings.
+ * The saved profile is changed later from Settings → Profile and situation.
  *
- * @param props {{ edit?: boolean }} - true to edit the existing profile
  * @returns {JSX.Element} - the wizard
  */
-export function OnboardingPage({ edit = false }: { edit?: boolean }) {
-  const { t, locale } = useI18n();
+export function OnboardingPage() {
+  const { t } = useI18n();
   const me = useMe();
   const { refresh } = useAuth();
   const navigate = useNavigate();
@@ -44,15 +37,6 @@ export function OnboardingPage({ edit = false }: { edit?: boolean }) {
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
-    if (edit) {
-      Promise.all([api<{ packs: PackMeta[] }>('/api/packs'), api<{ profile: Profile }>('/api/profile')])
-        .then(([packList, { profile }]) => {
-          setPacks(packList.packs);
-          setForm(fromProfile(profile, locale));
-        })
-        .catch(() => setFailed(true));
-      return;
-    }
     Promise.all([
       api<{ packs: PackMeta[] }>('/api/packs'),
       api<{ draft: { step: OnboardingStep; data: Partial<OnboardingForm> } | null }>('/api/onboarding'),
@@ -65,7 +49,7 @@ export function OnboardingPage({ edit = false }: { edit?: boolean }) {
         }
       })
       .catch(() => setFailed(true));
-  }, [edit, locale]);
+  }, []);
 
   if (failed) return <StatusScreen state="error" />;
   if (!packs) return <StatusScreen state="loading" />;
@@ -82,7 +66,6 @@ export function OnboardingPage({ edit = false }: { edit?: boolean }) {
    */
   function go(target: OnboardingStep): void {
     setStep(target);
-    if (edit) return;
     void api('/api/onboarding', { method: 'PUT', body: { step: target, data: form } }).catch(() => undefined);
   }
 
@@ -95,7 +78,7 @@ export function OnboardingPage({ edit = false }: { edit?: boolean }) {
     const payload = profileSchema.parse(toProfile(form, pack));
     await api('/api/profile', { method: 'PUT', body: payload });
     await refresh();
-    navigate(edit ? '/settings' : '/', { replace: true });
+    navigate('/', { replace: true });
   }
 
   const props: OnboardingStepProps = {

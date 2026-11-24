@@ -116,7 +116,7 @@ function MissionForm({ initial, clients }: { initial?: Mission | undefined; clie
   if (selectable.length === 0) {
     return (
       <>
-        <PageHeader title={t('missions.new')} />
+        <PageHeader width="narrow" title={t('missions.new')} />
         <Notice tone="info">{t('missions.noClient')}</Notice>
       </>
     );
@@ -188,9 +188,16 @@ function MissionForm({ initial, clients }: { initial?: Mission | undefined; clie
 
   return (
     <>
-      <PageHeader title={initial ? t('missions.edit', { name: initial.name }) : t('missions.new')} />
+      <PageHeader
+        width="narrow"
+        title={initial ? t('missions.edit', { name: initial.name }) : t('missions.new')}
+      />
       <form className={form.form} onSubmit={(event) => void save(event)} noValidate>
-        {failure && <Notice tone="error">{failure}</Notice>}
+        {failure && (
+          <Notice tone="error" live>
+            {failure}
+          </Notice>
+        )}
         <fieldset className={form.section}>
           <legend>{t('missions.section.general')}</legend>
           <TextField

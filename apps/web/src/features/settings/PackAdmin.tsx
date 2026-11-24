@@ -1,18 +1,23 @@
 import type { Localized, PackMeta } from '@almanach/shared';
 import { useState } from 'react';
+import { ActionBar } from '../../components/ActionBar/ActionBar.tsx';
 import { Badge } from '../../components/Badge/Badge.tsx';
-import buttonStyles from '../../components/Button/Button.module.css';
-import { Button } from '../../components/Button/Button.tsx';
+import { Button, buttonClassName } from '../../components/Button/Button.tsx';
+import { ConfirmDialog } from '../../components/ConfirmDialog/ConfirmDialog.tsx';
+import { Field } from '../../components/Field/Field.tsx';
 import form from '../../components/FormPage/FormPage.module.css';
 import { LoadError } from '../../components/LoadError/LoadError.tsx';
 import { Notice } from '../../components/Notice/Notice.tsx';
+import { Row } from '../../components/Row/Row.tsx';
 import list from '../../components/RowList/RowList.module.css';
+import { SettingsSection } from '../../components/SettingsSection/SettingsSection.tsx';
 import { Skeleton } from '../../components/Skeleton/Skeleton.tsx';
 import { useI18n } from '../../i18n/I18nProvider.tsx';
 import { ApiError, api } from '../../lib/api.ts';
 import { formatDate } from '../../lib/format.ts';
 import { useResource } from '../../lib/useResource.ts';
-import styles from '../planning/Planning.module.css';
+import text from '../../styles/text.module.css';
+import { describeError } from '../install/errors.ts';
 
 /** One difference listed under a pending update, as computed by the server. */
 type RuleChange =
@@ -55,15 +60,17 @@ interface PackAdminData {
 }
 
 /**
- * Administrator section: installed country packs, signed updates, import and rollback (S-300 to S-304)
+ * Administrator panel: installed country packs, signed updates, import and rollback (S-300 to S-304)
  *
  * @returns {JSX.Element} - the section
  */
 export function PackAdmin() {
   const { t, locale } = useI18n();
   const { data, error, reload } = useResource<PackAdminData>('/api/admin/packs');
-  const [message, setMessage] = useState<{ tone: 'info' | 'error'; text: string }>();
+  const [message, setMessage] = useState<{ tone: 'success' | 'error'; text: string }>();
   const [later, setLater] = useState<Set<string>>(new Set());
+  const [reverting, setReverting] = useState<string>();
+  const [busy, setBusy] = useState(false);
 
   /**
    * Puts one difference into words (S-244b)
@@ -108,12 +115,18 @@ export function PackAdmin() {
    * @returns {Promise<void>} - resolves when done
    */
   const run = async (action: () => Promise<string>): Promise<void> => {
+    setBusy(true);
     try {
-      setMessage({ tone: 'info', text: await action() });
+      setMessage({ tone: 'success', text: await action() });
       reload();
     } catch (problem) {
       const code = problem instanceof ApiError ? String(problem.body.error ?? '') : '';
-      setMessage({ tone: 'error', text: t(`packs.error.${code}` as 'packs.error.invalid_bundle') });
+      setMessage({
+        tone: 'error',
+        text: code ? t(`packs.error.${code}` as 'packs.error.invalid_bundle') : describeError(problem, t),
+      });
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -140,179 +153,210 @@ export function PackAdmin() {
 
   if (error !== undefined) return <LoadError error={error} onRetry={reload} />;
   if (!data) return <Skeleton rows={2} />;
+  const history = data.bundles.filter((bundle) => !bundle.pending);
+  const keys = [...new Set(history.map((bundle) => bundle.keyId))];
 
   return (
-    <section className={form.section} aria-labelledby="packs-title">
-      <h2 id="packs-title" className={styles.sectionTitle}>
-        {t('packs.title')}
-      </h2>
-      {message && <Notice tone={message.tone}>{message.text}</Notice>}
-      <ul className={list.list}>
-        {data.packs.map((pack) => (
-          <li key={pack.country} className={list.item}>
-            <div className={list.row}>
-              <span className={list.primary}>
-                <strong>{pack.name[locale]}</strong>
-                <span className={list.secondary}>
-                  {pack.activeSequence === null
+    <>
+      {message && (
+        <Notice tone={message.tone} live>
+          {message.text}
+        </Notice>
+      )}
+      <SettingsSection title={t('packs.title')} description={t('settings.packs.body')}>
+        <ul className={list.list}>
+          {data.packs.map((pack) => (
+            <li key={pack.country} className={list.item}>
+              <Row
+                primary={
+                  <>
+                    <strong>{pack.name[locale]}</strong>{' '}
+                    <Badge tone={pack.maturity === 'verified' ? 'ok' : 'warn'}>
+                      {t(`settings.maturity.${pack.maturity}`)}
+                    </Badge>
+                  </>
+                }
+                meta={`${
+                  pack.activeSequence === null
                     ? t('packs.builtin')
-                    : t('packs.update', { sequence: pack.activeSequence })}{' '}
-                  · {pack.years.join(', ') || '—'}
-                </span>
-              </span>
-              <Badge tone={pack.maturity === 'verified' ? 'ok' : 'warn'}>
-                {t(`settings.maturity.${pack.maturity}`)}
-              </Badge>
-              {pack.activeSequence !== null && (
-                <Button
-                  variant="ghost"
-                  onClick={() =>
-                    void run(async () => {
-                      await api(`/api/admin/packs/${pack.country}/builtin`, { method: 'POST' });
-                      return t('packs.reverted', { country: pack.country });
-                    })
-                  }
-                >
-                  {t('packs.revert')}
-                </Button>
-              )}
-            </div>
-          </li>
-        ))}
-      </ul>
+                    : t('packs.update', { sequence: pack.activeSequence })
+                } · ${pack.years.join(', ') || '—'}`}
+                actions={
+                  pack.activeSequence !== null && (
+                    <Button variant="ghost" aria-haspopup="dialog" onClick={() => setReverting(pack.country)}>
+                      {t('packs.revert')}
+                    </Button>
+                  )
+                }
+              />
+            </li>
+          ))}
+        </ul>
+      </SettingsSection>
       {data.bundles
         .filter((bundle) => bundle.pending && !later.has(bundle.id))
         .map((bundle) => (
-          <section key={bundle.id} className={styles.pendingUpdate} aria-labelledby={`pending-${bundle.id}`}>
-            <h3 id={`pending-${bundle.id}`} className={styles.cardTitle}>
-              {t('packs.pending', { country: bundle.country, sequence: bundle.sequence })}
-            </h3>
-            {bundle.notes && <p className={styles.caption}>{bundle.notes}</p>}
+          <SettingsSection
+            key={bundle.id}
+            title={t('packs.pending', { country: bundle.country, sequence: bundle.sequence })}
+            description={bundle.notes ?? undefined}
+            badge={<Badge tone="accent">{t('settings.packs.new')}</Badge>}
+            footer={
+              <ActionBar
+                primaryLabel={t('packs.apply')}
+                disabled={bundle.changes === null}
+                busy={busy}
+                onPrimary={() =>
+                  void run(async () => {
+                    await api(`/api/admin/packs/bundles/${bundle.id}/activate`, { method: 'POST' });
+                    return t('packs.applied', { country: bundle.country, sequence: bundle.sequence });
+                  })
+                }
+              >
+                <Button variant="ghost" onClick={() => setLater(new Set([...later, bundle.id]))}>
+                  {t('packs.later')}
+                </Button>
+              </ActionBar>
+            }
+          >
             {bundle.changes === null ? (
               <Notice tone="error">{t('packs.pending.invalid')}</Notice>
             ) : bundle.changes.length === 0 ? (
-              <p className={styles.text}>{t('packs.change.none')}</p>
+              <p className={text.text}>{t('packs.change.none')}</p>
             ) : (
-              <ul className={styles.plain}>
+              <ul className={text.plain}>
                 {bundle.changes.map((change, index) => (
                   // biome-ignore lint/suspicious/noArrayIndexKey: the list is fixed for a given bundle
                   <li key={index}>{describe(change)}</li>
                 ))}
               </ul>
             )}
+          </SettingsSection>
+        ))}
+      <SettingsSection
+        title={t('settings.packs.updates')}
+        description={data.enabled ? undefined : t('packs.disabled')}
+        footer={
+          data.enabled && (
             <div className={form.actions}>
-              <Button variant="ghost" onClick={() => setLater(new Set([...later, bundle.id]))}>
-                {t('packs.later')}
-              </Button>
-              {bundle.changes !== null && (
+              {data.automatic && (
                 <Button
+                  variant="ghost"
+                  busy={busy}
                   onClick={() =>
                     void run(async () => {
-                      await api(`/api/admin/packs/bundles/${bundle.id}/activate`, { method: 'POST' });
-                      return t('packs.applied', { country: bundle.country, sequence: bundle.sequence });
+                      const result = await api<{ installed: unknown[] }>('/api/admin/packs/check', {
+                        method: 'POST',
+                      });
+                      return t('packs.found', { count: result.installed.length });
                     })
                   }
                 >
-                  {t('packs.apply')}
+                  {t('packs.check')}
                 </Button>
               )}
+              <label className={`${buttonClassName('primary')} ${text.fileButton}`}>
+                {t('packs.import')}
+                <input
+                  type="file"
+                  accept="application/json,.json"
+                  className="visually-hidden"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    event.target.value = '';
+                    if (file) void importFile(file);
+                  }}
+                />
+              </label>
             </div>
-          </section>
-        ))}
-      {data.bundles.some((bundle) => !bundle.pending) && (
-        <>
-          <h3 className={styles.cardTitle}>{t('packs.history')}</h3>
-          <ul className={list.list}>
-            {data.bundles
-              .filter((bundle) => !bundle.pending)
-              .map((bundle) => (
+          )
+        }
+      >
+        {data.enabled && data.automatic && (
+          <Field label={t('packs.auto')} checkbox>
+            {(control) => (
+              <input
+                {...control}
+                type="checkbox"
+                checked={data.autoCheck}
+                disabled={busy}
+                onChange={(event) => {
+                  const enabled = event.target.checked;
+                  void run(async () => {
+                    await api('/api/admin/packs/auto-check', { method: 'PUT', body: { enabled } });
+                    return enabled ? t('packs.auto.on') : t('packs.auto.off');
+                  });
+                }}
+              />
+            )}
+          </Field>
+        )}
+        {data.enabled && !data.automatic && <p className={text.caption}>{t('packs.auto.noUrl')}</p>}
+        {history.length > 0 && (
+          <>
+            <h3 className={text.subTitle}>{t('packs.history')}</h3>
+            <ul className={list.list}>
+              {history.map((bundle) => (
                 <li key={bundle.id} className={list.item}>
-                  <div className={list.row}>
-                    <span className={list.primary}>
+                  <Row
+                    primary={
                       <strong>
-                        {bundle.country} #{bundle.sequence}
+                        {bundle.country} · {t('packs.update', { sequence: bundle.sequence })}
                       </strong>
-                      <span className={list.secondary}>
-                        {formatDate((bundle.appliedAt ?? bundle.installedAt).slice(0, 10), locale)} ·{' '}
-                        {t('packs.key', { key: bundle.keyId })}
-                        {bundle.notes ? ` · ${bundle.notes}` : ''}
-                      </span>
-                    </span>
-                    {bundle.active ? (
-                      <Badge tone="ok">{t('packs.active')}</Badge>
-                    ) : (
-                      <Button
-                        variant="ghost"
-                        onClick={() =>
-                          void run(async () => {
-                            await api(`/api/admin/packs/bundles/${bundle.id}/activate`, { method: 'POST' });
-                            return t('packs.activated', {
-                              country: bundle.country,
-                              sequence: bundle.sequence,
-                            });
-                          })
-                        }
-                      >
-                        {t('packs.activate')}
-                      </Button>
-                    )}
-                  </div>
+                    }
+                    meta={`${formatDate((bundle.appliedAt ?? bundle.installedAt).slice(0, 10), locale)}${
+                      bundle.notes ? ` · ${bundle.notes}` : ''
+                    }`}
+                    actions={
+                      bundle.active ? (
+                        <Badge tone="ok">{t('packs.active')}</Badge>
+                      ) : (
+                        <Button
+                          variant="ghost"
+                          busy={busy}
+                          onClick={() =>
+                            void run(async () => {
+                              await api(`/api/admin/packs/bundles/${bundle.id}/activate`, { method: 'POST' });
+                              return t('packs.activated', {
+                                country: bundle.country,
+                                sequence: bundle.sequence,
+                              });
+                            })
+                          }
+                        >
+                          {t('packs.activate')}
+                        </Button>
+                      )
+                    }
+                  />
                 </li>
               ))}
-          </ul>
-        </>
-      )}
-      {data.enabled && data.automatic && (
-        <label className={styles.check}>
-          <input
-            type="checkbox"
-            checked={data.autoCheck}
-            onChange={(event) => {
-              const enabled = event.target.checked;
-              void run(async () => {
-                await api('/api/admin/packs/auto-check', { method: 'PUT', body: { enabled } });
-                return enabled ? t('packs.auto.on') : t('packs.auto.off');
-              });
-            }}
-          />
-          {t('packs.auto')}
-        </label>
-      )}
-      {data.enabled && !data.automatic && <p className={styles.caption}>{t('packs.auto.noUrl')}</p>}
-      {data.enabled ? (
-        <div className={form.actions}>
-          {data.automatic && (
-            <Button
-              variant="ghost"
-              onClick={() =>
-                void run(async () => {
-                  const result = await api<{ installed: unknown[] }>('/api/admin/packs/check', {
-                    method: 'POST',
-                  });
-                  return t('packs.found', { count: result.installed.length });
-                })
-              }
-            >
-              {t('packs.check')}
-            </Button>
+            </ul>
+          </>
+        )}
+        <details className={text.details}>
+          <summary>{t('settings.technical')}</summary>
+          <p>{t('settings.packs.technical')}</p>
+          {keys.length > 0 && (
+            <p className={text.mono}>{keys.map((key) => t('packs.key', { key })).join(' · ')}</p>
           )}
-          <label className={`${buttonStyles.button} ${buttonStyles.primary} ${styles.fileButton}`}>
-            {t('packs.import')}
-            <input
-              type="file"
-              accept="application/json,.json"
-              className="visually-hidden"
-              onChange={(event) => {
-                const file = event.target.files?.[0];
-                event.target.value = '';
-                if (file) void importFile(file);
-              }}
-            />
-          </label>
-        </div>
-      ) : (
-        <p className={styles.caption}>{t('packs.disabled')}</p>
-      )}
-    </section>
+        </details>
+      </SettingsSection>
+      <ConfirmDialog
+        open={reverting !== undefined}
+        title={t('packs.revert')}
+        body={t('settings.packs.revert.body')}
+        confirmLabel={t('packs.revert')}
+        onCancel={() => setReverting(undefined)}
+        onConfirm={() => {
+          const country = reverting;
+          setReverting(undefined);
+          void run(async () => {
+            await api(`/api/admin/packs/${country}/builtin`, { method: 'POST' });
+            return t('packs.reverted', { country: country ?? '' });
+          });
+        }}
+      />
+    </>
   );
 }

@@ -133,6 +133,7 @@ export const planEn = {
   'notifications.invoice_overdue': 'Invoice {number} is overdue ({client})',
   'notifications.threshold_near': '{label}: {percent} % reached',
   'notifications.threshold_exceeded': '{label}: threshold exceeded',
+  'notifications.threshold_below': '{label}: turnover back under the threshold',
 
   'reminders.title': 'Reminders',
   'reminders.email': 'Send reminders by e-mail',
@@ -153,7 +154,7 @@ export const planEn = {
   'reminders.test': 'Send a test',
   'reminders.test.email.sent': 'Test e-mail sent.',
   'reminders.test.email.off': 'E-mail reminders are off.',
-  'reminders.test.email.nosmtp': 'No mail server is configured on this instance (SMTP_URL).',
+  'reminders.test.email.nosmtp': 'E-mail sending is not set up yet: see Settings → Sending e-mails.',
   'reminders.test.email.failed': 'The test e-mail could not be sent.',
   'reminders.test.ntfy.sent': 'Test push sent.',
   'reminders.test.ntfy.off': 'Push notifications are off.',
@@ -267,7 +268,8 @@ export const planEn = {
   'packs.activate': 'Use this version',
   'packs.check': 'Check for updates',
   'packs.import': 'Import a signed update',
-  'packs.disabled': 'Updates are off: no signing key is configured (PACK_PUBLIC_KEYS).',
+  'packs.disabled':
+    'Rule updates are off: the server administrator has not set a verification key yet (see technical details).',
   'packs.imported': 'Update {country} #{sequence} installed.',
   'packs.reverted': '{country} uses the shipped pack again.',
   'packs.activated': '{country} now uses update #{sequence}.',
@@ -387,7 +389,7 @@ export const planEn = {
   'packs.auto.on': 'Daily check turned on. Updates found wait for your approval.',
   'packs.auto.off': 'Daily check turned off. Nothing is downloaded any more.',
   'packs.auto.noUrl':
-    'Automatic checking needs PACK_UPDATE_URL in the server settings. You can still import a signed file.',
+    'Daily checks need an update address in the server configuration (see technical details). You can still import a signed file.',
   'packs.found': '{count} new update(s) found.',
   'system.update.label': 'New version',
   'system.update.body': 'Almanach {version} is available (you run {current}).',
@@ -488,16 +490,17 @@ export const planEn = {
   'stripe.body':
     'Imports Stripe customers as clients of this company, and payments collected through Stripe as receipts linked to their client: paid invoices, payments without an invoice, and refunds as negative amounts. They count in revenue, thresholds and estimates. Amounts are before tax when Stripe gives it; no card data is stored.',
   'stripe.notAllowed':
-    'An administrator must first allow Stripe syncs in Settings → Instance. Until then, Almanach never contacts Stripe.',
-  'stripe.noSecretsKey': 'To store a Stripe key, the server needs SECRETS_KEY (see .env.example).',
-  'stripe.key': 'Restricted key (rk_…)',
+    'An administrator must first allow Stripe syncs in Settings → Instance and permissions. Until then, Almanach never contacts Stripe.',
+  'stripe.noSecretsKey':
+    'To store a Stripe key, the server administrator must first set an encryption key (SECRETS_KEY in the server settings).',
+  'stripe.key': 'Read-only Stripe key',
   'stripe.key.hint':
-    'In Stripe, create a restricted key with Read on Charges, Customers, Invoices and Balance transactions (and Refunds if listed), None elsewhere. It is stored encrypted.',
+    'In Stripe, under Developers → API keys, create a restricted key (it starts with “rk_”) that can only Read Charges, Customers, Invoices and Balance transactions (and Refunds if listed). It is stored encrypted.',
   'stripe.key.saved': 'A key is saved. Enter a new one only to replace it.',
   'stripe.enabled': 'Sync every 6 hours',
   'stripe.save': 'Save',
   'stripe.sync': 'Sync now',
-  'stripe.remove': 'Remove the key',
+  'stripe.remove': 'Remove the Stripe key',
   'stripe.status': '{count} receipt(s) imported. Last sync: {date}.',
   'stripe.never': 'never',
   'stripe.synced': '{count} new receipt(s) imported.',
@@ -616,12 +619,12 @@ export const planEn = {
   'system.externalSources': 'Allow external document sources',
   'system.externalSources.hint':
     'Companies may then poll HTTPS feeds of quotes and invoices from other tools every 15 minutes. Nothing is fetched while this is off.',
-  'system.mcp': 'Allow the MCP endpoint (AI assistants)',
+  'system.mcp': 'Allow AI assistants (MCP endpoint)',
   'system.mcp.hint':
-    '/mcp then answers personal access tokens created in Settings. It never issues, sends or deletes anything.',
+    'Assistants can then connect with the personal access tokens created in Settings → AI assistants. They never issue, send or delete anything.',
   'external.title': 'External sources',
   'external.body':
-    'Read-only quotes, invoices and credit notes from another tool, through an HTTPS feed in the almanach-feed/1 format. They show with the source name, never count in numbering, declarations or exports, and external quotes never count in revenue.',
+    'Read-only quotes, invoices and credit notes from another tool. They show with the source name, never count in numbering, declarations or exports, and external quotes never count in revenue.',
   'external.notAllowed': 'An administrator must first allow external sources in Settings → Instance.',
   'external.status': '{count} document(s). Last sync: {date}.',
   'external.synced': '{count} document(s) received.',
@@ -631,7 +634,7 @@ export const planEn = {
   'external.name': 'Name',
   'external.url': 'Feed address',
   'external.url.hint': 'HTTPS only, e.g. https://api.example.com/platform/integrations/almanach/feed',
-  'external.token': 'Bearer token',
+  'external.token': 'Access token',
   'external.token.hint': 'Stored encrypted, never shown again.',
   'external.token.saved':
     'A token is saved. Type one only to replace it (required when the address changes).',
@@ -648,10 +651,11 @@ export const planEn = {
   'external.error.feed_too_large': 'The feed is too large (over 5 MiB).',
   'external.error.feed_invalid': 'The feed is not in the almanach-feed/1 format.',
   'external.error.feed_failed': 'The sync failed.',
-  'tokens.title': 'Personal access tokens (MCP)',
+  'tokens.title': 'Personal access tokens',
   'tokens.body':
-    'Let an AI assistant read your data through /mcp (docs/mcp.md). "Read + drafts" may also create clients and draft quotes or invoices, never issue, send or delete.',
-  'tokens.notAllowed': 'An administrator must first allow the MCP endpoint in Settings → Instance.',
+    'Let an AI assistant read your data. “Read + drafts” may also create clients and draft quotes or invoices; it never issues, sends or deletes anything.',
+  'tokens.notAllowed':
+    'An administrator must first allow AI assistants in Settings → Instance and permissions.',
   'tokens.created': 'Copy this token now, it will not be shown again:',
   'tokens.used': 'Created {created} · last used {used}',
   'tokens.scope': 'Scope',

@@ -2,9 +2,10 @@ import { type Client, formatMoney, type Mission, vatSituation } from '@almanach/
 import { type ReactNode, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { Badge } from '../../components/Badge/Badge.tsx';
-import buttonStyles from '../../components/Button/Button.module.css';
 import { Button } from '../../components/Button/Button.tsx';
-import { ConfirmDialog } from '../../components/ConfirmDialog/ConfirmDialog.tsx';
+import { ButtonLink } from '../../components/Button/ButtonLink.tsx';
+import { DangerAction, DangerZone } from '../../components/DangerZone/DangerZone.tsx';
+import { EmptyState } from '../../components/EmptyState/EmptyState.tsx';
 import form from '../../components/FormPage/FormPage.module.css';
 import { LoadError } from '../../components/LoadError/LoadError.tsx';
 import { Notice } from '../../components/Notice/Notice.tsx';
@@ -42,7 +43,6 @@ export function ClientDetailPage() {
     }[];
   }>(`/api/clients/${id}`);
   const missions = useResource<{ missions: Mission[] }>('/api/missions');
-  const [confirmDelete, setConfirmDelete] = useState(false);
   const [failure, setFailure] = useState<string>();
 
   if (error !== undefined) return <LoadError error={error} onRetry={reload} />;
@@ -71,7 +71,6 @@ export function ClientDetailPage() {
    * @returns {Promise<void>} - resolves when done
    */
   async function remove(): Promise<void> {
-    setConfirmDelete(false);
     try {
       await api(`/api/clients/${client.id}`, { method: 'DELETE' });
       navigate('/clients', { replace: true });
@@ -99,27 +98,29 @@ export function ClientDetailPage() {
 
   return (
     <>
-      <PageHeader title={client.name} subtitle={client.archived ? t('clients.archived.notice') : undefined}>
-        <Link to={`/clients/${client.id}/edit`} className={`${buttonStyles.button} ${buttonStyles.primary}`}>
+      <PageHeader
+        width="narrow"
+        title={client.name}
+        subtitle={client.archived ? t('clients.archived.notice') : undefined}
+      >
+        <ButtonLink to={`/clients/${client.id}/edit`} variant="primary">
           {t('common.edit')}
-        </Link>
+        </ButtonLink>
         {!client.archived && (
-          <Link
-            to={`/documents/new?type=invoice&client=${client.id}`}
-            className={`${buttonStyles.button} ${buttonStyles.ghost}`}
-          >
+          <ButtonLink to={`/documents/new?type=invoice&client=${client.id}`} variant="ghost">
             {t('documents.new.invoice')}
-          </Link>
+          </ButtonLink>
         )}
         <Button variant="ghost" onClick={() => void toggleArchive()}>
           {client.archived ? t('clients.unarchive') : t('clients.archive')}
         </Button>
-        <Button variant="ghost" onClick={() => setConfirmDelete(true)}>
-          {t('common.delete')}
-        </Button>
       </PageHeader>
       <div className={form.form}>
-        {failure && <Notice tone="error">{failure}</Notice>}
+        {failure && (
+          <Notice tone="error" live>
+            {failure}
+          </Notice>
+        )}
         {client.stripeDeletedAt && <Notice tone="warn">{t('clients.stripe.deleted')}</Notice>}
         {situation && situation !== 'domestic' && (
           <Notice tone={situation === 'eu_b2b_missing_vat' ? 'warn' : 'info'}>{t(`vat.${situation}`)}</Notice>
@@ -187,16 +188,13 @@ export function ClientDetailPage() {
         <section aria-labelledby="client-missions">
           <PageHeaderLite id="client-missions" title={t('nav.missions')}>
             {!client.archived && (
-              <Link
-                to={`/missions/new?client=${client.id}`}
-                className={`${buttonStyles.button} ${buttonStyles.ghost}`}
-              >
+              <ButtonLink to={`/missions/new?client=${client.id}`} variant="ghost">
                 {t('missions.new')}
-              </Link>
+              </ButtonLink>
             )}
           </PageHeaderLite>
           {own.length === 0 ? (
-            <p className={list.count}>{t('clients.missions.empty')}</p>
+            <EmptyState inline title={t('clients.missions.empty')} body={t('clients.missions.empty.body')} />
           ) : (
             <ul className={list.list}>
               {own.map((mission) => (
@@ -216,16 +214,16 @@ export function ClientDetailPage() {
             </ul>
           )}
         </section>
+        <DangerZone>
+          <DangerAction
+            label={t('clients.delete.label')}
+            consequence={t('clients.delete.body')}
+            actionLabel={t('common.delete')}
+            confirmTitle={t('clients.delete.title', { name: client.name })}
+            onConfirm={() => void remove()}
+          />
+        </DangerZone>
       </div>
-      <ConfirmDialog
-        open={confirmDelete}
-        title={t('clients.delete.title', { name: client.name })}
-        body={t('clients.delete.body')}
-        confirmLabel={t('common.delete')}
-        danger
-        onConfirm={() => void remove()}
-        onCancel={() => setConfirmDelete(false)}
-      />
     </>
   );
 }

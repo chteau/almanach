@@ -2,8 +2,8 @@ import { type DocumentView, daysBetween, type LinkedRecords } from '@almanach/sh
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router';
 import { Badge } from '../../components/Badge/Badge.tsx';
-import buttonStyles from '../../components/Button/Button.module.css';
 import { Button } from '../../components/Button/Button.tsx';
+import { ButtonLink } from '../../components/Button/ButtonLink.tsx';
 import { EmptyState } from '../../components/EmptyState/EmptyState.tsx';
 import form from '../../components/FormPage/FormPage.module.css';
 import { LoadError } from '../../components/LoadError/LoadError.tsx';
@@ -171,9 +171,9 @@ export function DocumentsPage({ kind }: { kind: Kind }) {
 
   const newButton =
     kind === 'credit_note' ? null : (
-      <Link to={`/documents/new?type=${kind}`} className={`${buttonStyles.button} ${buttonStyles.primary}`}>
+      <ButtonLink to={`/documents/new?type=${kind}`} variant="primary">
         {t(`documents.new.${kind}`)}
-      </Link>
+      </ButtonLink>
     );
 
   return (

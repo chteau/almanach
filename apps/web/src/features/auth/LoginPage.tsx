@@ -62,7 +62,11 @@ export function LoginPage() {
       <main className={styles.main}>
         <PageHeader title={t('login.title')} />
         <form className={styles.form} onSubmit={handleSubmit} noValidate>
-          {error && <Notice tone="error">{error}</Notice>}
+          {error && (
+            <Notice tone="error" live>
+              {error}
+            </Notice>
+          )}
           <TextField
             label={t('login.email')}
             type="email"

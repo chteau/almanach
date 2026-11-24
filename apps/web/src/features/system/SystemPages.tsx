@@ -1,9 +1,10 @@
 import { useMemo } from 'react';
-import { Link, useRouteError } from 'react-router';
-import buttonStyles from '../../components/Button/Button.module.css';
+import { useRouteError } from 'react-router';
+import { buttonClassName } from '../../components/Button/Button.tsx';
+import { ButtonLink } from '../../components/Button/ButtonLink.tsx';
 import { EmptyState } from '../../components/EmptyState/EmptyState.tsx';
 import { useI18n } from '../../i18n/I18nProvider.tsx';
-import styles from '../planning/Planning.module.css';
+import styles from '../../styles/text.module.css';
 
 /**
  * Page shown for an unknown address (S-270)
@@ -15,9 +16,9 @@ export function NotFoundPage() {
   return (
     <main id="main" className={styles.systemPage}>
       <EmptyState title={t('system.notFound.title')} body={t('system.notFound.body')}>
-        <Link to="/" className={`${buttonStyles.button} ${buttonStyles.primary}`}>
+        <ButtonLink to="/" variant="primary">
           {t('system.home')}
-        </Link>
+        </ButtonLink>
       </EmptyState>
     </main>
   );
@@ -40,11 +41,7 @@ export function ErrorPage() {
         <p className={styles.caption}>
           {t('common.error.reference', { id: reference })} <code>{reference}</code>
         </p>
-        <button
-          type="button"
-          className={`${buttonStyles.button} ${buttonStyles.primary}`}
-          onClick={() => window.location.reload()}
-        >
+        <button type="button" className={buttonClassName('primary')} onClick={() => window.location.reload()}>
           {t('system.reload')}
         </button>
       </EmptyState>

@@ -79,7 +79,11 @@ export function CountryStep({ form, pack, packs, update, next }: OnboardingStepP
 
   return (
     <StepShell title={t('onboarding.country.title')} body={t('onboarding.country.body')} onSubmit={submit}>
-      {error && <Notice tone="error">{error}</Notice>}
+      {error && (
+        <Notice tone="error" live>
+          {error}
+        </Notice>
+      )}
       <fieldset className={wizard.choices}>
         <legend className="visually-hidden">{t('onboarding.country.title')}</legend>
         {packs.map((candidate) => (
@@ -568,7 +572,11 @@ export function SummaryStep({
       submitLabel={t('onboarding.summary.submit')}
       submitDisabled={busy}
     >
-      {error && <Notice tone="error">{error}</Notice>}
+      {error && (
+        <Notice tone="error" live>
+          {error}
+        </Notice>
+      )}
       <dl className={wizard.summary}>
         {rows.map(([label, value]) => (
           <div key={label} className={wizard.summaryRow}>

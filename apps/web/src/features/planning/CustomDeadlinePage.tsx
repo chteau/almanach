@@ -1,7 +1,7 @@
 import { type SyntheticEvent, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { Button } from '../../components/Button/Button.tsx';
-import { ConfirmDialog } from '../../components/ConfirmDialog/ConfirmDialog.tsx';
+import { DangerAction, DangerZone } from '../../components/DangerZone/DangerZone.tsx';
 import form from '../../components/FormPage/FormPage.module.css';
 import { LoadError } from '../../components/LoadError/LoadError.tsx';
 import { Notice } from '../../components/Notice/Notice.tsx';
@@ -60,7 +60,6 @@ function CustomForm({ existing }: { existing: Custom | null }) {
   const [dirty, setDirty] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [failure, setFailure] = useState<string>();
-  const [confirmDelete, setConfirmDelete] = useState(false);
   const allowLeave = useUnsavedGuard(dirty, t('common.unsaved'));
 
   /**
@@ -113,7 +112,6 @@ function CustomForm({ existing }: { existing: Custom | null }) {
    * @returns {Promise<void>} - resolves when deleted
    */
   async function remove(): Promise<void> {
-    setConfirmDelete(false);
     if (!existing) return;
     await api(`/api/custom-deadlines/${existing.id}`, { method: 'DELETE' }).catch(() => undefined);
     allowLeave();
@@ -122,9 +120,13 @@ function CustomForm({ existing }: { existing: Custom | null }) {
 
   return (
     <>
-      <PageHeader title={existing ? existing.title : t('custom.new')} />
+      <PageHeader width="narrow" title={existing ? existing.title : t('custom.new')} />
       <form className={form.form} onSubmit={(event) => void submit(event)} noValidate>
-        {failure && <Notice tone="error">{failure}</Notice>}
+        {failure && (
+          <Notice tone="error" live>
+            {failure}
+          </Notice>
+        )}
         <TextField
           label={t('custom.title')}
           hint={t('custom.title.hint')}
@@ -171,23 +173,20 @@ function CustomForm({ existing }: { existing: Custom | null }) {
         />
         <ActivitySelect value={activityId} onChange={edit(setActivityId)} />
         <div className={form.actions}>
-          {existing && (
-            <Button variant="ghost" onClick={() => setConfirmDelete(true)}>
-              {t('common.delete')}
-            </Button>
-          )}
           <Button type="submit">{t('common.save')}</Button>
         </div>
       </form>
-      <ConfirmDialog
-        open={confirmDelete}
-        title={t('custom.delete')}
-        body={t('custom.delete.body')}
-        confirmLabel={t('common.delete')}
-        danger
-        onConfirm={() => void remove()}
-        onCancel={() => setConfirmDelete(false)}
-      />
+      {existing && (
+        <DangerZone>
+          <DangerAction
+            label={t('custom.delete.label')}
+            consequence={t('custom.delete.body')}
+            actionLabel={t('common.delete')}
+            confirmTitle={t('custom.delete')}
+            onConfirm={() => void remove()}
+          />
+        </DangerZone>
+      )}
     </>
   );
 }

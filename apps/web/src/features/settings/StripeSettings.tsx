@@ -1,15 +1,22 @@
-import { useState } from 'react';
+import { type SyntheticEvent, useState } from 'react';
+import { ActionBar } from '../../components/ActionBar/ActionBar.tsx';
+import { Badge } from '../../components/Badge/Badge.tsx';
 import { Button } from '../../components/Button/Button.tsx';
-import form from '../../components/FormPage/FormPage.module.css';
+import { DangerAction, DangerZone } from '../../components/DangerZone/DangerZone.tsx';
+import { Field } from '../../components/Field/Field.tsx';
+import { LoadError } from '../../components/LoadError/LoadError.tsx';
 import { Notice } from '../../components/Notice/Notice.tsx';
+import { SettingsSection } from '../../components/SettingsSection/SettingsSection.tsx';
+import { Skeleton } from '../../components/Skeleton/Skeleton.tsx';
 import { TextField } from '../../components/TextField/TextField.tsx';
 import { useI18n } from '../../i18n/I18nProvider.tsx';
 import type { MessageKey } from '../../i18n/messages.ts';
 import { ApiError, api } from '../../lib/api.ts';
 import { formatDate } from '../../lib/format.ts';
 import { useResource } from '../../lib/useResource.ts';
+import text from '../../styles/text.module.css';
 import { describeError } from '../install/errors.ts';
-import styles from '../planning/Planning.module.css';
+import { useAction } from './useAction.ts';
 
 const STRIPE_ERRORS = ['stripe_unauthorized', 'stripe_forbidden', 'stripe_unreachable', 'stripe_failed'];
 
@@ -26,125 +33,169 @@ interface StripeStatus {
 }
 
 /**
- * Settings section for the Stripe sync of the active company
+ * Picks the message key for a count, so "0 receipts" and "1 receipt" read naturally
  *
- * @returns {JSX.Element | null} - the section, once loaded
+ * @param count {number} - number of items
+ * @param base {string} - key prefix, completed with .zero, .one or .many
+ * @returns {MessageKey} - the key to translate
+ */
+export function countKey(count: number, base: string): MessageKey {
+  return `${base}.${count === 0 ? 'zero' : count === 1 ? 'one' : 'many'}` as MessageKey;
+}
+
+/**
+ * Settings panel for the Stripe sync of the active company
+ *
+ * @returns {JSX.Element} - the sections
  */
 export function StripeSettings() {
   const { t, locale } = useI18n();
-  const { data, reload } = useResource<StripeStatus>('/api/settings/stripe');
+  const { data, error, reload } = useResource<StripeStatus>('/api/settings/stripe');
   const [key, setKey] = useState('');
-  const [message, setMessage] = useState<{ tone: 'info' | 'error'; text: string }>();
-  if (!data) return null;
-
+  const [enabled, setEnabled] = useState<boolean>();
   /**
    * Translates a failure code from the server or from the last sync
    *
-   * @param code {string} - error code
-   * @param problem {unknown} - original failure, for the generic message
+   * @param problem {unknown} - failure
    * @returns {string} - message
    */
-  const explain = (code: string, problem?: unknown): string =>
-    STRIPE_ERRORS.includes(code) ? t(`stripe.error.${code}` as MessageKey) : describeError(problem, t);
+  const explain = (problem: unknown): string => {
+    const code = problem instanceof ApiError ? String(problem.body.error ?? '') : String(problem ?? '');
+    return STRIPE_ERRORS.includes(code) ? t(`stripe.error.${code}` as MessageKey) : describeError(problem, t);
+  };
+  const save = useAction(explain);
+  const sync = useAction(explain);
+  const remove = useAction(explain);
+
+  if (error !== undefined) return <LoadError error={error} onRetry={reload} />;
+  if (!data) return <Skeleton rows={3} />;
+  const on = enabled ?? data.enabled;
+  const dirty = key !== '' || on !== data.enabled;
 
   /**
-   * Runs a request and reloads the status
+   * Saves the key and the schedule
    *
-   * @param request {() => Promise<string | undefined>} - API call returning an optional success message
-   * @returns {Promise<void>} - resolves once handled
+   * @param event {SyntheticEvent} - submission
+   * @returns {Promise<void>} - resolves when done
    */
-  async function run(request: () => Promise<string | undefined>): Promise<void> {
-    try {
-      const text = await request();
-      setMessage(text ? { tone: 'info', text } : undefined);
+  async function submit(event: SyntheticEvent): Promise<void> {
+    event.preventDefault();
+    const done = await save.run(async () => {
+      await api('/api/settings/stripe', { method: 'PUT', body: { enabled: on, ...(key ? { key } : {}) } });
+    });
+    if (done) {
       setKey('');
-    } catch (problem) {
-      const code = problem instanceof ApiError ? String(problem.body.error ?? '') : '';
-      setMessage({ tone: 'error', text: explain(code, problem) });
+      setEnabled(undefined);
     }
     reload();
   }
 
+  const ready = data.allowed && data.secretsKey;
+
   return (
-    <section className={form.section} aria-labelledby="stripe-title">
-      <h2 id="stripe-title" className={styles.sectionTitle}>
-        {t('stripe.title')}
-      </h2>
-      <p className={styles.text}>{t('stripe.body')}</p>
-      {!data.allowed && <Notice tone="info">{t('stripe.notAllowed')}</Notice>}
-      {data.allowed && !data.secretsKey && <Notice tone="warn">{t('stripe.noSecretsKey')}</Notice>}
-      {message && <Notice tone={message.tone}>{message.text}</Notice>}
-      {!message && data.error && <Notice tone="error">{explain(data.error)}</Notice>}
-      {(/^(sk|rk)_test_/.test(key) || (!key && data.testKey)) && (
-        <Notice tone="warn">{t('stripe.testKey')}</Notice>
-      )}
-      {data.allowed && data.secretsKey && (
-        <form
-          className={form.form}
-          onSubmit={(event) => {
-            event.preventDefault();
-            const enabled = (event.currentTarget.elements.namedItem('enabled') as HTMLInputElement).checked;
-            void run(async () => {
-              await api('/api/settings/stripe', {
-                method: 'PUT',
-                body: { enabled, ...(key ? { key } : {}) },
-              });
-              return undefined;
-            });
-          }}
+    <>
+      <form onSubmit={(event) => void submit(event)} noValidate>
+        <SettingsSection
+          title={t('stripe.title')}
+          description={t('stripe.body')}
+          badge={
+            data.keySet && (
+              <Badge tone={data.enabled ? 'ok' : undefined}>
+                {data.enabled ? t('settings.on') : t('settings.off')}
+              </Badge>
+            )
+          }
+          footer={
+            ready && (
+              <ActionBar
+                primaryLabel={t('stripe.save')}
+                busy={save.busy}
+                dirty={dirty}
+                feedback={sync.feedback ?? save.feedback}
+              >
+                {data.enabled && (
+                  <Button
+                    variant="ghost"
+                    busy={sync.busy}
+                    onClick={() =>
+                      void sync
+                        .run(async () => {
+                          const result = await api<{ imported: number }>('/api/settings/stripe/sync', {
+                            method: 'POST',
+                          });
+                          return t(countKey(result.imported, 'settings.stripe.synced'), {
+                            count: result.imported,
+                          });
+                        })
+                        .then(reload)
+                    }
+                  >
+                    {t('stripe.sync')}
+                  </Button>
+                )}
+              </ActionBar>
+            )
+          }
         >
-          <TextField
-            label={t('stripe.key')}
-            hint={data.keySet ? t('stripe.key.saved') : t('stripe.key.hint')}
-            value={key}
-            autoComplete="off"
-            spellCheck={false}
-            placeholder={data.keySet ? '••••••••' : 'rk_live_…'}
-            onChange={(event) => setKey(event.target.value.trim())}
+          {!data.allowed && <Notice tone="info">{t('stripe.notAllowed')}</Notice>}
+          {data.allowed && !data.secretsKey && <Notice tone="warn">{t('stripe.noSecretsKey')}</Notice>}
+          {data.error && <Notice tone="error">{explain(data.error)}</Notice>}
+          {(/^(sk|rk)_test_/.test(key) || (!key && data.testKey)) && (
+            <Notice tone="warn">{t('stripe.testKey')}</Notice>
+          )}
+          {ready && (
+            <>
+              <TextField
+                label={t('stripe.key')}
+                hint={data.keySet ? t('stripe.key.saved') : t('stripe.key.hint')}
+                value={key}
+                autoComplete="off"
+                spellCheck={false}
+                placeholder={data.keySet ? '••••••••' : undefined}
+                onChange={(event) => setKey(event.target.value.trim())}
+              />
+              <Field label={t('stripe.enabled')} checkbox>
+                {(control) => (
+                  <input
+                    {...control}
+                    type="checkbox"
+                    checked={on}
+                    onChange={(event) => setEnabled(event.target.checked)}
+                  />
+                )}
+              </Field>
+            </>
+          )}
+          <p className={text.caption}>
+            {t(countKey(data.imported, 'settings.stripe.imported'), { count: data.imported })}{' '}
+            {t('settings.stripe.lastSync', {
+              date: data.syncedAt ? formatDate(data.syncedAt.slice(0, 10), locale) : t('stripe.never'),
+            })}
+          </p>
+        </SettingsSection>
+      </form>
+      {data.keySet && (
+        <DangerZone>
+          {remove.feedback?.tone === 'error' && (
+            <li>
+              <Notice tone="error" live>
+                {remove.feedback.text}
+              </Notice>
+            </li>
+          )}
+          <DangerAction
+            label={t('stripe.remove')}
+            consequence={t('settings.stripe.remove.consequence')}
+            actionLabel={t('settings.remove')}
+            busy={remove.busy}
+            onConfirm={() =>
+              void remove
+                .run(() => api('/api/settings/stripe', { method: 'DELETE' }).then(() => undefined))
+                .then(reload)
+            }
           />
-          <label className={styles.check}>
-            <input type="checkbox" name="enabled" defaultChecked={data.enabled} key={String(data.enabled)} />
-            {t('stripe.enabled')}
-          </label>
-          <div className={form.actions}>
-            <Button type="submit">{t('stripe.save')}</Button>
-            {data.enabled && (
-              <Button
-                variant="ghost"
-                onClick={() =>
-                  void run(async () => {
-                    const result = await api<{ imported: number }>('/api/settings/stripe/sync', {
-                      method: 'POST',
-                    });
-                    return t('stripe.synced', { count: result.imported });
-                  })
-                }
-              >
-                {t('stripe.sync')}
-              </Button>
-            )}
-            {data.keySet && (
-              <Button
-                variant="ghost"
-                onClick={() =>
-                  void run(async () => {
-                    await api('/api/settings/stripe', { method: 'DELETE' });
-                    return undefined;
-                  })
-                }
-              >
-                {t('stripe.remove')}
-              </Button>
-            )}
-          </div>
-        </form>
+        </DangerZone>
       )}
-      <p className={styles.caption}>
-        {t('stripe.status', {
-          count: data.imported,
-          date: data.syncedAt ? formatDate(data.syncedAt.slice(0, 10), locale) : t('stripe.never'),
-        })}
-      </p>
-    </section>
+    </>
   );
 }

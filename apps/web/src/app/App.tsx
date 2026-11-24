@@ -61,14 +61,6 @@ const router = createBrowserRouter([
         ),
       },
       {
-        path: '/settings/profile',
-        element: (
-          <RequireAuth>
-            <OnboardingPage edit />
-          </RequireAuth>
-        ),
-      },
-      {
         element: (
           <RequireAuth>
             <AppShell />
@@ -84,6 +76,7 @@ const router = createBrowserRouter([
           { path: '/time', element: <TimePage /> },
           { path: '/notifications', element: <NotificationsPage /> },
           { path: '/settings', element: <SettingsPage /> },
+          { path: '/settings/:section', element: <SettingsPage /> },
           { path: '/menu', element: <MenuPage /> },
           { path: '/clients', element: <ClientsPage /> },
           { path: '/clients/new', element: <ClientFormPage /> },

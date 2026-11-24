@@ -48,7 +48,11 @@ export function ChecksStep({ form, next, back }: StepProps) {
       onBack={back}
       submitDisabled={blocked}
     >
-      {error && <Notice tone="error">{error}</Notice>}
+      {error && (
+        <Notice tone="error" live>
+          {error}
+        </Notice>
+      )}
       {!checks && !error && <p aria-live="polite">{t('common.loading')}</p>}
       {checks && (
         <ul className={styles.checks}>

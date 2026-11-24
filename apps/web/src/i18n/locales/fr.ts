@@ -3,6 +3,7 @@ import { appFr } from './app.fr.ts';
 import { componentsFr } from './components.fr.ts';
 import { docsFr } from './docs.fr.ts';
 import { planFr } from './plan.fr.ts';
+import { settingsFr } from './settings.fr.ts';
 
 /** Messages en français. */
 export const fr: Messages = {
@@ -118,4 +119,5 @@ export const fr: Messages = {
   ...componentsFr,
   ...docsFr,
   ...planFr,
+  ...settingsFr,
 };

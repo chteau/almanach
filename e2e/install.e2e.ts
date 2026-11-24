@@ -324,11 +324,14 @@ test('dashboard, calendar, deadline, thresholds, reminders and calendar feed (P0
   await expect(page.getByText(/VAT is due from the day the threshold is crossed/)).toBeVisible();
   await expectAccessible(page);
 
-  await page.goto('/settings');
+  await page.goto('/settings/rules');
   await expect(page.getByText('Verified', { exact: true }).first()).toBeVisible();
+  await page.goto('/settings/reminders');
   await page.getByLabel('Remind me this many days before').fill('14, 3, 0');
-  await page.getByRole('button', { name: 'Save' }).last().click();
+  await page.getByRole('button', { name: 'Save' }).click();
   await expect(page.getByText('Reminder settings saved.')).toBeVisible();
+  await expectAccessible(page);
+  await page.goto('/settings/calendar');
   await page.getByRole('button', { name: 'Create a link' }).click();
   const feed = await page.getByLabel('Subscription link').inputValue();
   expect(feed).toMatch(/\/api\/ical\/[\w-]+\.ics$/);
@@ -339,7 +342,8 @@ test('dashboard, calendar, deadline, thresholds, reminders and calendar feed (P0
   expect(body).toContain('BEGIN:VCALENDAR');
   expect(body).toContain('Renew insurance');
   await expectAccessible(page);
-  await page.getByRole('button', { name: 'Revoke the link' }).click();
+  await page.getByRole('region', { name: 'Danger zone' }).getByRole('button', { name: 'Revoke' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Revoke' }).click();
   await expect(page.getByRole('button', { name: 'Create a link' })).toBeVisible();
   expect((await request.get(new URL(feed).pathname)).status()).toBe(404);
 });
@@ -392,8 +396,8 @@ test('invoicing settings: numbering, PDF look and defaults (S-234 to S-236)', as
   await page.getByRole('button', { name: 'Sign in' }).click();
   await expect(page.getByRole('heading', { name: 'Dashboard', exact: true })).toBeVisible();
 
-  await page.goto('/settings');
-  const billing = page.locator('#billing');
+  await page.goto('/settings/numbering');
+  let billing = page.getByRole('region', { name: 'Document numbers' });
   const next = new Date().getFullYear() + 1;
   await expect(billing.getByText(/Invoices were already issued/)).toBeVisible();
   await billing.getByLabel('Invoice prefix').fill('FAC');
@@ -404,15 +408,28 @@ test('invoicing settings: numbering, PDF look and defaults (S-234 to S-236)', as
   await billing.getByLabel('Invoice prefix').fill('F-1');
   await expect(billing.getByText('Letters and digits only, 1 to 10.')).toBeVisible();
   await billing.getByLabel('Invoice prefix').fill('FAC');
-  await billing.getByLabel('Layout').selectOption('band');
+  await expectAccessible(page);
+  await billing.getByRole('button', { name: 'Save' }).click();
+  await expect(page.getByText(`Saved. The new numbering applies from 1 January ${next}.`)).toBeVisible();
+  await expect(billing.getByText(new RegExp(`New format planned from ${next}`))).toBeVisible();
+
+  await page.goto('/settings/defaults');
+  billing = page.getByRole('region', { name: 'Defaults' });
   await billing.getByLabel('Payment terms for new clients (days)').fill('45');
   await billing
     .getByLabel(/Default note on new documents/)
     .fill('Pénalités de retard : 3 fois le taux légal.');
   await expectAccessible(page);
   await billing.getByRole('button', { name: 'Save' }).click();
-  await expect(page.getByText(`Saved. The new numbering applies from 1 January ${next}.`)).toBeVisible();
-  await expect(billing.getByText(new RegExp(`New format planned from ${next}`))).toBeVisible();
+  await expect(billing.getByText(/^(Invoicing settings saved|Saved\. The new numbering)/)).toBeVisible();
+
+  await page.goto('/settings/pdf');
+  billing = page.getByRole('region', { name: 'PDF look' });
+  await billing.getByLabel('Layout').selectOption('band');
+  await billing.getByRole('button', { name: 'Save' }).click();
+  await expect(billing.getByText(/^(Invoicing settings saved|Saved\. The new numbering)/)).toBeVisible();
+  await expectAccessible(page);
+  billing = page.getByRole('region', { name: 'Logo' });
 
   const png = Buffer.from(
     'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
@@ -503,8 +520,9 @@ test('signed pack updates, data export, search and system pages (P20 to P22)', a
       buffer: Buffer.from(JSON.stringify(content)),
     });
 
-  await page.goto('/settings');
+  await page.goto('/settings/packs');
   const packs = page.getByRole('region', { name: 'Country rule packs' });
+  const updates = page.getByRole('region', { name: 'Rule updates' });
   await expect(packs.getByText(/Shipped with Almanach/).first()).toBeVisible();
   const first = bundle(1);
   await upload('fr-1.json', { ...first, payload: `${first.payload.slice(0, -4)}AAAA` });
@@ -513,7 +531,7 @@ test('signed pack updates, data export, search and system pages (P20 to P22)', a
   await expect(
     page.getByText('Update FR #1 received. Read what it changes below, then apply it.'),
   ).toBeVisible();
-  const pending = packs.getByRole('region', { name: 'Update available: FR #1' });
+  const pending = page.getByRole('region', { name: 'Update available: FR #1' });
   await expect(pending.getByText('No change to the rules in use.')).toBeVisible();
   await expectAccessible(page);
   await pending.getByRole('button', { name: 'Apply' }).click();
@@ -525,22 +543,23 @@ test('signed pack updates, data export, search and system pages (P20 to P22)', a
     'rates: [{ from: "2026-01-01", rateBp: 2560 }, { from: "2026-07-01", rateBp: 2600 }]',
   );
   await upload('fr-2.json', bundle(2));
-  const second = packs.getByRole('region', { name: 'Update available: FR #2' });
+  const second = page.getByRole('region', { name: 'Update available: FR #2' });
   await expect(
     second.getByText(/the rate goes from 25\.6 % to 26 % on Jul 1, 2026\. Your 2026 estimates change\./),
   ).toBeVisible();
   await second.getByRole('button', { name: 'Later' }).click();
   await expect(second).toHaveCount(0);
   await page.reload();
-  await packs
+  await page
     .getByRole('region', { name: 'Update available: FR #2' })
     .getByRole('button', { name: 'Apply' })
     .click();
   await expect(page.getByText('Update FR #2 applied.')).toBeVisible();
-  await expect(packs.getByText(/Automatic checking needs PACK_UPDATE_URL/)).toBeVisible();
-  await packs.getByRole('button', { name: 'Use this version' }).click();
+  await expect(updates.getByText(/Daily checks need an update address/)).toBeVisible();
+  await updates.getByRole('button', { name: 'Use this version' }).click();
   await expect(page.getByText('FR now uses update #1.')).toBeVisible();
   await packs.getByRole('button', { name: 'Back to the shipped pack' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Back to the shipped pack' }).click();
   await expect(page.getByText('FR uses the shipped pack again.')).toBeVisible();
   await expectAccessible(page);
 
@@ -584,7 +603,7 @@ test('two-step sign-in protects the account and sessions can be revoked (S-260 t
   await page.getByRole('button', { name: 'Sign in' }).click();
   await expect(page.getByRole('heading', { name: 'Dashboard', exact: true })).toBeVisible();
 
-  await page.goto('/settings');
+  await page.goto('/settings/two-factor');
   await page.getByRole('button', { name: 'Turn on' }).click();
   const secret = (await page.getByLabel('Setup key').inputValue()).replace(/\s/g, '');
   await page.getByLabel('Authenticator code').fill('000000');
@@ -607,12 +626,18 @@ test('two-step sign-in protects the account and sessions can be revoked (S-260 t
   await page.getByRole('button', { name: 'Sign in' }).click();
   await expect(page.getByRole('heading', { name: 'Dashboard', exact: true })).toBeVisible();
 
-  await page.goto('/settings');
-  await expect(page.getByText('7 recovery code(s) left.')).toBeVisible();
+  await page.goto('/settings/devices');
   await expect(page.getByRole('button', { name: 'Sign out', exact: true }).first()).toBeVisible();
-  await page.getByRole('button', { name: 'Sign out every other device' }).click();
-  await expect(page.getByRole('button', { name: 'Sign out every other device' })).toHaveCount(0);
-  await page.locator('#totp-title').scrollIntoViewIfNeeded();
+  const danger = page.getByRole('region', { name: 'Danger zone' });
+  await expect(danger.getByText('Sign out every other device').first()).toBeVisible();
+  await danger.getByRole('button', { name: 'Sign out' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Sign out' }).click();
+  await expect(page.getByText('All other devices signed out.')).toBeVisible();
+  await expect(danger).toHaveCount(0);
+  await expectAccessible(page);
+
+  await page.goto('/settings/two-factor');
+  await expect(page.getByText('7 recovery code(s) left.')).toBeVisible();
   await page
     .getByRole('region', { name: 'Two-step sign-in' })
     .getByLabel('Current password')
@@ -656,8 +681,8 @@ test('a change of situation splits the obligations, and a cessation makes the ac
   ).toBe(204);
   const yesterday = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
 
-  await page.goto('/settings');
-  const situation = page.locator('#situation');
+  await page.goto('/settings/profile');
+  const situation = page.getByRole('region', { name: 'Change of situation' });
   await situation.getByRole('button', { name: 'Change status or country' }).click();
   await situation.getByLabel('Effective from').fill(yesterday);
   await situation.getByLabel('Status').selectOption('micro_bic_services');
@@ -674,7 +699,10 @@ test('a change of situation splits the obligations, and a cessation makes the ac
   expect(locked.status()).toBe(409);
   expect((await locked.json()).error).toBe('use_situation');
 
-  await situation.getByRole('button', { name: 'Declare the end of activity' }).click();
+  const danger = page.getByRole('region', { name: 'Danger zone' });
+  await expect(danger.getByText('Declare the end of activity').first()).toBeVisible();
+  await danger.getByRole('button', { name: 'Declare' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Choose the last day' }).click();
   await situation.getByLabel('Last day of activity').fill(yesterday);
   await situation.getByRole('button', { name: 'Confirm the end of activity' }).click();
   await expect(situation.getByText(/Activity ended on/)).toBeVisible();

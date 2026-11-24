@@ -115,8 +115,9 @@ Everything is optional.
 
 | Variable | Purpose |
 |---|---|
-| `SMTP_URL` | Mail server for reminders (`smtps://user:password@host:465`). |
+| `SMTP_URL` | Mail server for reminders (`smtps://user:password@host:465`). Wins over the e-mail settings saved in the interface; without it, an administrator sets e-mail in the settings ([details, French](docs/email.md)). |
 | `SMTP_FROM` | Sender of reminders. |
+| `MS_OAUTH_CLIENT_ID` | Application (client) ID of your own Microsoft Entra app registration, public client without secret: enables sending from an Outlook.com / Hotmail mailbox through OAuth2 ([details, French](docs/email.md)). |
 | `REMINDERS` | `false` turns the reminder job off (on by default, every 10 minutes). |
 | `PACK_PUBLIC_KEYS` | Ed25519 public keys allowed to sign packs, comma-separated. Without them, no update is accepted and only the shipped packs are used. |
 | `PACK_UPDATE_URL` | HTTPS folder serving `index.json` and signed packs. Checked once a day, only once an administrator turns it on in Settings. |

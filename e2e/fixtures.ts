@@ -4,6 +4,9 @@ import { expect, type Page } from '@playwright/test';
 /** Installation token preset for end-to-end servers. */
 export const INSTALL_TOKEN = 'e2e-install-token-0123456789abcdef-0123';
 
+/** Test-only key encrypting stored secrets (32 bytes, base64). Never use it elsewhere. */
+export const E2E_SECRETS_KEY = 'ZTJlLW9ubHktc2VjcmV0cy1rZXktMzItYnl0ZXMhISE=';
+
 /** Test-only pack signing key pair; the public half is trusted by end-to-end servers. Never use it elsewhere. */
 export const PACK_TEST_KEYS = {
   publicKey: 'rsYLbmN9Z0iTCWQS-8Z2OW9UPTPSI5NgMEb3dvQd-uw',

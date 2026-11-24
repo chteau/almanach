@@ -68,7 +68,11 @@ export function SummaryStep({ form, back }: StepProps) {
           </div>
         ))}
       </dl>
-      {error && <Notice tone="error">{error}</Notice>}
+      {error && (
+        <Notice tone="error" live>
+          {error}
+        </Notice>
+      )}
     </StepShell>
   );
 }

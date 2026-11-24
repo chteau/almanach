@@ -1,7 +1,7 @@
 import { daysBetween } from '@almanach/shared';
 import { Link } from 'react-router';
 import { Badge } from '../../components/Badge/Badge.tsx';
-import buttonStyles from '../../components/Button/Button.module.css';
+import { ButtonLink } from '../../components/Button/ButtonLink.tsx';
 import { EmptyState } from '../../components/EmptyState/EmptyState.tsx';
 import form from '../../components/FormPage/FormPage.module.css';
 import { Gauge } from '../../components/Gauge/Gauge.tsx';
@@ -11,7 +11,7 @@ import { PageHeader } from '../../components/PageHeader/PageHeader.tsx';
 import list from '../../components/RowList/RowList.module.css';
 import { Skeleton } from '../../components/Skeleton/Skeleton.tsx';
 import { useI18n } from '../../i18n/I18nProvider.tsx';
-import { formatDate, formatMoney } from '../../lib/format.ts';
+import { formatDate, formatMoney, setDateRegion } from '../../lib/format.ts';
 import { useResource } from '../../lib/useResource.ts';
 import { linkedPath } from '../linked/activity.ts';
 import { ActivityBreakdown } from './ActivityBreakdown.tsx';
@@ -104,6 +104,7 @@ export function DashboardPage() {
     ['year', data.revenue.year],
   ] as const;
   const outlook = data.outlook;
+  if (outlook) setDateRegion(outlook.pack.country);
   const setAside = outlook?.estimates.reduce((sum, item) => sum + item.cents, 0) ?? 0;
 
   return (
@@ -111,12 +112,12 @@ export function DashboardPage() {
       <PageHeader title={t('nav.dashboard')} subtitle={formatDate(data.today, locale)} />
       {fresh && (
         <EmptyState title={t('dashboard.empty.title')} body={t('dashboard.empty.body')}>
-          <Link to="/clients/new" className={`${buttonStyles.button} ${buttonStyles.primary}`}>
+          <ButtonLink to="/clients/new" variant="primary">
             {t('clients.new')}
-          </Link>
-          <Link to="/documents/new?type=invoice" className={`${buttonStyles.button} ${buttonStyles.ghost}`}>
+          </ButtonLink>
+          <ButtonLink to="/documents/new?type=invoice" variant="ghost">
             {t('documents.new.invoice')}
-          </Link>
+          </ButtonLink>
         </EmptyState>
       )}
 
@@ -317,7 +318,11 @@ export function DashboardPage() {
                     })}
                   </p>
                 )}
-                {threshold.exceeded && <Notice tone="warn">{labelOf(threshold.consequence, locale)}</Notice>}
+                {(threshold.exceeded || threshold.fellBelow) && (
+                  <Notice tone={threshold.fellBelow ? 'info' : 'warn'}>
+                    {labelOf(threshold.consequence, locale)}
+                  </Notice>
+                )}
               </div>
             ))}
           </section>

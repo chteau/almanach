@@ -21,6 +21,8 @@ import {
 import { linkedRoutes } from './features/federation/linked.ts';
 import { installRoutes } from './features/install/install.routes.ts';
 import type { InstallService } from './features/install/install.service.ts';
+import { mailRoutes } from './features/mail/mail.routes.ts';
+import type { Mailer } from './features/mail/mailer.ts';
 import { mcpRoutes, tokenRoutes } from './features/mcp/mcp.ts';
 import { missionRoutes } from './features/missions/missions.routes.ts';
 import type { PackRegistry } from './features/packs/packs.ts';
@@ -64,6 +66,8 @@ export interface AppDeps {
   releases: ReleaseCheck;
   stripe: StripeSync;
   federation: Federation;
+  /** Outgoing e-mail; the reminders' one by default (tests). */
+  mailer?: Mailer;
   /** External document sources; a service without schedule by default (tests). */
   externalSources?: ExternalSources;
 }
@@ -190,6 +194,7 @@ export function createApp(deps: AppDeps): Hono<AppEnv> {
     deps.externalSources ??
     new ExternalSources(deps.db, deps.config.secretsKey, fetch, deps.config.externalSources);
   app.route('/api/settings/external-sources', externalSourceRoutes(deps.db, sources, deps.config.secretsKey));
+  app.route('/api/settings/mail', mailRoutes(deps.db, deps.mailer ?? deps.reminders.mailer));
   app.route('/api/settings/tokens', tokenRoutes(deps.db, deps.config.mcp));
   app.route('/api/linked', linkedRoutes(deps.db));
   app.route('/api/account', accountRoutes(deps.db, deps.config));

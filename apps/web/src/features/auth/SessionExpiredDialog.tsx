@@ -48,7 +48,11 @@ export function SessionExpiredDialog({ email, onSignedIn, onLeave }: SessionExpi
           {t('login.expired.title')}
         </h2>
         <p className={dialogStyles.body}>{t('login.expired.body', { email })}</p>
-        {error && <Notice tone="error">{error}</Notice>}
+        {error && (
+          <Notice tone="error" live>
+            {error}
+          </Notice>
+        )}
         <TextField
           label={t('login.password')}
           type="password"

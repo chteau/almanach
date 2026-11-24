@@ -194,9 +194,16 @@ function ClientForm({ initial, defaultTerms }: { initial?: Client | undefined; d
 
   return (
     <>
-      <PageHeader title={initial ? t('clients.edit', { name: initial.name }) : t('clients.new')} />
+      <PageHeader
+        width="narrow"
+        title={initial ? t('clients.edit', { name: initial.name }) : t('clients.new')}
+      />
       <form className={form.form} onSubmit={(event) => void save(event)} noValidate>
-        {failure && <Notice tone="error">{failure}</Notice>}
+        {failure && (
+          <Notice tone="error" live>
+            {failure}
+          </Notice>
+        )}
         {initial?.stripeId && <Notice tone="info">{t('clients.stripe.edit')}</Notice>}
         {duplicates.length > 0 && (
           <Notice tone="warn">
@@ -326,7 +333,11 @@ function ClientForm({ initial, defaultTerms }: { initial?: Client | undefined; d
         </fieldset>
         <fieldset className={form.section}>
           <legend>{t('clients.contacts')}</legend>
-          {err('contacts') && <Notice tone="error">{err('contacts')}</Notice>}
+          {err('contacts') && (
+            <Notice tone="error" live>
+              {err('contacts')}
+            </Notice>
+          )}
           {draft.contacts.map((contact, index) => {
             const set = (patch: Partial<typeof contact>) =>
               change({

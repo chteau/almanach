@@ -1,9 +1,9 @@
 import { addDays, daysBetween, LOCALES, type Locale } from '@almanach/shared';
 import { and, eq, gte, isNull, lt, sql } from 'drizzle-orm';
-import { createTransport, type Transporter } from 'nodemailer';
 import type { Config } from '../../config.ts';
 import type { Database } from '../../db/client.ts';
 import { companies, instance, notifications, profiles, userSettings, users } from '../../db/schema.ts';
+import { Mailer } from '../mail/mailer.ts';
 import type { PlanningService } from './planning.service.ts';
 
 type NotificationRow = typeof notifications.$inferSelect;
@@ -17,6 +17,7 @@ const TEXT: Record<Locale, Record<string, (params: Record<string, string | numbe
     invoice_overdue: (p) => `Facture ${p.number} en retard (${p.client})`,
     threshold_near: (p) => `${p.label} : ${p.percent} % atteint`,
     threshold_exceeded: (p) => `${p.label} : seuil dépassé`,
+    threshold_below: (p) => `${p.label} : chiffre d’affaires repassé sous le seuil`,
   },
   en: {
     deadline_soon: (p) => (p.days === 0 ? `Today: ${p.title}` : `${p.title} in ${p.days} days (${p.date})`),
@@ -24,6 +25,7 @@ const TEXT: Record<Locale, Record<string, (params: Record<string, string | numbe
     invoice_overdue: (p) => `Invoice ${p.number} is overdue (${p.client})`,
     threshold_near: (p) => `${p.label}: ${p.percent} % reached`,
     threshold_exceeded: (p) => `${p.label}: threshold exceeded`,
+    threshold_below: (p) => `${p.label}: turnover back under the threshold`,
   },
   de: {
     deadline_soon: (p) => (p.days === 0 ? `Heute: ${p.title}` : `${p.title} in ${p.days} Tagen (${p.date})`),
@@ -31,6 +33,7 @@ const TEXT: Record<Locale, Record<string, (params: Record<string, string | numbe
     invoice_overdue: (p) => `Rechnung ${p.number} ist überfällig (${p.client})`,
     threshold_near: (p) => `${p.label}: ${p.percent} % erreicht`,
     threshold_exceeded: (p) => `${p.label}: Schwelle überschritten`,
+    threshold_below: (p) => `${p.label}: Umsatz wieder unter der Schwelle`,
   },
 };
 
@@ -74,7 +77,8 @@ export function dueOffset(daysLeft: number, offsets: number[]): number | null {
 
 /** Creates in-app notifications and sends pushes and e-mails; safe to run repeatedly (S-330 to S-332). */
 export class ReminderJob {
-  private readonly mailer: Transporter | null;
+  /** Outgoing e-mail, shared with the settings routes. */
+  readonly mailer: Mailer;
   private timer: ReturnType<typeof setInterval> | null = null;
   private running = false;
 
@@ -83,19 +87,25 @@ export class ReminderJob {
    *
    * @param db {Database} - Drizzle database
    * @param planning {PlanningService} - planning rules
-   * @param config {Config} - runtime configuration (SMTP)
+   * @param config {Config} - runtime configuration (SMTP, SECRETS_KEY, MS_OAUTH_CLIENT_ID)
+   * @param mailer {Mailer} - shared mail service, built from config when absent (tests)
    */
   constructor(
     private readonly db: Database,
     private readonly planning: PlanningService,
-    private readonly config: Config,
+    config: Config,
+    mailer?: Mailer,
   ) {
-    this.mailer = config.smtpUrl ? createTransport(config.smtpUrl) : null;
+    this.mailer = mailer ?? new Mailer(db, config);
   }
 
-  /** Whether SMTP is configured on this instance. */
-  get hasMail(): boolean {
-    return this.mailer !== null;
+  /**
+   * This method tells whether e-mail is configured, in the environment or in the settings
+   *
+   * @returns {Promise<boolean>} - true when e-mail can be sent
+   */
+  hasMail(): Promise<boolean> {
+    return this.mailer.configured();
   }
 
   /**
@@ -222,7 +232,16 @@ export class ReminderJob {
     for (const threshold of outlook?.thresholds ?? []) {
       if (threshold.window === 'previous_fiscal_year') continue;
       const key = `threshold:${threshold.id}:${threshold.windowStart.slice(0, 7)}`;
-      if (threshold.exceeded) {
+      if (threshold.direction === 'below') {
+        if (threshold.fellBelow)
+          rows.push({
+            companyId,
+            kind: 'threshold_below',
+            dedupeKey: `${key}:below`,
+            params: { label: threshold.label[locale], id: threshold.id },
+            link: '/thresholds',
+          });
+      } else if (threshold.exceeded) {
         rows.push({
           companyId,
           kind: 'threshold_exceeded',
@@ -264,7 +283,7 @@ export class ReminderJob {
     settings: typeof userSettings.$inferSelect | null,
     title = 'Almanach',
   ): Promise<void> {
-    const wantsMail = (settings?.emailReminders ?? true) && this.mailer !== null;
+    const wantsMail = (settings?.emailReminders ?? true) && (await this.mailer.configured());
     const ntfy = settings?.ntfy ?? null;
     if (!wantsMail && !ntfy) return;
     const pending = await this.db
@@ -298,14 +317,7 @@ export class ReminderJob {
           );
           if (!response.ok) throw new Error(`ntfy answered ${response.status}`);
         }
-        if (wantsMail && this.mailer) {
-          await this.mailer.sendMail({
-            from: this.config.smtpFrom ?? 'Almanach <almanach@localhost>',
-            to: email,
-            subject: `${title} — ${text}`,
-            text,
-          });
-        }
+        if (wantsMail) await this.mailer.send({ to: email, subject: `${title} — ${text}`, text });
         await this.db.update(notifications).set({ pushedAt: new Date() }).where(eq(notifications.id, row.id));
       } catch (error) {
         console.error('[reminders] delivery failed', error instanceof Error ? error.message : error);
@@ -339,14 +351,9 @@ export class ReminderJob {
       email: 'off',
       ntfy: 'off',
     };
-    if (this.mailer) {
+    if (await this.mailer.configured()) {
       result.email = await this.mailer
-        .sendMail({
-          from: this.config.smtpFrom ?? 'Almanach <almanach@localhost>',
-          to: email,
-          subject: text,
-          text,
-        })
+        .send({ to: email, subject: text, text })
         .then(() => 'sent' as const)
         .catch(() => 'failed' as const);
     }

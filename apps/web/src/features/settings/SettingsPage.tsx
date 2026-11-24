@@ -1,117 +1,164 @@
-import type { PackMeta, Profile } from '@almanach/shared';
-import { Link } from 'react-router';
-import { Badge } from '../../components/Badge/Badge.tsx';
-import buttonStyles from '../../components/Button/Button.module.css';
-import form from '../../components/FormPage/FormPage.module.css';
-import { LoadError } from '../../components/LoadError/LoadError.tsx';
+import { type ReactNode, useEffect, useState } from 'react';
+import { Link, Navigate, NavLink, useLocation, useParams } from 'react-router';
 import { PageHeader } from '../../components/PageHeader/PageHeader.tsx';
-import { Skeleton } from '../../components/Skeleton/Skeleton.tsx';
 import { useI18n } from '../../i18n/I18nProvider.tsx';
-import { formatDate } from '../../lib/format.ts';
-import { useResource } from '../../lib/useResource.ts';
 import { ActivitiesSettings } from '../activities/ActivitiesSettings.tsx';
 import { useMe } from '../auth/AuthProvider.tsx';
 import { CompaniesSettings } from '../companies/CompaniesSettings.tsx';
-import styles from '../planning/Planning.module.css';
-import { RemindersSettings } from '../planning/RemindersSettings.tsx';
+import { CalendarFeedSettings, RemindersSettings } from '../planning/RemindersSettings.tsx';
 import { BillingSettings } from './BillingSettings.tsx';
 import { DataSettings } from './DataSettings.tsx';
 import { ExternalSourcesSettings } from './ExternalSourcesSettings.tsx';
 import { FederationSettings } from './FederationSettings.tsx';
+import { MailSettings } from './MailSettings.tsx';
 import { PackAdmin } from './PackAdmin.tsx';
-import { SecuritySettings } from './SecuritySettings.tsx';
+import { ProfileSettings } from './ProfileSettings.tsx';
+import { RulesSettings } from './RulesSettings.tsx';
+import { DevicesSettings, PasswordSettings, TwoFactorSettings } from './SecuritySettings.tsx';
+import styles from './Settings.module.css';
 import { SituationSettings } from './SituationSettings.tsx';
 import { StripeSettings } from './StripeSettings.tsx';
 import { SystemSettings } from './SystemSettings.tsx';
+import { groupOf, legacyPanel, type SettingsPanel, visibleGroups } from './sections.ts';
 import { TokensSettings } from './TokensSettings.tsx';
 
+const DESKTOP = '(min-width: 900px)';
+
+/** What each panel shows. */
+const PANELS: Record<SettingsPanel, () => ReactNode> = {
+  profile: () => (
+    <>
+      <ProfileSettings />
+      <SituationSettings />
+    </>
+  ),
+  companies: () => (
+    <>
+      <CompaniesSettings />
+      <ActivitiesSettings />
+    </>
+  ),
+  rules: () => <RulesSettings />,
+  numbering: () => <BillingSettings part="numbering" />,
+  pdf: () => <BillingSettings part="pdf" />,
+  defaults: () => <BillingSettings part="defaults" />,
+  stripe: () => <StripeSettings />,
+  linked: () => <FederationSettings />,
+  sources: () => <ExternalSourcesSettings />,
+  assistants: () => <TokensSettings />,
+  reminders: () => <RemindersSettings />,
+  calendar: () => <CalendarFeedSettings />,
+  email: () => <MailSettings />,
+  password: () => <PasswordSettings />,
+  'two-factor': () => <TwoFactorSettings />,
+  devices: () => <DevicesSettings />,
+  data: () => <DataSettings />,
+  instance: () => <SystemSettings />,
+  packs: () => <PackAdmin />,
+};
+
 /**
- * Settings (P20): profile, country pack and its sources, security, reminders and calendar feed
+ * Tracks a CSS media query
+ *
+ * @param query {string} - media query
+ * @returns {boolean} - whether it currently matches
+ */
+function useMediaQuery(query: string): boolean {
+  const [matches, setMatches] = useState(() => window.matchMedia(query).matches);
+  useEffect(() => {
+    const list = window.matchMedia(query);
+    /**
+     * Follows the query when the window is resized
+     *
+     * @returns {void} - nothing
+     */
+    const onChange = (): void => setMatches(list.matches);
+    list.addEventListener('change', onChange);
+    return () => list.removeEventListener('change', onChange);
+  }, [query]);
+  return matches;
+}
+
+/**
+ * Settings navigation: groups and their panels
+ *
+ * @returns {JSX.Element} - the navigation
+ */
+function SettingsNav() {
+  const { t } = useI18n();
+  const me = useMe();
+  return (
+    <nav aria-label={t('settings.nav')} className={styles.nav}>
+      {visibleGroups(me.role === 'admin').map((group) => (
+        <div key={group.id} className={styles.group}>
+          <h2 className={styles.groupTitle}>{t(`settings.group.${group.id}`)}</h2>
+          <ul className={styles.links}>
+            {group.panels.map((panel) => (
+              <li key={panel}>
+                <NavLink to={`/settings/${panel}`} className={styles.link}>
+                  <span>{t(`settings.panel.${panel}`)}</span>
+                  <svg viewBox="0 0 24 24" aria-hidden="true" className={styles.chevron}>
+                    <path d="M9 6l6 6-6 6" />
+                  </svg>
+                </NavLink>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
+    </nav>
+  );
+}
+
+/**
+ * Settings (P20): a side navigation of groups and panels on wide screens; on phones, the list of
+ * panels first, then the chosen panel on its own screen with a way back
  *
  * @returns {JSX.Element} - the page
  */
 export function SettingsPage() {
-  const { t, locale } = useI18n();
+  const { t } = useI18n();
   const me = useMe();
-  const { data, error, reload } = useResource<{
-    profile: Profile;
-    pack: PackMeta | null;
-    rulesYears: number[];
-  }>('/api/profile');
+  const { section } = useParams();
+  const location = useLocation();
+  const desktop = useMediaQuery(DESKTOP);
+  const admin = me.role === 'admin';
+
+  if (section === undefined) {
+    const legacy = legacyPanel(location.hash);
+    if (legacy && groupOf(legacy, admin)) return <Navigate to={`/settings/${legacy}`} replace />;
+    if (desktop) return <Navigate to="/settings/profile" replace />;
+    return (
+      <>
+        <PageHeader title={t('nav.settings')} width="narrow" />
+        <SettingsNav />
+      </>
+    );
+  }
+
+  const group = groupOf(section, admin);
+  if (!group) return <Navigate to="/settings" replace />;
+  const panel = section as SettingsPanel;
 
   return (
-    <>
-      <PageHeader title={t('nav.settings')} />
-      <div className={form.form}>
-        {error !== undefined && <LoadError error={error} onRetry={reload} />}
-        {!data && error === undefined && <Skeleton rows={3} />}
-        {data && (
-          <section className={form.section} aria-labelledby="profile-title">
-            <div className={styles.sectionHead}>
-              <h2 id="profile-title" className={styles.sectionTitle}>
-                {t('settings.profile')}
-              </h2>
-              <Link to="/settings/profile" className={`${buttonStyles.button} ${buttonStyles.ghost}`}>
-                {t('common.edit')}
-              </Link>
-            </div>
-            <dl className={form.facts}>
-              <div>
-                <dt>{t('settings.company')}</dt>
-                <dd>{data.profile.company.name}</dd>
-              </div>
-              <div>
-                <dt>{t('settings.status')}</dt>
-                <dd>
-                  {data.pack?.statuses.find((status) => status.id === data.profile.status)?.label[locale] ??
-                    t('settings.generic')}
-                </dd>
-              </div>
-              <div>
-                <dt>{t('settings.activityStart')}</dt>
-                <dd>{formatDate(data.profile.activityStart, locale)}</dd>
-              </div>
-              <div>
-                <dt>{t('settings.currency')}</dt>
-                <dd>{data.profile.currency}</dd>
-              </div>
-            </dl>
-            <ActivitiesSettings />
-          </section>
+    <div className={styles.layout}>
+      {desktop && <SettingsNav />}
+      <div className={styles.content}>
+        {!desktop && (
+          <Link to="/settings" className={styles.back}>
+            <svg viewBox="0 0 24 24" aria-hidden="true" className={styles.chevron}>
+              <path d="M15 6l-6 6 6 6" />
+            </svg>
+            {t('nav.settings')}
+          </Link>
         )}
-        {data?.profile && <SituationSettings />}
-        {data?.profile && <BillingSettings />}
-        {data?.profile && <StripeSettings />}
-        {data?.profile && <FederationSettings />}
-        {data?.profile && <ExternalSourcesSettings />}
-        <CompaniesSettings />
-        {data?.pack && (
-          <section className={form.section} aria-labelledby="pack-title">
-            <h2 id="pack-title" className={styles.sectionTitle}>
-              {t('settings.pack')}
-            </h2>
-            <p className={styles.text}>
-              <strong>{data.pack.name[locale]}</strong>{' '}
-              <Badge tone={data.pack.maturity === 'verified' ? 'ok' : 'warn'}>
-                {t(`settings.maturity.${data.pack.maturity}`)}
-              </Badge>
-            </p>
-            <p className={styles.caption}>{t(`settings.maturity.${data.pack.maturity}.body`)}</p>
-            <p className={styles.caption}>
-              {data.rulesYears.length > 0
-                ? t('settings.rulesYears', { years: data.rulesYears.join(', ') })
-                : t('settings.rulesYears.none')}
-            </p>
-            <p className={styles.caption}>{t('settings.sources')}</p>
-          </section>
-        )}
-        {me.role === 'admin' && <PackAdmin />}
-        {me.role === 'admin' && <SystemSettings />}
-        <SecuritySettings />
-        <TokensSettings />
-        <RemindersSettings />
-        <DataSettings />
+        <PageHeader
+          title={t(`settings.panel.${panel}`)}
+          subtitle={t(`settings.group.${group.id}`)}
+          width="narrow"
+        />
+        <div className={styles.panel}>{PANELS[panel]()}</div>
       </div>
-    </>
+    </div>
   );
 }

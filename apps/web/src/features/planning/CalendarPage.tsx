@@ -2,8 +2,9 @@ import { addDays } from '@almanach/shared';
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router';
 import { Badge } from '../../components/Badge/Badge.tsx';
-import buttonStyles from '../../components/Button/Button.module.css';
 import { Button } from '../../components/Button/Button.tsx';
+import { ButtonLink } from '../../components/Button/ButtonLink.tsx';
+import { EmptyState } from '../../components/EmptyState/EmptyState.tsx';
 import { LoadError } from '../../components/LoadError/LoadError.tsx';
 import { Notice } from '../../components/Notice/Notice.tsx';
 import { PageHeader } from '../../components/PageHeader/PageHeader.tsx';
@@ -166,9 +167,9 @@ export function CalendarPage() {
   return (
     <>
       <PageHeader title={t('nav.calendar')}>
-        <Link to="/calendar/custom/new" className={`${buttonStyles.button} ${buttonStyles.primary}`}>
+        <ButtonLink to="/calendar/custom/new" variant="primary">
           {t('calendar.add')}
-        </Link>
+        </ButtonLink>
       </PageHeader>
       <div className={styles.calendarBar}>
         <div className={styles.nav}>
@@ -224,7 +225,11 @@ export function CalendarPage() {
           {t('calendar.showHidden')}
         </label>
       </fieldset>
-      {failure && <Notice tone="error">{failure}</Notice>}
+      {failure && (
+        <Notice tone="error" live>
+          {failure}
+        </Notice>
+      )}
       {error !== undefined && <LoadError error={error} onRetry={reload} />}
       {loading && !data && <Skeleton rows={5} />}
       {data && (view === 'month' || view === 'week') && (
@@ -260,7 +265,7 @@ export function CalendarPage() {
         </table>
       )}
       {data && (view === 'list' || view === 'agenda') && visible.length === 0 && (
-        <p className={styles.caption}>{t('calendar.empty')}</p>
+        <EmptyState inline title={t('calendar.empty')} body={t('calendar.empty.body')} />
       )}
       {data && (view === 'list' || view === 'agenda') && visible.length > 0 && (
         <ul className={list.list}>
@@ -298,12 +303,9 @@ export function CalendarPage() {
                       <Button variant="ghost" onClick={() => void toggleDone(item)}>
                         {item.done ? t('calendar.undo') : t('calendar.markDone')}
                       </Button>
-                      <Link
-                        to={`/calendar/custom/${item.key.split(':')[1]}`}
-                        className={`${buttonStyles.button} ${buttonStyles.ghost}`}
-                      >
+                      <ButtonLink to={`/calendar/custom/${item.key.split(':')[1]}`} variant="ghost">
                         {t('common.edit')}
-                      </Link>
+                      </ButtonLink>
                     </span>
                   </div>
                 )}
@@ -313,7 +315,7 @@ export function CalendarPage() {
         </ul>
       )}
       <p className={styles.caption}>
-        <Link to="/settings#calendar-feed">{t('calendar.subscribe')}</Link>
+        <Link to="/settings/calendar">{t('calendar.subscribe')}</Link>
       </p>
     </>
   );

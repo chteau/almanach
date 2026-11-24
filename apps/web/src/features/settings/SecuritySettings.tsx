@@ -1,20 +1,26 @@
 import { PASSWORD_MIN_LENGTH, passwordIssues } from '@almanach/shared';
-import { type SyntheticEvent, useState } from 'react';
+import { type ReactNode, type SyntheticEvent, useState } from 'react';
+import { ActionBar } from '../../components/ActionBar/ActionBar.tsx';
 import { Badge } from '../../components/Badge/Badge.tsx';
 import { Button } from '../../components/Button/Button.tsx';
+import { ConfirmDialog } from '../../components/ConfirmDialog/ConfirmDialog.tsx';
+import { DangerAction, DangerZone } from '../../components/DangerZone/DangerZone.tsx';
 import form from '../../components/FormPage/FormPage.module.css';
 import { LoadError } from '../../components/LoadError/LoadError.tsx';
 import { Notice } from '../../components/Notice/Notice.tsx';
+import { Row } from '../../components/Row/Row.tsx';
 import list from '../../components/RowList/RowList.module.css';
+import { SettingsSection } from '../../components/SettingsSection/SettingsSection.tsx';
 import { Skeleton } from '../../components/Skeleton/Skeleton.tsx';
 import { TextField } from '../../components/TextField/TextField.tsx';
 import { useI18n } from '../../i18n/I18nProvider.tsx';
 import { ApiError, api } from '../../lib/api.ts';
 import { formatDate } from '../../lib/format.ts';
 import { useResource } from '../../lib/useResource.ts';
+import text from '../../styles/text.module.css';
 import { useMe } from '../auth/AuthProvider.tsx';
 import { describeError } from '../install/errors.ts';
-import styles from '../planning/Planning.module.css';
+import { useAction } from './useAction.ts';
 
 interface Account {
   totpEnabled: boolean;
@@ -30,35 +36,17 @@ interface Account {
 }
 
 /**
- * Password, two-factor sign-in and active sessions (S-260 to S-263)
- *
- * @returns {JSX.Element} - the security sections
- */
-export function SecuritySettings() {
-  const { data, error, reload } = useResource<Account>('/api/account');
-  if (error !== undefined) return <LoadError error={error} onRetry={reload} />;
-  if (!data) return <Skeleton rows={3} />;
-  return (
-    <>
-      <PasswordForm />
-      <TwoFactor account={data} onChange={reload} />
-      <Sessions account={data} onChange={reload} />
-    </>
-  );
-}
-
-/**
- * Password change form
+ * Password change form (S-260)
  *
  * @returns {JSX.Element} - the form
  */
-function PasswordForm() {
+export function PasswordSettings() {
   const { t } = useI18n();
   const me = useMe();
   const [current, setCurrent] = useState('');
   const [next, setNext] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [message, setMessage] = useState<{ tone: 'info' | 'error'; text: string }>();
+  const action = useAction();
 
   /**
    * Validates and changes the password
@@ -73,55 +61,92 @@ function PasswordForm() {
     if (!current) found.current = t('security.password.current.required');
     if (issues.length > 0) found.next = issues.map((issue) => t(`install.admin.password.${issue}`)).join(' ');
     setErrors(found);
-    if (Object.keys(found).length > 0) return;
-    try {
-      await api('/api/account/password', { method: 'PUT', body: { current, next } });
+    if (Object.keys(found).length > 0) {
+      action.setFeedback({ tone: 'error', text: t('settings.form.invalid') });
+      return;
+    }
+    await action.run(async () => {
+      try {
+        await api('/api/account/password', { method: 'PUT', body: { current, next } });
+      } catch (problem) {
+        if (problem instanceof ApiError && problem.body.error === 'invalid_password') {
+          setErrors({ current: t('security.password.wrong') });
+        }
+        throw problem;
+      }
       setCurrent('');
       setNext('');
-      setMessage({ tone: 'info', text: t('security.password.changed') });
-    } catch (problem) {
-      if (problem instanceof ApiError && problem.body.error === 'invalid_password')
-        setErrors({ current: t('security.password.wrong') });
-      else setMessage({ tone: 'error', text: describeError(problem, t) });
-    }
+      return t('security.password.changed');
+    });
   }
 
   return (
-    <form
-      className={form.section}
-      onSubmit={(event) => void submit(event)}
-      noValidate
-      aria-labelledby="password-title"
-    >
-      <h2 id="password-title" className={styles.sectionTitle}>
-        {t('security.password')}
-      </h2>
-      {message && <Notice tone={message.tone}>{message.text}</Notice>}
-      <input type="text" autoComplete="username" value={me.email} readOnly hidden />
-      <div className={form.grid}>
-        <TextField
-          label={t('security.password.current')}
-          type="password"
-          autoComplete="current-password"
-          value={current}
-          onChange={(event) => setCurrent(event.target.value)}
-          error={errors.current}
-        />
-        <TextField
-          label={t('security.password.next')}
-          hint={t('security.password.next.hint', { min: PASSWORD_MIN_LENGTH })}
-          type="password"
-          autoComplete="new-password"
-          value={next}
-          onChange={(event) => setNext(event.target.value)}
-          error={errors.next}
-        />
-      </div>
-      <div className={form.actions}>
-        <Button type="submit">{t('security.password.submit')}</Button>
-      </div>
+    <form onSubmit={(event) => void submit(event)} noValidate>
+      <SettingsSection
+        title={t('security.password')}
+        footer={
+          <ActionBar
+            primaryLabel={t('security.password.submit')}
+            busy={action.busy}
+            dirty={current !== '' || next !== ''}
+            feedback={action.feedback}
+          />
+        }
+      >
+        <input type="text" autoComplete="username" value={me.email} readOnly hidden />
+        <div className={form.grid}>
+          <TextField
+            label={t('security.password.current')}
+            type="password"
+            autoComplete="current-password"
+            value={current}
+            onChange={(event) => setCurrent(event.target.value)}
+            error={errors.current}
+          />
+          <TextField
+            label={t('security.password.next')}
+            hint={t('security.password.next.hint', { min: PASSWORD_MIN_LENGTH })}
+            type="password"
+            autoComplete="new-password"
+            value={next}
+            onChange={(event) => setNext(event.target.value)}
+            error={errors.next}
+          />
+        </div>
+      </SettingsSection>
     </form>
   );
+}
+
+/**
+ * Loads the account security state for a panel
+ *
+ * @param render {(account: Account, reload: () => void) => JSX.Element} - panel body
+ * @returns {JSX.Element} - the body, a skeleton, or the load error
+ */
+function WithAccount({ render }: { render: (account: Account, reload: () => void) => ReactNode }) {
+  const { data, error, reload } = useResource<Account>('/api/account');
+  if (error !== undefined) return <LoadError error={error} onRetry={reload} />;
+  if (!data) return <Skeleton rows={3} />;
+  return render(data, reload);
+}
+
+/**
+ * Two-step sign-in panel (S-261, S-262)
+ *
+ * @returns {JSX.Element} - the panel
+ */
+export function TwoFactorSettings() {
+  return <WithAccount render={(account, reload) => <TwoFactor account={account} onChange={reload} />} />;
+}
+
+/**
+ * Signed-in devices panel (S-263)
+ *
+ * @returns {JSX.Element} - the panel
+ */
+export function DevicesSettings() {
+  return <WithAccount render={(account, reload) => <Sessions account={account} onChange={reload} />} />;
 }
 
 /**
@@ -136,66 +161,60 @@ function TwoFactor({ account, onChange }: { account: Account; onChange: () => vo
   const [code, setCode] = useState('');
   const [password, setPassword] = useState('');
   const [codes, setCodes] = useState<string[]>();
-  const [failure, setFailure] = useState<string>();
-
   /**
-   * Runs an API call and shows its error in the section
+   * Names the known failures of the two-step calls
    *
-   * @param action {() => Promise<void>} - call
-   * @returns {Promise<void>} - resolves when done
+   * @param problem {unknown} - failure
+   * @returns {string | undefined} - specific message, if any
    */
-  const run = async (action: () => Promise<void>): Promise<void> => {
-    try {
-      setFailure(undefined);
-      await action();
-    } catch (problem) {
-      const known = problem instanceof ApiError ? problem.body.error : undefined;
-      setFailure(
-        known === 'invalid_code'
-          ? t('login.error.code')
-          : known === 'invalid_password'
-            ? t('security.password.wrong')
-            : describeError(problem, t),
-      );
-    }
+  const explain = (problem: unknown): string | undefined => {
+    const known = problem instanceof ApiError ? problem.body.error : undefined;
+    return known === 'invalid_code'
+      ? t('login.error.code')
+      : known === 'invalid_password'
+        ? t('security.password.wrong')
+        : undefined;
   };
+  const action = useAction(explain);
+
+  const badge = (
+    <Badge tone={account.totpEnabled ? 'ok' : 'neutral'}>
+      {account.totpEnabled ? t('security.totp.on') : t('security.totp.off')}
+    </Badge>
+  );
 
   return (
-    <section className={form.section} aria-labelledby="totp-title">
-      <div className={styles.sectionHead}>
-        <h2 id="totp-title" className={styles.sectionTitle}>
-          {t('security.totp')}
-        </h2>
-        <Badge tone={account.totpEnabled ? 'ok' : 'neutral'}>
-          {account.totpEnabled ? t('security.totp.on') : t('security.totp.off')}
-        </Badge>
-      </div>
-      {failure && <Notice tone="error">{failure}</Notice>}
+    <>
       {codes && (
-        <Notice tone="warn">
+        <Notice tone="warn" live>
           {t('security.totp.codes')}
-          <code className={styles.codes}>{codes.join('\n')}</code>
+          <code className={text.codes}>{codes.join('\n')}</code>
         </Notice>
       )}
       {!account.totpEnabled && !setup && (
-        <>
-          <p className={styles.text}>{t('security.totp.body')}</p>
-          <div className={form.actions}>
-            <Button
-              onClick={() =>
-                void run(async () => setSetup(await api('/api/account/totp/setup', { method: 'POST' })))
+        <SettingsSection
+          title={t('security.totp')}
+          description={t('security.totp.body')}
+          badge={badge}
+          footer={
+            <ActionBar
+              primaryLabel={t('security.totp.start')}
+              busy={action.busy}
+              feedback={action.feedback?.tone === 'error' ? action.feedback : null}
+              onPrimary={() =>
+                void action.run(async () => {
+                  setSetup(await api('/api/account/totp/setup', { method: 'POST' }));
+                })
               }
-            >
-              {t('security.totp.start')}
-            </Button>
-          </div>
-        </>
+            />
+          }
+        />
       )}
       {!account.totpEnabled && setup && (
         <form
           onSubmit={(event) => {
             event.preventDefault();
-            void run(async () => {
+            void action.run(async () => {
               const result = await api<{ recoveryCodes: string[] }>('/api/account/totp/enable', {
                 method: 'POST',
                 body: { code: code.trim() },
@@ -204,120 +223,197 @@ function TwoFactor({ account, onChange }: { account: Account; onChange: () => vo
               setSetup(undefined);
               setCode('');
               onChange();
+              return t('settings.totp.enabled');
             });
           }}
           noValidate
         >
-          <p className={styles.text}>{t('security.totp.scan')}</p>
-          <p>
-            <a href={setup.uri}>{t('security.totp.open')}</a>
-          </p>
-          <TextField
-            label={t('security.totp.secret')}
-            value={setup.secret.replace(/(.{4})/g, '$1 ').trim()}
-            readOnly
-          />
-          <TextField
-            label={t('login.code')}
-            inputMode="numeric"
-            autoComplete="one-time-code"
-            value={code}
-            onChange={(event) => setCode(event.target.value)}
-          />
-          <div className={form.actions}>
-            <Button variant="ghost" onClick={() => setSetup(undefined)}>
-              {t('common.cancel')}
-            </Button>
-            <Button type="submit">{t('security.totp.confirm')}</Button>
-          </div>
+          <SettingsSection
+            title={t('security.totp')}
+            description={t('security.totp.scan')}
+            badge={badge}
+            footer={
+              <ActionBar
+                primaryLabel={t('security.totp.confirm')}
+                busy={action.busy}
+                feedback={action.feedback}
+              >
+                <Button variant="ghost" onClick={() => setSetup(undefined)}>
+                  {t('common.cancel')}
+                </Button>
+              </ActionBar>
+            }
+          >
+            <p className={text.text}>
+              <a href={setup.uri}>{t('security.totp.open')}</a>
+            </p>
+            <TextField
+              label={t('security.totp.secret')}
+              value={setup.secret.replace(/(.{4})/g, '$1 ').trim()}
+              readOnly
+            />
+            <TextField
+              label={t('login.code')}
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              value={code}
+              onChange={(event) => setCode(event.target.value)}
+            />
+          </SettingsSection>
         </form>
       )}
       {account.totpEnabled && (
         <form
           onSubmit={(event) => {
             event.preventDefault();
-            void run(async () => {
+            void action.run(async () => {
               await api('/api/account/totp/disable', { method: 'POST', body: { password } });
               setPassword('');
               setCodes(undefined);
               onChange();
+              return t('settings.totp.disabled');
             });
           }}
           noValidate
         >
-          <p className={styles.caption}>{t('security.totp.left', { count: account.recoveryCodesLeft })}</p>
-          <TextField
-            label={t('security.password.current')}
-            type="password"
-            autoComplete="current-password"
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-          />
-          <div className={form.actions}>
-            <Button type="submit" variant="ghost">
-              {t('security.totp.disable')}
-            </Button>
-          </div>
+          <SettingsSection
+            title={t('security.totp')}
+            description={t('security.totp.left', { count: account.recoveryCodesLeft })}
+            badge={badge}
+            footer={
+              <ActionBar
+                primaryLabel={t('security.totp.disable')}
+                busy={action.busy}
+                feedback={action.feedback}
+              />
+            }
+          >
+            <TextField
+              label={t('security.password.current')}
+              hint={t('settings.totp.disable.hint')}
+              type="password"
+              autoComplete="current-password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+            />
+          </SettingsSection>
         </form>
       )}
-    </section>
+    </>
   );
 }
 
 /**
- * Lists signed-in devices and lets the person sign them out
+ * Lists signed-in devices and lets the person sign them out after confirmation
  *
  * @param props {{ account: Account; onChange: () => void }} - account state and refresh callback
- * @returns {JSX.Element} - the section
+ * @returns {JSX.Element} - the sections
  */
 function Sessions({ account, onChange }: { account: Account; onChange: () => void }) {
   const { t, locale } = useI18n();
+  const [target, setTarget] = useState<Account['sessions'][number]>();
+  const [result, setResult] = useState<{ tone: 'success' | 'error'; text: string }>();
+  const [busy, setBusy] = useState(false);
   const others = account.sessions.filter((session) => !session.current).length;
+
+  /**
+   * Signs out devices and reports the outcome
+   *
+   * @param call {() => Promise<unknown>} - API call
+   * @param success {string} - text when it worked
+   * @returns {Promise<void>} - resolves when done
+   */
+  async function signOut(call: () => Promise<unknown>, success: string): Promise<void> {
+    setBusy(true);
+    try {
+      await call();
+      setResult({ tone: 'success', text: success });
+    } catch (problem) {
+      setResult({ tone: 'error', text: describeError(problem, t) });
+    } finally {
+      setBusy(false);
+    }
+    onChange();
+  }
+
+  /**
+   * Readable name of a session's device
+   *
+   * @param session {Account['sessions'][number]} - session
+   * @returns {string} - e.g. "Firefox · Linux"
+   */
+  const device = (session: Account['sessions'][number]): string =>
+    session.userAgent ? describeAgent(session.userAgent) : t('security.sessions.unknown');
+
   return (
-    <section className={form.section} aria-labelledby="sessions-title">
-      <h2 id="sessions-title" className={styles.sectionTitle}>
-        {t('security.sessions')}
-      </h2>
-      <ul className={list.list}>
-        {account.sessions.map((session) => (
-          <li key={session.id} className={list.item}>
-            <div className={list.row}>
-              <span className={list.primary}>
-                <strong>
-                  {session.userAgent ? describeAgent(session.userAgent) : t('security.sessions.unknown')}
-                </strong>
-                <span className={list.secondary}>
-                  {t('security.sessions.since', { date: formatDate(session.createdAt.slice(0, 10), locale) })}
-                  {session.ip ? ` · ${session.ip}` : ''}
-                </span>
-              </span>
-              {session.current ? (
-                <Badge tone="ok">{t('security.sessions.current')}</Badge>
-              ) : (
-                <Button
-                  variant="ghost"
-                  onClick={() =>
-                    void api(`/api/account/sessions/${session.id}`, { method: 'DELETE' }).then(onChange)
-                  }
-                >
-                  {t('security.sessions.revoke')}
-                </Button>
-              )}
-            </div>
-          </li>
-        ))}
-      </ul>
+    <>
+      <SettingsSection title={t('security.sessions')} description={t('settings.sessions.body')}>
+        {result && (
+          <Notice tone={result.tone} live>
+            {result.text}
+          </Notice>
+        )}
+        <ul className={list.list}>
+          {account.sessions.map((session) => (
+            <li key={session.id} className={list.item}>
+              <Row
+                primary={<strong>{device(session)}</strong>}
+                meta={`${t('security.sessions.since', { date: formatDate(session.createdAt.slice(0, 10), locale) })}${
+                  session.ip ? ` · ${session.ip}` : ''
+                }`}
+                actions={
+                  session.current ? (
+                    <Badge tone="ok">{t('security.sessions.current')}</Badge>
+                  ) : (
+                    <Button variant="ghost" aria-haspopup="dialog" onClick={() => setTarget(session)}>
+                      {t('security.sessions.revoke')}
+                    </Button>
+                  )
+                }
+              />
+            </li>
+          ))}
+        </ul>
+      </SettingsSection>
       {others > 0 && (
-        <div className={form.actions}>
-          <Button
-            variant="ghost"
-            onClick={() => void api('/api/account/sessions/revoke-others', { method: 'POST' }).then(onChange)}
-          >
-            {t('security.sessions.revokeOthers')}
-          </Button>
-        </div>
+        <DangerZone>
+          <DangerAction
+            label={t('security.sessions.revokeOthers')}
+            consequence={
+              others === 1
+                ? t('settings.sessions.revokeOthers.one')
+                : t('settings.sessions.revokeOthers.many', { count: others })
+            }
+            actionLabel={t('settings.sessions.signOut')}
+            busy={busy}
+            onConfirm={() =>
+              void signOut(
+                () => api('/api/account/sessions/revoke-others', { method: 'POST' }),
+                t('settings.sessions.othersSignedOut'),
+              )
+            }
+          />
+        </DangerZone>
       )}
-    </section>
+      <ConfirmDialog
+        open={target !== undefined}
+        danger
+        title={t('security.sessions.revoke')}
+        body={t('settings.sessions.revoke.body', { device: target ? device(target) : '' })}
+        confirmLabel={t('settings.sessions.signOut')}
+        onCancel={() => setTarget(undefined)}
+        onConfirm={() => {
+          const session = target;
+          setTarget(undefined);
+          if (session) {
+            void signOut(
+              () => api(`/api/account/sessions/${session.id}`, { method: 'DELETE' }),
+              t('settings.sessions.signedOut', { device: device(session) }),
+            );
+          }
+        }}
+      />
+    </>
   );
 }
 

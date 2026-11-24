@@ -365,7 +365,11 @@ export function DocumentEditor(props: EditorProps) {
         )}
       </PageHeader>
       <div className={form.form}>
-        {failure && <Notice tone="error">{failure}</Notice>}
+        {failure && (
+          <Notice tone="error" live>
+            {failure}
+          </Notice>
+        )}
         {issueErrors.length > 0 && (
           <Notice tone="error">
             <p className={form.summary}>{t('documents.issue.blocked')}</p>

@@ -12,7 +12,7 @@ import { Notice } from '../Notice/Notice.tsx';
 export function LoadError({ error, onRetry }: { error: unknown; onRetry: () => void }) {
   const { t } = useI18n();
   return (
-    <Notice tone="error">
+    <Notice tone="error" live>
       <p>{describeError(error, t)}</p>
       <Button variant="ghost" onClick={onRetry}>
         {t('common.retry')}

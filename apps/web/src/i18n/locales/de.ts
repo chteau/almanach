@@ -3,6 +3,7 @@ import { appDe } from './app.de.ts';
 import { componentsDe } from './components.de.ts';
 import { docsDe } from './docs.de.ts';
 import { planDe } from './plan.de.ts';
+import { settingsDe } from './settings.de.ts';
 
 /** Deutsche Texte. */
 export const de: Messages = {
@@ -123,4 +124,5 @@ export const de: Messages = {
   ...componentsDe,
   ...docsDe,
   ...planDe,
+  ...settingsDe,
 };

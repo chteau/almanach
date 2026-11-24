@@ -138,6 +138,7 @@ export const planFr: Record<keyof typeof planEn, string> = {
   'notifications.invoice_overdue': 'Facture {number} en retard ({client})',
   'notifications.threshold_near': '{label} : {percent} % atteint',
   'notifications.threshold_exceeded': '{label} : seuil dépassé',
+  'notifications.threshold_below': '{label} : chiffre d’affaires repassé sous le seuil',
 
   'reminders.title': 'Rappels',
   'reminders.email': 'Recevoir les rappels par e-mail',
@@ -158,7 +159,8 @@ export const planFr: Record<keyof typeof planEn, string> = {
   'reminders.test': 'Envoyer un test',
   'reminders.test.email.sent': 'E-mail de test envoyé.',
   'reminders.test.email.off': 'Les rappels par e-mail sont désactivés.',
-  'reminders.test.email.nosmtp': 'Aucun serveur d’e-mail n’est configuré sur cette instance (SMTP_URL).',
+  'reminders.test.email.nosmtp':
+    'L’envoi des e-mails n’est pas encore réglé : voir Réglages → Envoi des e-mails.',
   'reminders.test.email.failed': 'L’e-mail de test n’a pas pu être envoyé.',
   'reminders.test.ntfy.sent': 'Notification push de test envoyée.',
   'reminders.test.ntfy.off': 'Les notifications push sont désactivées.',
@@ -273,7 +275,8 @@ export const planFr: Record<keyof typeof planEn, string> = {
   'packs.activate': 'Utiliser cette version',
   'packs.check': 'Rechercher des mises à jour',
   'packs.import': 'Importer une mise à jour signée',
-  'packs.disabled': 'Mises à jour désactivées : aucune clé de signature n’est configurée (PACK_PUBLIC_KEYS).',
+  'packs.disabled':
+    'Les mises à jour des règles sont désactivées : l’administrateur du serveur n’a pas encore configuré de clé de vérification (voir les détails techniques).',
   'packs.imported': 'Mise à jour {country} n° {sequence} installée.',
   'packs.reverted': '{country} utilise de nouveau le pack livré.',
   'packs.activated': '{country} utilise maintenant la mise à jour n° {sequence}.',
@@ -395,7 +398,7 @@ export const planFr: Record<keyof typeof planEn, string> = {
   'packs.auto.on': 'Vérification quotidienne activée. Les mises à jour trouvées attendent votre accord.',
   'packs.auto.off': 'Vérification quotidienne désactivée. Plus rien n’est téléchargé.',
   'packs.auto.noUrl':
-    'La vérification automatique nécessite PACK_UPDATE_URL dans la configuration du serveur. L’import d’un fichier signé reste possible.',
+    'La vérification quotidienne nécessite une adresse de mise à jour dans la configuration du serveur (voir les détails techniques). L’import d’un fichier signé reste possible.',
   'packs.found': '{count} nouvelle(s) mise(s) à jour trouvée(s).',
   'system.update.label': 'Nouvelle version',
   'system.update.body': 'Almanach {version} est disponible (vous utilisez la {current}).',
@@ -497,17 +500,17 @@ export const planFr: Record<keyof typeof planEn, string> = {
   'stripe.body':
     'Importe les clients Stripe comme clients de cette entreprise, et les paiements encaissés via Stripe comme recettes, rattachées à leur client : factures payées, paiements sans facture, et remboursements en négatif. Ils comptent dans le chiffre d’affaires, les seuils et les estimations. Montants hors taxes quand Stripe les fournit ; aucune donnée de carte n’est conservée.',
   'stripe.notAllowed':
-    'Un administrateur doit d’abord autoriser la synchronisation Stripe dans Réglages → Instance. D’ici là, Almanach ne contacte jamais Stripe.',
+    'Un administrateur doit d’abord autoriser la synchronisation Stripe dans Réglages → Instance et autorisations. D’ici là, Almanach ne contacte jamais Stripe.',
   'stripe.noSecretsKey':
-    'Pour enregistrer une clé Stripe, le serveur a besoin de SECRETS_KEY (voir .env.example).',
-  'stripe.key': 'Clé restreinte (rk_…)',
+    'Pour enregistrer une clé Stripe, l’administrateur du serveur doit d’abord définir une clé de chiffrement (SECRETS_KEY dans la configuration du serveur).',
+  'stripe.key': 'Clé Stripe en lecture seule',
   'stripe.key.hint':
-    'Dans Stripe, créez une clé restreinte avec Lecture sur Charges, Customers, Invoices et Balance transactions (et Refunds s’il apparaît), Aucun ailleurs. Elle est stockée chiffrée.',
+    'Dans Stripe, rubrique Développeurs → Clés API, créez une clé restreinte (elle commence par « rk_ ») qui peut seulement Lire Charges, Customers, Invoices et Balance transactions (et Refunds s’il apparaît). Elle est stockée chiffrée.',
   'stripe.key.saved': 'Une clé est enregistrée. N’en saisissez une nouvelle que pour la remplacer.',
   'stripe.enabled': 'Synchroniser toutes les 6 heures',
   'stripe.save': 'Enregistrer',
   'stripe.sync': 'Synchroniser maintenant',
-  'stripe.remove': 'Supprimer la clé',
+  'stripe.remove': 'Retirer la clé Stripe',
   'stripe.status': '{count} recette(s) importée(s). Dernière synchronisation : {date}.',
   'stripe.never': 'jamais',
   'stripe.synced': '{count} nouvelle(s) recette(s) importée(s).',
@@ -635,12 +638,12 @@ export const planFr: Record<keyof typeof planEn, string> = {
   'system.externalSources': 'Autoriser les sources de documents externes',
   'system.externalSources.hint':
     'Les entreprises peuvent alors interroger toutes les 15 minutes des flux HTTPS de devis et factures d’autres outils. Rien n’est récupéré tant que c’est décoché.',
-  'system.mcp': 'Autoriser le point d’accès MCP (assistants IA)',
+  'system.mcp': 'Autoriser les assistants IA (point d’accès MCP)',
   'system.mcp.hint':
-    '/mcp répond alors aux jetons personnels créés dans les réglages. Il n’émet, n’envoie et ne supprime jamais rien.',
+    'Les assistants peuvent alors se connecter avec les jetons créés dans Réglages → Assistants IA. Ils n’émettent, n’envoient et ne suppriment jamais rien.',
   'external.title': 'Sources externes',
   'external.body':
-    'Devis, factures et avoirs d’un autre outil, en lecture seule, via un flux HTTPS au format almanach-feed/1. Ils s’affichent au nom de la source, hors numérotation, déclarations et export ; les devis externes ne comptent jamais dans le chiffre d’affaires.',
+    'Devis, factures et avoirs d’un autre outil, en lecture seule. Ils s’affichent au nom de la source, hors numérotation, déclarations et export ; les devis externes ne comptent jamais dans le chiffre d’affaires.',
   'external.notAllowed':
     'Un administrateur doit d’abord autoriser les sources externes dans Réglages → Instance.',
   'external.status': '{count} document(s). Dernière synchronisation : {date}.',
@@ -652,7 +655,7 @@ export const planFr: Record<keyof typeof planEn, string> = {
   'external.url': 'Adresse du flux',
   'external.url.hint':
     'HTTPS uniquement, par exemple https://api.example.com/platform/integrations/almanach/feed',
-  'external.token': 'Jeton Bearer',
+  'external.token': 'Jeton d’accès',
   'external.token.hint': 'Stocké chiffré, jamais réaffiché.',
   'external.token.saved':
     'Un jeton est enregistré. N’en saisissez un que pour le remplacer (obligatoire si l’adresse change).',
@@ -669,11 +672,11 @@ export const planFr: Record<keyof typeof planEn, string> = {
   'external.error.feed_too_large': 'Le flux est trop volumineux (plus de 5 Mio).',
   'external.error.feed_invalid': 'Le flux n’est pas au format almanach-feed/1.',
   'external.error.feed_failed': 'La synchronisation a échoué.',
-  'tokens.title': 'Jetons personnels (MCP)',
+  'tokens.title': 'Jetons d’accès personnels',
   'tokens.body':
-    'Permettent à un assistant IA de lire vos données via /mcp (docs/mcp.md). « Lecture + brouillons » peut aussi créer des clients et des brouillons de devis ou factures, jamais émettre, envoyer ni supprimer.',
+    'Permettent à un assistant IA de lire vos données. « Lecture + brouillons » peut aussi créer des clients et des brouillons de devis ou de factures ; il n’émet, n’envoie et ne supprime jamais rien.',
   'tokens.notAllowed':
-    'Un administrateur doit d’abord autoriser le point d’accès MCP dans Réglages → Instance.',
+    'Un administrateur doit d’abord autoriser les assistants IA dans Réglages → Instance et autorisations.',
   'tokens.created': 'Copiez ce jeton maintenant, il ne sera plus affiché :',
   'tokens.used': 'Créé le {created} · dernière utilisation : {used}',
   'tokens.scope': 'Portée',

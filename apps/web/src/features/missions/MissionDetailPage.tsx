@@ -2,9 +2,8 @@ import type { Mission } from '@almanach/shared';
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { Badge } from '../../components/Badge/Badge.tsx';
-import buttonStyles from '../../components/Button/Button.module.css';
-import { Button } from '../../components/Button/Button.tsx';
-import { ConfirmDialog } from '../../components/ConfirmDialog/ConfirmDialog.tsx';
+import { ButtonLink } from '../../components/Button/ButtonLink.tsx';
+import { DangerAction, DangerZone } from '../../components/DangerZone/DangerZone.tsx';
 import form from '../../components/FormPage/FormPage.module.css';
 import { LoadError } from '../../components/LoadError/LoadError.tsx';
 import { Notice } from '../../components/Notice/Notice.tsx';
@@ -26,7 +25,6 @@ export function MissionDetailPage() {
   const { t, locale } = useI18n();
   const navigate = useNavigate();
   const { data, error, reload } = useResource<{ mission: Mission }>(`/api/missions/${id}`);
-  const [confirmDelete, setConfirmDelete] = useState(false);
   const [failure, setFailure] = useState<string>();
 
   if (error !== undefined) return <LoadError error={error} onRetry={reload} />;
@@ -39,7 +37,6 @@ export function MissionDetailPage() {
    * @returns {Promise<void>} - resolves when done
    */
   async function remove(): Promise<void> {
-    setConfirmDelete(false);
     try {
       await api(`/api/missions/${mission.id}`, { method: 'DELETE' });
       navigate('/missions', { replace: true });
@@ -63,6 +60,7 @@ export function MissionDetailPage() {
   return (
     <>
       <PageHeader
+        width="narrow"
         title={mission.name}
         subtitle={
           <>
@@ -71,30 +69,28 @@ export function MissionDetailPage() {
           </>
         }
       >
-        <Link
-          to={`/missions/${mission.id}/edit`}
-          className={`${buttonStyles.button} ${buttonStyles.primary}`}
-        >
+        <ButtonLink to={`/missions/${mission.id}/edit`} variant="primary">
           {t('common.edit')}
-        </Link>
-        <Link
+        </ButtonLink>
+        <ButtonLink
           to={`/documents/new?type=invoice&client=${mission.clientId}&mission=${mission.id}`}
-          className={`${buttonStyles.button} ${buttonStyles.ghost}`}
+          variant="ghost"
         >
           {t('documents.new.invoice')}
-        </Link>
-        <Link
+        </ButtonLink>
+        <ButtonLink
           to={`/documents/new?type=quote&client=${mission.clientId}&mission=${mission.id}`}
-          className={`${buttonStyles.button} ${buttonStyles.ghost}`}
+          variant="ghost"
         >
           {t('documents.new.quote')}
-        </Link>
-        <Button variant="ghost" onClick={() => setConfirmDelete(true)}>
-          {t('common.delete')}
-        </Button>
+        </ButtonLink>
       </PageHeader>
       <div className={form.form}>
-        {failure && <Notice tone="error">{failure}</Notice>}
+        {failure && (
+          <Notice tone="error" live>
+            {failure}
+          </Notice>
+        )}
         <section className={form.section} aria-label={t('missions.section.pricing')}>
           <dl className={form.facts}>
             {facts.map(([label, value]) => (
@@ -111,16 +107,16 @@ export function MissionDetailPage() {
             <p className={form.summary}>{mission.notes}</p>
           </section>
         )}
+        <DangerZone>
+          <DangerAction
+            label={t('missions.delete.label')}
+            consequence={t('missions.delete.body')}
+            actionLabel={t('common.delete')}
+            confirmTitle={t('missions.delete.title', { name: mission.name })}
+            onConfirm={() => void remove()}
+          />
+        </DangerZone>
       </div>
-      <ConfirmDialog
-        open={confirmDelete}
-        title={t('missions.delete.title', { name: mission.name })}
-        body={t('missions.delete.body')}
-        confirmLabel={t('common.delete')}
-        danger
-        onConfirm={() => void remove()}
-        onCancel={() => setConfirmDelete(false)}
-      />
     </>
   );
 }

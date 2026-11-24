@@ -94,6 +94,7 @@ export function DeadlinePage() {
   return (
     <>
       <PageHeader
+        width="narrow"
         title={labelOf(occurrence.label, locale)}
         subtitle={
           <>
@@ -113,7 +114,11 @@ export function DeadlinePage() {
         </a>
       </PageHeader>
       <div className={form.form}>
-        {failure && <Notice tone="error">{failure}</Notice>}
+        {failure && (
+          <Notice tone="error" live>
+            {failure}
+          </Notice>
+        )}
         <section className={form.section} aria-labelledby="what-title">
           <h2 id="what-title" className={styles.sectionTitle}>
             {t('deadline.what')}

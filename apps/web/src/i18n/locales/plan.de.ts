@@ -140,6 +140,7 @@ export const planDe: Record<keyof typeof planEn, string> = {
   'notifications.invoice_overdue': 'Rechnung {number} ist überfällig ({client})',
   'notifications.threshold_near': '{label}: {percent} % erreicht',
   'notifications.threshold_exceeded': '{label}: Schwelle überschritten',
+  'notifications.threshold_below': '{label}: Umsatz wieder unter der Schwelle',
 
   'reminders.title': 'Erinnerungen',
   'reminders.email': 'Erinnerungen per E-Mail',
@@ -160,7 +161,8 @@ export const planDe: Record<keyof typeof planEn, string> = {
   'reminders.test': 'Test senden',
   'reminders.test.email.sent': 'Test-E-Mail gesendet.',
   'reminders.test.email.off': 'E-Mail-Erinnerungen sind aus.',
-  'reminders.test.email.nosmtp': 'Auf dieser Instanz ist kein Mailserver eingerichtet (SMTP_URL).',
+  'reminders.test.email.nosmtp':
+    'Der E-Mail-Versand ist noch nicht eingerichtet: siehe Einstellungen → E-Mail-Versand.',
   'reminders.test.email.failed': 'Die Test-E-Mail konnte nicht gesendet werden.',
   'reminders.test.ntfy.sent': 'Test-Push gesendet.',
   'reminders.test.ntfy.off': 'Push-Nachrichten sind aus.',
@@ -275,7 +277,8 @@ export const planDe: Record<keyof typeof planEn, string> = {
   'packs.activate': 'Diese Version verwenden',
   'packs.check': 'Nach Updates suchen',
   'packs.import': 'Signiertes Update importieren',
-  'packs.disabled': 'Updates sind aus: kein Signaturschlüssel eingerichtet (PACK_PUBLIC_KEYS).',
+  'packs.disabled':
+    'Regel-Updates sind deaktiviert: Die Serververwaltung hat noch keinen Prüfschlüssel festgelegt (siehe technische Details).',
   'packs.imported': 'Update {country} Nr. {sequence} installiert.',
   'packs.reverted': '{country} verwendet wieder das gelieferte Paket.',
   'packs.activated': '{country} verwendet jetzt Update Nr. {sequence}.',
@@ -399,7 +402,7 @@ export const planDe: Record<keyof typeof planEn, string> = {
   'packs.auto.on': 'Tägliche Prüfung aktiviert. Gefundene Updates warten auf Ihre Freigabe.',
   'packs.auto.off': 'Tägliche Prüfung deaktiviert. Es wird nichts mehr heruntergeladen.',
   'packs.auto.noUrl':
-    'Die automatische Prüfung benötigt PACK_UPDATE_URL in der Serverkonfiguration. Der Import einer signierten Datei bleibt möglich.',
+    'Die tägliche Prüfung braucht eine Update-Adresse in der Serverkonfiguration (siehe technische Details). Der Import einer signierten Datei bleibt möglich.',
   'packs.found': '{count} neue(s) Update(s) gefunden.',
   'system.update.label': 'Neue Version',
   'system.update.body': 'Almanach {version} ist verfügbar (Sie nutzen {current}).',
@@ -501,17 +504,17 @@ export const planDe: Record<keyof typeof planEn, string> = {
   'stripe.body':
     'Importiert Stripe-Kunden als Kunden dieses Unternehmens und über Stripe vereinnahmte Zahlungen als Einnahmen, ihrem Kunden zugeordnet: bezahlte Rechnungen, Zahlungen ohne Rechnung und Erstattungen als negative Beträge. Sie zählen für Umsatz, Schwellen und Schätzungen. Beträge netto, wenn Stripe sie liefert; Kartendaten werden nie gespeichert.',
   'stripe.notAllowed':
-    'Eine Administratorin oder ein Administrator muss den Stripe-Abgleich zuerst unter Einstellungen → Instanz erlauben. Bis dahin kontaktiert Almanach Stripe nie.',
+    'Eine Administratorin oder ein Administrator muss den Stripe-Abgleich zuerst unter Einstellungen → Instanz und Berechtigungen erlauben. Bis dahin kontaktiert Almanach Stripe nie.',
   'stripe.noSecretsKey':
-    'Um einen Stripe-Schlüssel zu speichern, braucht der Server SECRETS_KEY (siehe .env.example).',
-  'stripe.key': 'Eingeschränkter Schlüssel (rk_…)',
+    'Um einen Stripe-Schlüssel zu speichern, muss die Serververwaltung zuerst einen Verschlüsselungsschlüssel festlegen (SECRETS_KEY in der Serverkonfiguration).',
+  'stripe.key': 'Stripe-Schlüssel nur zum Lesen',
   'stripe.key.hint':
-    'Legen Sie in Stripe einen eingeschränkten Schlüssel an: Lesen für Charges, Customers, Invoices und Balance transactions (und Refunds, falls aufgeführt), sonst Keine. Er wird verschlüsselt gespeichert.',
+    'Legen Sie in Stripe unter Entwickler → API-Schlüssel einen eingeschränkten Schlüssel an (er beginnt mit „rk_“), der nur Charges, Customers, Invoices und Balance transactions (und Refunds, falls aufgeführt) lesen darf. Er wird verschlüsselt gespeichert.',
   'stripe.key.saved': 'Ein Schlüssel ist gespeichert. Geben Sie nur zum Ersetzen einen neuen ein.',
   'stripe.enabled': 'Alle 6 Stunden abgleichen',
   'stripe.save': 'Speichern',
   'stripe.sync': 'Jetzt abgleichen',
-  'stripe.remove': 'Schlüssel entfernen',
+  'stripe.remove': 'Stripe-Schlüssel entfernen',
   'stripe.status': '{count} Einnahme(n) importiert. Letzter Abgleich: {date}.',
   'stripe.never': 'nie',
   'stripe.synced': '{count} neue Einnahme(n) importiert.',
@@ -638,12 +641,12 @@ export const planDe: Record<keyof typeof planEn, string> = {
   'system.externalSources': 'Externe Dokumentquellen erlauben',
   'system.externalSources.hint':
     'Unternehmen können dann alle 15 Minuten HTTPS-Feeds mit Angeboten und Rechnungen anderer Tools abrufen. Solange dies aus ist, wird nichts abgerufen.',
-  'system.mcp': 'MCP-Endpunkt erlauben (KI-Assistenten)',
+  'system.mcp': 'KI-Assistenten erlauben (MCP-Endpunkt)',
   'system.mcp.hint':
-    '/mcp beantwortet dann persönliche Zugriffstoken aus den Einstellungen. Es stellt nie etwas aus, versendet oder löscht nichts.',
+    'Assistenten können sich dann mit den Token aus Einstellungen → KI-Assistenten verbinden. Sie stellen nie etwas aus, versenden oder löschen nichts.',
   'external.title': 'Externe Quellen',
   'external.body':
-    'Angebote, Rechnungen und Gutschriften eines anderen Tools, schreibgeschützt, über einen HTTPS-Feed im Format almanach-feed/1. Sie erscheinen mit dem Quellennamen, zählen nie zu Nummerierung, Erklärungen oder Export, externe Angebote nie zum Umsatz.',
+    'Angebote, Rechnungen und Gutschriften eines anderen Tools, schreibgeschützt. Sie erscheinen mit dem Quellennamen, zählen nie zu Nummerierung, Erklärungen oder Export, externe Angebote nie zum Umsatz.',
   'external.notAllowed':
     'Ein Administrator muss externe Quellen zuerst unter Einstellungen → Instanz erlauben.',
   'external.status': '{count} Dokument(e). Letzte Synchronisierung: {date}.',
@@ -654,7 +657,7 @@ export const planDe: Record<keyof typeof planEn, string> = {
   'external.name': 'Name',
   'external.url': 'Feed-Adresse',
   'external.url.hint': 'Nur HTTPS, z. B. https://api.example.com/platform/integrations/almanach/feed',
-  'external.token': 'Bearer-Token',
+  'external.token': 'Zugriffstoken',
   'external.token.hint': 'Verschlüsselt gespeichert, nie wieder angezeigt.',
   'external.token.saved':
     'Ein Token ist gespeichert. Nur zum Ersetzen eingeben (Pflicht bei geänderter Adresse).',
@@ -671,11 +674,11 @@ export const planDe: Record<keyof typeof planEn, string> = {
   'external.error.feed_too_large': 'Der Feed ist zu groß (über 5 MiB).',
   'external.error.feed_invalid': 'Der Feed entspricht nicht dem Format almanach-feed/1.',
   'external.error.feed_failed': 'Die Synchronisierung ist fehlgeschlagen.',
-  'tokens.title': 'Persönliche Zugriffstoken (MCP)',
+  'tokens.title': 'Persönliche Zugriffstoken',
   'tokens.body':
-    'Erlauben einem KI-Assistenten, Ihre Daten über /mcp zu lesen (docs/mcp.md). „Lesen + Entwürfe“ darf zudem Kunden und Entwürfe von Angeboten oder Rechnungen anlegen, nie ausstellen, versenden oder löschen.',
+    'Erlauben einem KI-Assistenten, Ihre Daten zu lesen. „Lesen + Entwürfe“ darf zudem Kunden und Entwürfe von Angeboten oder Rechnungen anlegen; es stellt nie etwas aus, versendet oder löscht nichts.',
   'tokens.notAllowed':
-    'Ein Administrator muss den MCP-Endpunkt zuerst unter Einstellungen → Instanz erlauben.',
+    'Ein Administrator muss KI-Assistenten zuerst unter Einstellungen → Instanz und Berechtigungen erlauben.',
   'tokens.created': 'Kopieren Sie dieses Token jetzt, es wird nicht wieder angezeigt:',
   'tokens.used': 'Erstellt am {created} · zuletzt genutzt: {used}',
   'tokens.scope': 'Umfang',

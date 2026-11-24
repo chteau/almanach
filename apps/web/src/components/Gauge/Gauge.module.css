@@ -7,7 +7,7 @@
 .head {
   display: flex;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--space-3);
 }
 
 .label {
@@ -17,14 +17,14 @@
 .track {
   height: 10px;
   overflow: hidden;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--surface-2);
   box-shadow: inset 0 0 0 1px var(--line);
 }
 
 .bar {
   height: 100%;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
 }
 
 .ok {
@@ -42,5 +42,5 @@
 .detail {
   margin: 0;
   color: var(--muted);
-  font-size: 13px;
+  font-size: var(--text-sm);
 }

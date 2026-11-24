@@ -13,7 +13,7 @@
   min-height: 48px;
   padding: 0 14px;
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   background: var(--surface);
   color: var(--ink);
   font: inherit;
@@ -26,19 +26,19 @@
 }
 
 .hint {
-  font-size: 13px;
+  font-size: var(--text-sm);
   color: var(--muted);
 }
 
 .error {
-  font-size: 13px;
+  font-size: var(--text-sm);
   color: var(--err-fg);
   font-weight: 500;
 }
 
 .textarea {
   min-height: 96px;
-  padding: 12px 14px;
+  padding: var(--space-3) 14px;
   resize: vertical;
 }
 

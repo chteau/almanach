@@ -1,8 +1,8 @@
 import { CLIENT_CSV_FIELDS, type ClientCsvField, CSV_MAX_ROWS, guessField, parseCsv } from '@almanach/shared';
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router';
-import buttonStyles from '../../components/Button/Button.module.css';
-import { Button } from '../../components/Button/Button.tsx';
+import { useNavigate } from 'react-router';
+import { Button, buttonClassName } from '../../components/Button/Button.tsx';
+import { ButtonLink } from '../../components/Button/ButtonLink.tsx';
 import form from '../../components/FormPage/FormPage.module.css';
 import { Notice } from '../../components/Notice/Notice.tsx';
 import { PageHeader } from '../../components/PageHeader/PageHeader.tsx';
@@ -10,8 +10,8 @@ import { SelectField } from '../../components/SelectField/SelectField.tsx';
 import { TableScroll } from '../../components/TableScroll/TableScroll.tsx';
 import { useI18n } from '../../i18n/I18nProvider.tsx';
 import { api } from '../../lib/api.ts';
+import styles from '../../styles/text.module.css';
 import { describeError } from '../install/errors.ts';
-import styles from '../planning/Planning.module.css';
 
 interface Report {
   accepted: number;
@@ -105,14 +105,18 @@ export function ClientImportPage() {
     <>
       <PageHeader title={t('import.title')} subtitle={fileName} />
       <div className={form.form}>
-        {failure && <Notice tone="error">{failure}</Notice>}
+        {failure && (
+          <Notice tone="error" live>
+            {failure}
+          </Notice>
+        )}
         <section className={form.section} aria-labelledby="import-file-title">
           <h2 id="import-file-title" className={styles.sectionTitle}>
             {t('import.file')}
           </h2>
           <p className={styles.text}>{t('import.body')}</p>
           <div className={form.actions}>
-            <label className={`${buttonStyles.button} ${buttonStyles.primary} ${styles.fileButton}`}>
+            <label className={`${buttonClassName('primary')} ${styles.fileButton}`}>
               {fileName ? t('import.otherFile') : t('import.choose')}
               <input
                 type="file"
@@ -198,9 +202,9 @@ export function ClientImportPage() {
               </table>
             </TableScroll>
             <div className={form.actions}>
-              <Link to="/clients" className={`${buttonStyles.button} ${buttonStyles.ghost}`}>
+              <ButtonLink to="/clients" variant="ghost">
                 {t('common.cancel')}
-              </Link>
+              </ButtonLink>
               <Button variant="ghost" disabled={!hasName || busy} onClick={() => void send(true)}>
                 {t('import.check')}
               </Button>
@@ -246,9 +250,9 @@ export function ClientImportPage() {
               </>
             )}
             {report.imported && (
-              <Link to="/clients" className={`${buttonStyles.button} ${buttonStyles.primary}`}>
+              <ButtonLink to="/clients" variant="primary">
                 {t('import.toClients')}
-              </Link>
+              </ButtonLink>
             )}
           </section>
         )}

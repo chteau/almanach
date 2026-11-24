@@ -9,10 +9,12 @@ import { type SyntheticEvent, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { Badge } from '../../components/Badge/Badge.tsx';
 import { Button } from '../../components/Button/Button.tsx';
+import { EmptyState } from '../../components/EmptyState/EmptyState.tsx';
 import form from '../../components/FormPage/FormPage.module.css';
 import { LoadError } from '../../components/LoadError/LoadError.tsx';
 import { Notice } from '../../components/Notice/Notice.tsx';
 import { PageHeader } from '../../components/PageHeader/PageHeader.tsx';
+import { Row } from '../../components/Row/Row.tsx';
 import list from '../../components/RowList/RowList.module.css';
 import { SelectField } from '../../components/SelectField/SelectField.tsx';
 import { Skeleton } from '../../components/Skeleton/Skeleton.tsx';
@@ -22,8 +24,8 @@ import { useI18n } from '../../i18n/I18nProvider.tsx';
 import { ApiError, api } from '../../lib/api.ts';
 import { formatDate, formatMoney } from '../../lib/format.ts';
 import { useResource } from '../../lib/useResource.ts';
+import styles from '../../styles/text.module.css';
 import { describeError } from '../install/errors.ts';
-import styles from '../planning/Planning.module.css';
 import time from './Time.module.css';
 
 interface Entry {
@@ -168,7 +170,11 @@ export function TimePage() {
     <>
       <PageHeader title={t('nav.time')} />
       <div className={form.form}>
-        {failure && <Notice tone="error">{failure}</Notice>}
+        {failure && (
+          <Notice tone="error" live>
+            {failure}
+          </Notice>
+        )}
         <section className={form.section} aria-labelledby="timer-title">
           <h2 id="timer-title" className={styles.sectionTitle}>
             {t('time.timer')}
@@ -295,7 +301,9 @@ export function TimePage() {
           </div>
           {error !== undefined && <LoadError error={error} onRetry={reload} />}
           {!data && error === undefined && <Skeleton rows={3} />}
-          {data && grid.length === 0 && <p className={styles.caption}>{t('time.week.empty')}</p>}
+          {data && grid.length === 0 && (
+            <EmptyState inline title={t('time.week.empty')} body={t('time.week.empty.body')} />
+          )}
           {data && grid.length > 0 && (
             <TableScroll>
               <table className={styles.table}>
@@ -353,34 +361,33 @@ export function TimePage() {
             <ul className={list.list}>
               {data.entries.map((entry) => (
                 <li key={entry.id} className={list.item}>
-                  <div className={list.row}>
-                    <span className={list.primary}>
-                      <strong>
-                        {entry.missionName} ·{' '}
-                        {formatDuration(entry.minutes, entry.billing === 'daily', locale)}
-                      </strong>
-                      <span className={list.secondary}>
-                        {formatDate(entry.date, locale)}
-                        {entry.note ? ` · ${entry.note}` : ''}
-                      </span>
-                    </span>
-                    <span className={list.badges}>
-                      {!entry.billable && <Badge>{t('time.nonBillable')}</Badge>}
-                      {entry.locked && <Badge tone="ok">{t('time.billed')}</Badge>}
-                    </span>
-                    {!entry.locked && (
-                      <Button
-                        variant="ghost"
-                        onClick={() =>
-                          void run(
-                            async () => void (await api(`/api/time/${entry.id}`, { method: 'DELETE' })),
-                          )
-                        }
-                      >
-                        {t('common.delete')}
-                      </Button>
-                    )}
-                  </div>
+                  <Row
+                    primary={
+                      <>
+                        <strong>
+                          {entry.missionName} ·{' '}
+                          {formatDuration(entry.minutes, entry.billing === 'daily', locale)}
+                        </strong>{' '}
+                        {!entry.billable && <Badge>{t('time.nonBillable')}</Badge>}
+                        {entry.locked && <Badge tone="ok">{t('time.billed')}</Badge>}
+                      </>
+                    }
+                    meta={`${formatDate(entry.date, locale)}${entry.note ? ` · ${entry.note}` : ''}`}
+                    actions={
+                      !entry.locked && (
+                        <Button
+                          variant="danger"
+                          onClick={() =>
+                            void run(
+                              async () => void (await api(`/api/time/${entry.id}`, { method: 'DELETE' })),
+                            )
+                          }
+                        >
+                          {t('common.delete')}
+                        </Button>
+                      )
+                    }
+                  />
                 </li>
               ))}
             </ul>
@@ -391,7 +398,9 @@ export function TimePage() {
           <h2 id="unbilled-title" className={styles.sectionTitle}>
             {t('time.unbilled')}
           </h2>
-          {byMission.size === 0 && <p className={styles.caption}>{t('time.unbilled.none')}</p>}
+          {byMission.size === 0 && (
+            <EmptyState inline title={t('time.unbilled.none')} body={t('time.unbilled.none.body')} />
+          )}
           <ul className={styles.plain}>
             {[...byMission.entries()].map(([missionId, entries]) => {
               const mission = missions.data?.missions.find((item) => item.id === missionId);
@@ -497,7 +506,11 @@ function EntryForm({
       <h2 id="entry-title" className={styles.sectionTitle}>
         {t('time.add')}
       </h2>
-      {failure && <Notice tone="error">{failure}</Notice>}
+      {failure && (
+        <Notice tone="error" live>
+          {failure}
+        </Notice>
+      )}
       <div className={form.grid}>
         <SelectField
           label={t('time.mission')}

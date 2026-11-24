@@ -123,8 +123,9 @@ Tout est facultatif.
 
 | Variable | Rôle |
 |---|---|
-| `SMTP_URL` | Serveur d'e-mail des rappels (`smtps://utilisateur:mot-de-passe@hote:465`). |
+| `SMTP_URL` | Serveur d'e-mail des rappels (`smtps://utilisateur:mot-de-passe@hote:465`). Prioritaire sur l'e-mail réglé dans l'interface ; sans lui, un administrateur règle l'envoi dans les réglages ([détails](docs/email.md)). |
 | `SMTP_FROM` | Expéditeur des rappels. |
+| `MS_OAUTH_CLIENT_ID` | Identifiant d'application (client) d'un enregistrement Microsoft Entra à vous, client public sans secret : permet l'envoi depuis une boîte Outlook.com / Hotmail en OAuth2 ([détails](docs/email.md)). |
 | `REMINDERS` | `false` coupe la tâche des rappels (active par défaut, toutes les 10 minutes). |
 | `PACK_PUBLIC_KEYS` | Clés publiques Ed25519 autorisées à signer des packs, séparées par des virgules. Sans elles, aucune mise à jour n'est acceptée et seuls les packs livrés servent. |
 | `PACK_UPDATE_URL` | Dossier HTTPS qui publie `index.json` et les packs signés. Vérifié une fois par jour, seulement si un administrateur l'active dans les réglages. |

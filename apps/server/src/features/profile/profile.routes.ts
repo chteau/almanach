@@ -1,4 +1,4 @@
-import { onboardingDraftSchema, type Profile, profileSchema } from '@almanach/shared';
+import { onboardingDraftSchema, type Profile, packFeatures, profileSchema } from '@almanach/shared';
 import { asc, eq } from 'drizzle-orm';
 import { Hono } from 'hono';
 import type { Database } from '../../db/client.ts';
@@ -20,7 +20,9 @@ import { SITUATION_KEYS } from './situation.routes.ts';
 export function profileRoutes(db: Database, packs: PackRegistry): Hono<AppEnv> {
   const router = new Hono<AppEnv>();
 
-  router.get('/packs', (c) => c.json({ packs: packs.list() }));
+  router.get('/packs', (c) =>
+    c.json({ packs: packs.list().map((pack) => ({ ...pack, features: packFeatures(pack) })) }),
+  );
 
   router.get('/profile', async (c) => {
     const [row] = await db.select().from(profiles).where(eq(profiles.companyId, c.var.company.id)).limit(1);

@@ -3,6 +3,7 @@ import { Button } from '../../components/Button/Button.tsx';
 import { EmptyState } from '../../components/EmptyState/EmptyState.tsx';
 import { LoadError } from '../../components/LoadError/LoadError.tsx';
 import { PageHeader } from '../../components/PageHeader/PageHeader.tsx';
+import { Row } from '../../components/Row/Row.tsx';
 import list from '../../components/RowList/RowList.module.css';
 import { Skeleton } from '../../components/Skeleton/Skeleton.tsx';
 import { useI18n } from '../../i18n/I18nProvider.tsx';
@@ -84,32 +85,35 @@ export function NotificationsPage() {
         <ul className={list.list}>
           {data.notifications.map((row) => (
             <li key={row.id} className={list.item}>
-              <div className={`${list.row} ${row.read ? '' : styles.unread}`}>
-                <span className={list.primary}>
-                  {row.link ? (
-                    <Link to={row.link} onClick={() => void markRead(row.id)}>
-                      {row.read ? text(row) : <strong>{text(row)}</strong>}
-                    </Link>
-                  ) : (
-                    text(row)
-                  )}
-                  <span className={list.secondary}>
-                    {formatDate(row.createdAt.slice(0, 10), locale)}
-                    {!row.read && ` · ${t('notifications.unread')}`}
-                  </span>
-                </span>
-                {!row.read && (
-                  <Button variant="ghost" onClick={() => void markRead(row.id)}>
-                    {t('notifications.markRead')}
-                  </Button>
-                )}
+              <div className={row.read ? undefined : styles.unread}>
+                <Row
+                  primary={
+                    row.link ? (
+                      <Link to={row.link} onClick={() => void markRead(row.id)}>
+                        {row.read ? text(row) : <strong>{text(row)}</strong>}
+                      </Link>
+                    ) : (
+                      text(row)
+                    )
+                  }
+                  meta={`${formatDate(row.createdAt.slice(0, 10), locale)}${
+                    row.read ? '' : ` · ${t('notifications.unread')}`
+                  }`}
+                  actions={
+                    !row.read && (
+                      <Button variant="ghost" onClick={() => void markRead(row.id)}>
+                        {t('notifications.markRead')}
+                      </Button>
+                    )
+                  }
+                />
               </div>
             </li>
           ))}
         </ul>
       )}
       <p className={styles.caption}>
-        <Link to="/settings#reminders">{t('notifications.configure')}</Link>
+        <Link to="/settings/reminders">{t('notifications.configure')}</Link>
       </p>
     </>
   );

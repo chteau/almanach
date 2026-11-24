@@ -1,0 +1,139 @@
+/* Shared text and list helpers for pages and settings panels, built on the design tokens. */
+
+.text {
+  margin: 0;
+  line-height: 1.5;
+}
+
+.caption {
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-sm);
+  color: var(--muted);
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.sectionTitle {
+  margin: 0;
+  font-size: var(--text-lg);
+}
+
+.sectionHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.subTitle {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-md);
+  font-weight: 600;
+}
+
+.plain {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.step {
+  display: block;
+  font-size: var(--text-sm);
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.check {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 44px;
+}
+
+.check input {
+  width: 20px;
+  height: 20px;
+}
+
+.codes {
+  display: block;
+  margin-top: var(--space-2);
+  font-family: var(--mono);
+  white-space: pre;
+  user-select: all;
+}
+
+/* Long codes, addresses and fingerprints wrap on small screens. */
+.wrap {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.mono {
+  font-family: var(--mono);
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+}
+
+.fileButton {
+  cursor: pointer;
+}
+
+.fileButton:focus-within {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.table th,
+.table td {
+  padding: var(--space-2) var(--space-2);
+  border-bottom: 1px solid var(--line);
+  text-align: right;
+  vertical-align: top;
+}
+
+.table th:first-child {
+  text-align: left;
+  font-weight: 500;
+}
+
+.table thead th {
+  font-size: var(--text-sm);
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.systemPage {
+  max-width: 560px;
+  margin: 10vh auto;
+  padding: 0 var(--space-4);
+}
+
+.details {
+  font-size: var(--text-sm);
+  color: var(--ink-2);
+}
+
+.details summary {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.details > :not(summary) {
+  margin: var(--space-2) 0 0;
+}

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Badge } from '../../components/Badge/Badge.tsx';
 import { useI18n } from '../../i18n/I18nProvider.tsx';
-import styles from '../planning/Planning.module.css';
+import styles from '../../styles/text.module.css';
 
 const STORAGE_KEY = 'almanach.hideTest';
 

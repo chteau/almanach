@@ -2,7 +2,7 @@ import type { Client, LinkedRecords } from '@almanach/shared';
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router';
 import { Badge } from '../../components/Badge/Badge.tsx';
-import buttonStyles from '../../components/Button/Button.module.css';
+import { ButtonLink } from '../../components/Button/ButtonLink.tsx';
 import { EmptyState } from '../../components/EmptyState/EmptyState.tsx';
 import { LoadError } from '../../components/LoadError/LoadError.tsx';
 import { PageHeader } from '../../components/PageHeader/PageHeader.tsx';
@@ -90,15 +90,15 @@ export function ClientsPage() {
   }, [clients, query, kind, country, archived, sort, locale, activity, hideTest]);
 
   const newButton = (
-    <Link to="/clients/new" className={`${buttonStyles.button} ${buttonStyles.primary}`}>
+    <ButtonLink to="/clients/new" variant="primary">
       {t('clients.new')}
-    </Link>
+    </ButtonLink>
   );
 
   const importButton = (
-    <Link to="/clients/import" className={`${buttonStyles.button} ${buttonStyles.ghost}`}>
+    <ButtonLink to="/clients/import" variant="ghost">
       {t('import.open')}
-    </Link>
+    </ButtonLink>
   );
 
   return (

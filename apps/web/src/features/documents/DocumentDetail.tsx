@@ -113,6 +113,7 @@ export function DocumentDetail({
   return (
     <>
       <PageHeader
+        width="narrow"
         title={`${t(`documents.type.${doc.type}`)} ${doc.number ?? ''}`}
         subtitle={
           <Badge tone={STATUS_TONE[doc.status]}>
@@ -138,7 +139,11 @@ export function DocumentDetail({
         )}
       </PageHeader>
       <div className={form.form}>
-        {failure && <Notice tone="error">{failure}</Notice>}
+        {failure && (
+          <Notice tone="error" live>
+            {failure}
+          </Notice>
+        )}
         <Notice tone="info">{t('documents.frozen')}</Notice>
         <section className={form.section} aria-label={t('documents.section.totals')}>
           <dl className={form.facts}>
@@ -226,7 +231,7 @@ export function DocumentDetail({
                     </span>
                     <strong>{money(payment.amountCents)}</strong>
                     <Button
-                      variant="ghost"
+                      variant="danger"
                       onClick={() =>
                         setConfirm({
                           title: t('payments.delete'),
@@ -345,7 +350,11 @@ function PaymentForm({ document: doc, dueCents, mainCurrency, onSaved }: Payment
       <h3 id="payment-form-title" className={styles.sectionTitle}>
         {t('payments.add')}
       </h3>
-      {error && <Notice tone="error">{error}</Notice>}
+      {error && (
+        <Notice tone="error" live>
+          {error}
+        </Notice>
+      )}
       {amountCents !== null && amountCents > dueCents && (
         <Notice tone="warn">
           {t('payments.overpaid', { amount: formatMoney(amountCents - dueCents, doc.currency, locale) })}

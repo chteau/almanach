@@ -2,7 +2,7 @@ import { type LinkedRecords, QUANTITY_SCALE } from '@almanach/shared';
 import type { ReactNode } from 'react';
 import { useParams } from 'react-router';
 import { Badge } from '../../components/Badge/Badge.tsx';
-import buttonStyles from '../../components/Button/Button.module.css';
+import { buttonClassName } from '../../components/Button/Button.tsx';
 import { EmptyState } from '../../components/EmptyState/EmptyState.tsx';
 import form from '../../components/FormPage/FormPage.module.css';
 import { LoadError } from '../../components/LoadError/LoadError.tsx';
@@ -13,8 +13,8 @@ import { useI18n } from '../../i18n/I18nProvider.tsx';
 import type { MessageKey } from '../../i18n/messages.ts';
 import { countryName, formatDate, formatMoney } from '../../lib/format.ts';
 import { useResource } from '../../lib/useResource.ts';
+import styles from '../../styles/text.module.css';
 import { STATUS_TONE } from '../documents/labels.ts';
-import styles from '../planning/Planning.module.css';
 import { type LinkedKind, originUrl } from './activity.ts';
 import { DevBadge } from './TestData.tsx';
 
@@ -80,20 +80,11 @@ export function LinkedRecordPage() {
   return (
     <>
       <PageHeader title={title ?? '—'}>
-        <button
-          type="button"
-          className={`${buttonStyles.button} ${buttonStyles.ghost}`}
-          onClick={() => history.back()}
-        >
+        <button type="button" className={buttonClassName('ghost')} onClick={() => history.back()}>
           {t('common.back')}
         </button>
         {origin && (
-          <a
-            href={origin}
-            target="_blank"
-            rel="noopener noreferrer"
-            className={`${buttonStyles.button} ${buttonStyles.ghost}`}
-          >
+          <a href={origin} target="_blank" rel="noopener noreferrer" className={buttonClassName('ghost')}>
             {t('linked.open')}
           </a>
         )}

@@ -2,6 +2,7 @@ import { appEn } from './app.en.ts';
 import { componentsEn } from './components.en.ts';
 import { docsEn } from './docs.en.ts';
 import { planEn } from './plan.en.ts';
+import { settingsEn } from './settings.en.ts';
 
 /** English messages: the reference catalogue every other locale must match. */
 export const en = {
@@ -112,4 +113,5 @@ export const en = {
   ...componentsEn,
   ...docsEn,
   ...planEn,
+  ...settingsEn,
 };

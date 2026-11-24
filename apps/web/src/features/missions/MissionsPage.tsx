@@ -2,7 +2,7 @@ import { BILLING_TYPES, endsSoon, MISSION_STATUSES, type Mission } from '@almana
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router';
 import { Badge } from '../../components/Badge/Badge.tsx';
-import buttonStyles from '../../components/Button/Button.module.css';
+import { ButtonLink } from '../../components/Button/ButtonLink.tsx';
 import { EmptyState } from '../../components/EmptyState/EmptyState.tsx';
 import { LoadError } from '../../components/LoadError/LoadError.tsx';
 import { PageHeader } from '../../components/PageHeader/PageHeader.tsx';
@@ -43,9 +43,9 @@ export function MissionsPage() {
   );
 
   const newButton = (
-    <Link to="/missions/new" className={`${buttonStyles.button} ${buttonStyles.primary}`}>
+    <ButtonLink to="/missions/new" variant="primary">
       {t('missions.new')}
-    </Link>
+    </ButtonLink>
   );
 
   /**
