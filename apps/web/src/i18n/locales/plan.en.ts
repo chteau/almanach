@@ -370,6 +370,11 @@ export const planEn = {
   'packs.received': 'Update {country} #{sequence} received. Read what it changes below, then apply it.',
   'packs.pending': 'Update available: {country} #{sequence}',
   'packs.pending.invalid': 'This update can no longer be verified and cannot be applied.',
+  'packs.pending.tooOld':
+    'This update needs Almanach {version} or later: update Almanach to apply it. The current pack stays in place.',
+  'packs.pending.reason': 'reason: {reason}',
+  'activities.unavailable':
+    'This country does not offer several activities: keep all your trades in this company; taxes are computed on their total.',
   'packs.apply': 'Apply',
   'packs.later': 'Later',
   'packs.applied': 'Update {country} #{sequence} applied.',

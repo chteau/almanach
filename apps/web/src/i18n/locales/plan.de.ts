@@ -381,6 +381,11 @@ export const planDe: Record<keyof typeof planEn, string> = {
     'Update {country} Nr. {sequence} empfangen. Lesen Sie unten, was es ändert, und wenden Sie es dann an.',
   'packs.pending': 'Update verfügbar: {country} Nr. {sequence}',
   'packs.pending.invalid': 'Dieses Update kann nicht mehr geprüft und nicht angewendet werden.',
+  'packs.pending.tooOld':
+    'Dieses Update erfordert Almanach {version} oder neuer: Aktualisieren Sie Almanach, um es anzuwenden. Das aktuelle Paket bleibt aktiv.',
+  'packs.pending.reason': 'Grund: {reason}',
+  'activities.unavailable':
+    'Dieses Land bietet keine mehreren Tätigkeiten an: Führen Sie alle Tätigkeiten in diesem Unternehmen; Steuern werden auf ihre Summe berechnet.',
   'packs.apply': 'Anwenden',
   'packs.later': 'Später',
   'packs.applied': 'Update {country} Nr. {sequence} angewendet.',

@@ -379,6 +379,11 @@ export const planFr: Record<keyof typeof planEn, string> = {
     'Mise à jour {country} n° {sequence} reçue. Lisez ce qu’elle change ci-dessous, puis appliquez-la.',
   'packs.pending': 'Mise à jour disponible : {country} n° {sequence}',
   'packs.pending.invalid': 'Cette mise à jour ne peut plus être vérifiée et ne peut pas être appliquée.',
+  'packs.pending.tooOld':
+    "Cette mise à jour demande Almanach {version} ou plus récent : mettez Almanach à jour pour l'appliquer. Le pack actuel reste en place.",
+  'packs.pending.reason': 'motif : {reason}',
+  'activities.unavailable':
+    'Ce pays ne propose pas plusieurs activités : toutes vos activités se suivent dans cette entreprise, et les impôts se calculent sur leur total.',
   'packs.apply': 'Appliquer',
   'packs.later': 'Plus tard',
   'packs.applied': 'Mise à jour {country} n° {sequence} appliquée.',

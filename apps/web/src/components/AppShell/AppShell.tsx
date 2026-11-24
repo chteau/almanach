@@ -5,6 +5,7 @@ import { useAuth, useMe } from '../../features/auth/AuthProvider.tsx';
 import { activateCompany, useCompanies } from '../../features/companies/useCompanies.ts';
 import { useI18n } from '../../i18n/I18nProvider.tsx';
 import type { MessageKey } from '../../i18n/messages.ts';
+import { setDateRegion } from '../../lib/format.ts';
 import { useResource } from '../../lib/useResource.ts';
 import { Logo } from '../Logo/Logo.tsx';
 import { SearchDialog } from '../SearchDialog/SearchDialog.tsx';
@@ -74,6 +75,9 @@ export function AppShell() {
   const unread = inbox.data?.notifications.filter((item) => !item.read).length ?? 0;
   const [searching, setSearching] = useState(false);
   const companies = useCompanies().data;
+  // Dates follow the country of the active company on every page, set before the pages below render.
+  const country = companies?.companies.find((company) => company.id === companies.active)?.country;
+  if (country !== undefined) setDateRegion(country);
 
   useEffect(() => {
     /**

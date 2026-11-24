@@ -31,7 +31,7 @@ export function ActivitiesSettings() {
   const add = useAction();
   if (!data || data.activities.length === 0) return <LinkedName />;
   const used = new Set(data.activities.map((activity) => activity.status));
-  const available = data.statuses.filter((item) => !used.has(item.id));
+  const available = data.canAdd ? data.statuses.filter((item) => !used.has(item.id)) : [];
 
   /**
    * Adds a secondary activity
@@ -87,6 +87,7 @@ export function ActivitiesSettings() {
               {failure}
             </Notice>
           )}
+          {!data.canAdd && <Notice tone="info">{t('activities.unavailable')}</Notice>}
           <ul className={list.list}>
             {data.activities.map((activity) => (
               <li key={activity.id ?? 'main'} className={list.item}>
