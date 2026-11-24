@@ -32,6 +32,7 @@ import {
   missions,
   payments,
   profiles,
+  reserveSettings,
   situationChanges,
 } from '../../db/schema.ts';
 import type { PackRegistry } from '../packs/packs.ts';
@@ -92,15 +93,21 @@ export function situationPeriods(
  *
  * @param profile {ProfileRow} - stored profile
  * @param activities {string[]} - statuses of the secondary activities
- * @returns {RuleProfile} - status, options, period, activity start and secondary activities
+ * @param household {RuleProfile['household']} - tax household from the reserve settings, when known
+ * @returns {RuleProfile} - status, options, period, activity start, secondary activities and household
  */
-export function ruleProfile(profile: ProfileRow, activities: string[] = []): RuleProfile {
+export function ruleProfile(
+  profile: ProfileRow,
+  activities: string[] = [],
+  household?: RuleProfile['household'],
+): RuleProfile {
   return {
     status: profile.status,
     options: profile.options,
     declarationPeriod: profile.declarationPeriod,
     activityStart: profile.activityStart,
     activities,
+    ...(household && { household }),
   };
 }
 
@@ -165,6 +172,20 @@ export class PlanningService {
       .where(eq(companyActivities.companyId, companyId))
       .orderBy(asc(companyActivities.createdAt));
     return rows.map((row) => row.status);
+  }
+
+  /**
+   * Tax household of a company (French income tax parts), from its reserve settings
+   *
+   * @param companyId {string} - company
+   * @returns {Promise<NonNullable<RuleProfile['household']>>} - parts in quarters and joint taxation; one part by default
+   */
+  async household(companyId: string): Promise<NonNullable<RuleProfile['household']>> {
+    const [row] = await this.db
+      .select({ partsQuarters: reserveSettings.taxPartsQuarters, joint: reserveSettings.jointTaxation })
+      .from(reserveSettings)
+      .where(eq(reserveSettings.companyId, companyId));
+    return row ?? { partsQuarters: 4, joint: false };
   }
 
   /**
@@ -567,7 +588,7 @@ export class PlanningService {
       ).filter((receipt) => receipt.date <= periodEnd);
       revenue = { ...local, receipts: [...local.receipts, ...linked] };
       const rules = this.packs.rules(pack.country, fiscalYearOf(periodStart, pack.fiscalYearStart).year);
-      const facts = ruleProfile(profile, await this.activities(companyId));
+      const facts = ruleProfile(profile, await this.activities(companyId), await this.household(companyId));
       if (rules && occurrence.estimates.length > 0) {
         estimates = computeEstimates(rules.rules, facts, revenue.receipts, occurrence.estimates);
         if (facts.activities?.length)
@@ -608,7 +629,7 @@ export class PlanningService {
     const set = await this.receipts(companyId, profile.currency, from, fiscal.end);
     const receipts =
       simulateCents > 0 ? [...set.receipts, { date: today, cents: simulateCents }] : set.receipts;
-    const facts = ruleProfile(profile, await this.activities(companyId));
+    const facts = ruleProfile(profile, await this.activities(companyId), await this.household(companyId));
     // Thresholds count the whole business, linked activities included; estimates count the local activities and
     // the links attached to one of them.
     const linked = await this.linkedRevenue(companyId, profile.currency, from);

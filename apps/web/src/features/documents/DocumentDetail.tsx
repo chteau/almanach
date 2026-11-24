@@ -40,6 +40,7 @@ export function DocumentDetail({
     doc.type === 'invoice' || doc.type === 'deposit' ? '/api/payments' : null,
   );
   const [failure, setFailure] = useState<string>();
+  const [reserveShare, setReserveShare] = useState<number | null>(null);
   const [confirm, setConfirm] = useState<null | {
     title: string;
     body: string;
@@ -252,12 +253,21 @@ export function DocumentDetail({
                 ))}
               </ul>
             )}
+            {reserveShare !== null && reserveShare > 0 && (
+              <Notice tone="success" live>
+                {t('reserve.share', {
+                  amount: formatMoney(reserveShare, profile?.currency ?? doc.currency, locale),
+                })}{' '}
+                <Link to="/thresholds#reserve">{t('reserve.details')}</Link>
+              </Notice>
+            )}
             {dueCents > 0 && (
               <PaymentForm
                 document={doc}
                 dueCents={dueCents}
                 mainCurrency={profile?.currency ?? doc.currency}
-                onSaved={() => {
+                onSaved={(share) => {
+                  setReserveShare(share);
                   allPayments.reload();
                   onChange();
                 }}
@@ -292,7 +302,8 @@ interface PaymentFormProps {
   document: DocumentView;
   dueCents: number;
   mainCurrency: string;
-  onSaved: () => void;
+  /** Called with the share of the tax reserve the payment brings, null when the country has no reserve. */
+  onSaved: (reserveShareCents: number | null) => void;
 }
 
 /**
@@ -329,12 +340,12 @@ function PaymentForm({ document: doc, dueCents, mainCurrency, onSaved }: Payment
       return;
     }
     try {
-      await api(`/api/documents/${doc.id}/payments`, {
+      const saved = await api<{ reserveShareCents: number | null }>(`/api/documents/${doc.id}/payments`, {
         method: 'POST',
         body: { date, amountCents, receivedCents, feesCents, method, reference, activityId },
       });
       setError(undefined);
-      onSaved();
+      onSaved(saved.reserveShareCents);
     } catch (failure) {
       setError(describeError(failure, t));
     }

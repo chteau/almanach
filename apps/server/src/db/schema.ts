@@ -373,6 +373,22 @@ export const deadlineMarks = pgTable(
   (table) => [primaryKey({ columns: [table.companyId, table.key] })],
 );
 
+/** Settings of the tax reserve chosen by the person; absent means the pack's margin and no extra. */
+export const reserveSettings = pgTable('reserve_settings', {
+  companyId: uuid('company_id')
+    .primaryKey()
+    .references(() => companies.id, { onDelete: 'cascade' }),
+  /** Null keeps the pack's prudent margin. */
+  marginBp: integer('margin_bp'),
+  extraRateBp: integer('extra_rate_bp').notNull().default(0),
+  extraMonthlyCents: bigint('extra_monthly_cents', { mode: 'number' }).notNull().default(0),
+  extraNote: text('extra_note'),
+  /** Tax household for French income tax: parts in quarters (4 = one part) and joint taxation. */
+  taxPartsQuarters: integer('tax_parts_quarters').notNull().default(4),
+  jointTaxation: boolean('joint_taxation').notNull().default(false),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
 /** Deadlines a person adds, once or recurring (S-063). */
 export const customDeadlines = pgTable(
   'custom_deadlines',

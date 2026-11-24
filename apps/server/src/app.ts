@@ -28,9 +28,10 @@ import { missionRoutes } from './features/missions/missions.routes.ts';
 import type { PackRegistry } from './features/packs/packs.ts';
 import { packAdminRoutes } from './features/packs/updates.routes.ts';
 import type { PackUpdates } from './features/packs/updates.ts';
-import { planningRoutes } from './features/planning/planning.routes.ts';
+import { instanceToday, planningRoutes } from './features/planning/planning.routes.ts';
 import type { PlanningService } from './features/planning/planning.service.ts';
 import type { ReminderJob } from './features/planning/reminders.ts';
+import { ReserveService, reserveRoutes } from './features/planning/reserve.ts';
 import { profileRoutes } from './features/profile/profile.routes.ts';
 import { readOnlyAfterCessation, situationRoutes } from './features/profile/situation.routes.ts';
 import { searchRoutes } from './features/search/search.routes.ts';
@@ -150,6 +151,8 @@ export function createApp(deps: AppDeps): Hono<AppEnv> {
     '/api/custom-deadlines/*',
     '/api/outlook',
     '/api/dashboard',
+    '/api/reserve',
+    '/api/reserve/*',
     '/api/notifications/*',
     '/api/settings/*',
     '/api/account',
@@ -216,8 +219,15 @@ export function createApp(deps: AppDeps): Hono<AppEnv> {
   app.route('/api', profileRoutes(deps.db, deps.packs));
   app.route('/api/clients', clientRoutes(deps.db));
   app.route('/api/missions', missionRoutes(deps.db));
-  app.route('/api', documentRoutes(deps.db, deps.documents));
-  const planning = planningRoutes(deps.db, deps.planning, deps.packs, deps.reminders);
+  const reserve = new ReserveService(deps.db, deps.planning, deps.packs);
+  app.route('/api/reserve', reserveRoutes(deps.db, reserve));
+  app.route(
+    '/api',
+    documentRoutes(deps.db, deps.documents, async (companyId, paymentId) =>
+      reserve.shareOf(companyId, paymentId, await instanceToday(deps.db)),
+    ),
+  );
+  const planning = planningRoutes(deps.db, deps.planning, deps.packs, deps.reminders, reserve);
   app.route('/api', planning.api);
   app.route('/api/ical', planning.feed);
   app.all('/api/*', (c) => c.json({ error: 'not_found' }, 404));

@@ -31,6 +31,7 @@ import type { PackRegistry } from '../packs/packs.ts';
 import { renderIcal } from './ical.ts';
 import { type CalendarItem, occurrencesOf, type PlanningService } from './planning.service.ts';
 import type { ReminderJob } from './reminders.ts';
+import type { ReserveService } from './reserve.ts';
 
 const KEY = /^(?:[a-z0-9_]{1,60}:\d{4}-\d{2}-\d{2}|custom:[0-9a-f-]{36}:\d{4}-\d{2}-\d{2})$/;
 
@@ -110,6 +111,7 @@ function dateParam(value: string | undefined, fallback: string): string | null {
  * @param planning {PlanningService} - planning rules
  * @param packs {PackRegistry} - country packs
  * @param reminders {ReminderJob} - reminder delivery, for test messages
+ * @param reserve {ReserveService | undefined} - tax reserve, summarized on the dashboard
  * @returns {{ api: Hono<AppEnv>; feed: Hono<AppEnv> }} - authenticated routes and the public feed
  */
 export function planningRoutes(
@@ -117,6 +119,7 @@ export function planningRoutes(
   planning: PlanningService,
   packs: PackRegistry,
   reminders: ReminderJob,
+  reserve?: ReserveService,
 ) {
   const api = new Hono<AppEnv>();
 
@@ -325,6 +328,7 @@ export function planningRoutes(
     const calendar = await planning.calendar(companyId, addDays(today, -366), addDays(today, 30), today);
     const visible = calendar.filter((item) => !item.hidden && !item.done && item.type !== 'mission');
     const outlook = await planning.outlook(companyId, today);
+    const reserveView = reserve ? await reserve.compute(companyId, today) : null;
     // Part of the linked activities: collected per period from their monthly totals, late invoices from their detail.
     const linkedTotals = await planning.linkedRevenue(companyId, profile.currency, earliest);
     /**
@@ -373,6 +377,12 @@ export function planningRoutes(
         year: within(link.receipts, periods.year),
       })),
       outlook,
+      reserve: reserveView && {
+        currency: reserveView.currency,
+        reserveCents: reserveView.reserveCents,
+        maturity: reserveView.maturity,
+        warning: reserveView.warning,
+      },
     });
   });
 

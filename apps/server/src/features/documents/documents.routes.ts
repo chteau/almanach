@@ -37,9 +37,15 @@ function todayFrom(value: string | undefined): string {
  *
  * @param db {Database} - Drizzle database
  * @param service {DocumentService} - document rules
+ * @param reserveShare {(companyId: string, paymentId: string) => Promise<number | null>} - share of the tax
+ * reserve a recorded payment brings, returned with it; none when absent
  * @returns {Hono<AppEnv>} - the router
  */
-export function documentRoutes(db: Database, service: DocumentService): Hono<AppEnv> {
+export function documentRoutes(
+  db: Database,
+  service: DocumentService,
+  reserveShare?: (companyId: string, paymentId: string) => Promise<number | null>,
+): Hono<AppEnv> {
   const router = new Hono<AppEnv>();
 
   /**
@@ -422,7 +428,8 @@ export function documentRoutes(db: Database, service: DocumentService): Hono<App
     await db
       .insert(auditLog)
       .values({ userId: c.var.user.id, action: 'payment.recorded', meta: { documentId: existing.id } });
-    return c.json({ id: row?.id }, 201);
+    const reserveShareCents = row && reserveShare ? await reserveShare(c.var.company.id, row.id) : null;
+    return c.json({ id: row?.id, reserveShareCents }, 201);
   });
 
   router.get('/payments', async (c) => {

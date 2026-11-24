@@ -131,13 +131,34 @@ const deIncomeTaxEstimate = z
   })
   .strict();
 
+/** Share of tax relief lost below a ceiling (French décote), for one person or a couple taxed jointly. */
+const decoteSchema = z.object({ limitCents: cents, baseCents: cents, rateBp: basisPoints }).strict();
+
+/**
+ * French progressive income tax: scale per part (quotient familial), capped benefit of the extra half-parts and
+ * décote. The household (parts, joint taxation) comes from the person's settings.
+ */
+const frIncomeTaxEstimate = z
+  .object({
+    kind: z.literal('fr_income_tax'),
+    /** Bands of income per part: rate applies up to `upToCents`, the last one is open. */
+    bands: z.array(z.object({ upToCents: cents.nullable(), rateBp: basisPoints }).strict()).min(1),
+    decote: z.object({ single: decoteSchema, couple: decoteSchema }).strict(),
+    /** Most an extra half-part may lower the tax (plafonnement des effets du quotient familial). */
+    halfPartCapCents: cents,
+  })
+  .strict();
+
 export const estimateSchema = z
   .object({
     id: ruleId,
     label: localized,
     appliesTo: appliesToSchema.default({}),
-    /** What the computation starts from. Revenue is what was collected; profit is revenue minus nothing yet. */
-    base: z.enum(['revenue', 'profit']),
+    /**
+     * What the computation starts from. Revenue is what was collected; profit is revenue minus nothing yet;
+     * taxable is revenue minus the flat-rate allowance of each activity (micro regime).
+     */
+    base: z.enum(['revenue', 'profit', 'taxable']),
     /**
      * "activity": each activity computes it on its own revenue at its own rates (French micro contributions).
      * "person": computed once on the total of every activity, as progressive income tax, UK Class 4 or US
@@ -150,6 +171,7 @@ export const estimateSchema = z
       profitBandEstimate,
       usSelfEmploymentEstimate,
       deIncomeTaxEstimate,
+      frIncomeTaxEstimate,
     ]),
     ...sourced,
   })
@@ -230,6 +252,30 @@ export const holidaySchema = z
   .object({ date: isoDate, name: z.string().min(1), appliesTo: appliesToSchema.optional() })
   .strict();
 
+/**
+ * Money to keep aside for the taxes and contributions of the fiscal year not paid yet: which estimates count,
+ * which deadlines settle them, and the prudent margin proposed by default (a product choice, not a legal value).
+ */
+export const reserveSchema = z
+  .object({
+    include: z.array(ruleId).min(1),
+    settles: z
+      .array(
+        z
+          .object({
+            deadline: ruleId,
+            /** Which fiscal year a payment at that deadline settles: the one of its period, the current or the previous one. */
+            fiscalYear: z.enum(['period', 'current', 'previous']),
+          })
+          .strict(),
+      )
+      .default([]),
+    marginBp: basisPoints,
+    warning: localized,
+    ...sourced,
+  })
+  .strict();
+
 /** Rules of one country for one fiscal year, loaded from packs/<cc>/<year>.yaml. */
 export const yearRulesSchema = z
   .object({
@@ -243,6 +289,7 @@ export const yearRulesSchema = z
     estimates: z.array(estimateSchema).default([]),
     allowances: z.array(allowanceSchema).default([]),
     deadlines: z.array(deadlineRuleSchema).default([]),
+    reserve: reserveSchema.optional(),
   })
   .strict();
 
@@ -252,3 +299,4 @@ export type EstimateRule = z.infer<typeof estimateSchema>;
 export type AllowanceRule = z.infer<typeof allowanceSchema>;
 export type DeadlineRule = z.infer<typeof deadlineRuleSchema>;
 export type Localized = z.infer<typeof localized>;
+export type ReserveRule = z.infer<typeof reserveSchema>;

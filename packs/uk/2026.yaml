@@ -241,3 +241,21 @@ deadlines:
     link: https://www.gov.uk/self-assessment-tax-returns/deadlines
     source: https://www.gov.uk/self-assessment-tax-returns/deadlines
     verified_on: "2026-11-24"
+
+# Reserve: Income Tax and Class 4 of the 2026-27 tax year to date, on takings less the trading allowance (no
+# expenses tracked yet). The payments on account due 31 January and 31 July 2027 are for 2026-27 (each half of the
+# previous year's bill, https://www.gov.uk/understand-self-assessment-bill/payments-on-account, 2026-11-24) and
+# reduce it; the balancing payment on 31 January 2028 settles the year itself. The 10 % margin is a product choice.
+reserve:
+  include: [income_tax, income_tax_scotland, class4_nic]
+  settles:
+    - { deadline: payment_on_account_1, fiscalYear: current }
+    - { deadline: payment_on_account_2, fiscalYear: current }
+    - { deadline: self_assessment_online, fiscalYear: previous }
+  marginBp: 1000
+  warning:
+    fr: "Estimation indicative de l'impôt sur le revenu et de la Class 4, calculée sur le chiffre d'affaires moins le trading allowance, sans autres revenus. Ne remplace pas votre décompte HMRC."
+    en: "Indicative Income Tax and Class 4 estimate, based on takings less the trading allowance, without other income. Not your HMRC calculation."
+    de: "Unverbindliche Schätzung von Einkommensteuer und Class 4 auf Basis des Umsatzes abzüglich Trading Allowance, ohne andere Einkünfte. Ersetzt nicht die Berechnung von HMRC."
+  source: https://www.gov.uk/understand-self-assessment-bill/payments-on-account
+  verified_on: "2026-11-24"

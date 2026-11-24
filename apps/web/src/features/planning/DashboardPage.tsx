@@ -17,6 +17,7 @@ import { linkedPath } from '../linked/activity.ts';
 import { ActivityBreakdown } from './ActivityBreakdown.tsx';
 import { LinkedActivities } from './LinkedActivities.tsx';
 import styles from './Planning.module.css';
+import { ReserveCard } from './Reserve.tsx';
 import { type CalendarItem, labelOf, type Outlook, TYPE_STYLE } from './types.ts';
 
 interface PeriodTotals {
@@ -49,6 +50,8 @@ interface Dashboard {
   /** Part of each linked activity in the collected amounts, from its monthly totals. */
   linkedRevenue: { label: string; month: number; quarter: number; year: number }[];
   outlook: Outlook | null;
+  /** Summary of the tax reserve, null when the country pack has none. */
+  reserve: { currency: string; reserveCents: number } | null;
 }
 
 /**
@@ -326,31 +329,35 @@ export function DashboardPage() {
               </div>
             ))}
           </section>
-          <section className={form.section} aria-labelledby="aside-title">
-            <h2 id="aside-title" className={styles.sectionTitle}>
-              {t('dashboard.setAside')}
-            </h2>
-            <p className={styles.figure}>{money(setAside)}</p>
-            <ul className={styles.plain}>
-              {outlook.estimates.map((estimate) => (
-                <li key={estimate.id}>
-                  {labelOf(estimate.label, locale)} : <strong>{money(estimate.cents)}</strong>
-                  <span className={styles.caption}>
-                    {' '}
-                    {estimate.steps
-                      .map(
-                        (step) =>
-                          `${money(step.baseCents)} × ${(step.rateBp / 100).toLocaleString(locale)} %`,
-                      )
-                      .join(' + ')}
-                  </span>
-                </li>
-              ))}
-            </ul>
-            <LinkedActivities outlook={outlook} money={money} />
-            <ActivityBreakdown activities={outlook.activities} money={money} />
-            <p className={styles.caption}>{t('outlook.disclaimer')}</p>
-          </section>
+          {data.reserve ? (
+            <ReserveCard />
+          ) : (
+            <section className={form.section} aria-labelledby="aside-title">
+              <h2 id="aside-title" className={styles.sectionTitle}>
+                {t('dashboard.setAside')}
+              </h2>
+              <p className={styles.figure}>{money(setAside)}</p>
+              <ul className={styles.plain}>
+                {outlook.estimates.map((estimate) => (
+                  <li key={estimate.id}>
+                    {labelOf(estimate.label, locale)} : <strong>{money(estimate.cents)}</strong>
+                    <span className={styles.caption}>
+                      {' '}
+                      {estimate.steps
+                        .map(
+                          (step) =>
+                            `${money(step.baseCents)} × ${(step.rateBp / 100).toLocaleString(locale)} %`,
+                        )
+                        .join(' + ')}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              <LinkedActivities outlook={outlook} money={money} />
+              <ActivityBreakdown activities={outlook.activities} money={money} />
+              <p className={styles.caption}>{t('outlook.disclaimer')}</p>
+            </section>
+          )}
         </div>
       )}
     </>

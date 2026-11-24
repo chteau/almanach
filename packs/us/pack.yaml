@@ -7,6 +7,10 @@ features:
   estimates: experimental
   deadlines: experimental
   activities: experimental
+  # Reserve: experimental — state taxes not modelled; revenue without expenses.
+  reserve: experimental
+# Packs using fields added in Almanach 0.1.0 (reserve, fr_income_tax).
+minAppVersion: "0.1.0"
 name: { fr: États-Unis, en: United States, de: Vereinigte Staaten }
 currency: USD
 fiscalYearStart: "01-01"

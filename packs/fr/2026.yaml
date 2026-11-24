@@ -245,6 +245,39 @@ estimates:
     source: https://entreprendre.service-public.gouv.fr/vosdroits/F23459
     verified_on: "2026-11-18"
 
+  # Impôt sur le revenu au barème, sans versement libératoire : barème progressif par part (quotient familial),
+  # plafonnement des demi-parts supplémentaires et décote. Le barème applicable aux revenus de 2026 sera fixé par la
+  # loi de finances pour 2027, pas encore adoptée le 2026-11-24 : on applique le dernier barème publié (revenus 2025,
+  # loi de finances pour 2026, F1419 « Vérifié le 12 novembre 2026 » ; brochure pratique IR 2026, calcul de l'impôt).
+  # Base : chiffre d'affaires de cette micro-entreprise moins l'abattement de chaque activité. Les autres revenus du
+  # foyer ne sont pas connus d'Almanach : l'estimation ne les compte pas. Parts et imposition commune : réglage de la
+  # personne (une part par défaut). Non modélisés : plafond spécifique du parent isolé (4 262 €), réductions et
+  # crédits d'impôt, contributions sur les hauts revenus, prélèvements sociaux.
+  - id: income_tax_bareme
+    label:
+      {
+        fr: "Impôt sur le revenu au barème (dernier barème publié)",
+        en: "Income tax at the progressive scale (latest published scale)",
+        de: "Einkommensteuer nach Tarif (zuletzt veröffentlichter Tarif)",
+      }
+    appliesTo: { withoutOptions: [versement_liberatoire] }
+    base: taxable
+    scope: person
+    formula:
+      kind: fr_income_tax
+      bands:
+        - { upToCents: 1160000, rateBp: 0 }
+        - { upToCents: 2957900, rateBp: 1100 }
+        - { upToCents: 8457700, rateBp: 3000 }
+        - { upToCents: 18191700, rateBp: 4100 }
+        - { upToCents: null, rateBp: 4500 }
+      decote:
+        single: { limitCents: 198200, baseCents: 89700, rateBp: 4525 }
+        couple: { limitCents: 327700, baseCents: 148300, rateBp: 4525 }
+      halfPartCapCents: 180700
+    source: https://www.impots.gouv.fr/www2/fichiers/documentation/brochure/ir_2026/pdf_som/21-calcul_impot_369a382.pdf
+    verified_on: "2026-11-24"
+
 # Abattements forfaitaires du régime micro-fiscal (art. 50-0 et 102 ter du CGI), appliqués quand le versement
 # libératoire n'est pas choisi. Activité mixte : l'abattement propre à chaque activité s'applique à la part de
 # chiffre d'affaires correspondante, le minimum de 305 € par activité (610 € pour deux activités).
@@ -380,3 +413,32 @@ deadlines:
     link: https://www.impots.gouv.fr/professionnel
     source: https://entreprendre.service-public.gouv.fr/vosdroits/F23547
     verified_on: "2026-11-18"
+
+# Réserve « à mettre de côté » : cotisations, versement libératoire ou impôt au barème, et CFP de l'année à date.
+# Les déclarations Urssaf faites soldent les cotisations et le versement libératoire de leur période. La marge de
+# 10 % est un choix du produit (prudence), pas une valeur légale ; la source est celle du calcul des cotisations.
+reserve:
+  include:
+    [
+      contributions_bnc,
+      contributions_cipav,
+      contributions_bic_services,
+      contributions_sales,
+      income_tax_bnc,
+      income_tax_bic_services,
+      income_tax_sales,
+      cfp_liberal,
+      cfp_commercial,
+      cfp_artisan,
+      income_tax_bareme,
+    ]
+  settles:
+    - { deadline: urssaf_monthly, fiscalYear: period }
+    - { deadline: urssaf_quarterly, fiscalYear: period }
+  marginBp: 1000
+  warning:
+    fr: "Estimation indicative calculée sur le chiffre d'affaires encaissé (le régime micro ne déduit pas les dépenses réelles). L'impôt au barème utilise le dernier barème publié et ne compte que cette activité et vos parts ; les acomptes de prélèvement à la source déjà payés ne sont pas déduits. Ne remplace pas un avis de l'administration."
+    en: "Indicative estimate based on revenue collected (the micro regime does not deduct actual expenses). Income tax uses the latest published scale and only counts this business and your parts; withholding instalments already paid are not deducted. Not an official notice."
+    de: "Unverbindliche Schätzung auf Basis der vereinnahmten Umsätze (das Mikro-Regime zieht keine tatsächlichen Ausgaben ab). Die Einkommensteuer nutzt den zuletzt veröffentlichten Tarif und berücksichtigt nur diese Tätigkeit und Ihre Anteile; bereits gezahlte Quellensteuer-Vorauszahlungen werden nicht abgezogen. Kein Bescheid der Verwaltung."
+  source: https://entreprendre.service-public.gouv.fr/vosdroits/F36232
+  verified_on: "2026-11-24"

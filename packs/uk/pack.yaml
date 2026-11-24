@@ -12,6 +12,10 @@ features:
   thresholds: verified
   estimates: verified
   deadlines: verified
+  # Reserve: Income Tax and Class 4 from gov.uk, payments on account per gov.uk, hand-computed cases in reserve tests.
+  reserve: verified
+# Packs using fields added in Almanach 0.1.0 (reserve, fr_income_tax).
+minAppVersion: "0.1.0"
 name: { fr: Royaume-Uni, en: United Kingdom, de: Vereinigtes Königreich }
 currency: GBP
 fiscalYearStart: "04-06"

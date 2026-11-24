@@ -175,3 +175,20 @@ deadlines:
     link: https://www.elster.de
     source: https://www.gesetze-im-internet.de/ao_1977/__149.html
     verified_on: "2026-11-18"
+
+# Rücklage: geschätzte Einkommensteuer des laufenden Jahres (Tarif § 32a EStG auf den Umsatz, da noch keine
+# Ausgaben erfasst werden: vorsichtige Überschätzung). Die Vorauszahlungen des Jahres (§ 37 EStG) mindern sie.
+# Nicht berücksichtigt: Solidaritätszuschlag, Kirchensteuer, Gewerbesteuer, Kranken- und Pflegeversicherung,
+# geschuldete Umsatzsteuer. Die Marge von 10 % ist eine Produktentscheidung, kein gesetzlicher Wert.
+reserve:
+  include: [income_tax]
+  settles:
+    - { deadline: est_vorauszahlung, fiscalYear: current }
+    - { deadline: annual_returns, fiscalYear: previous }
+  marginBp: 1000
+  warning:
+    fr: "Estimation indicative de l'impôt sur le revenu, calculée sur le chiffre d'affaires sans dépenses, pour une personne seule. Solidaritätszuschlag, impôt d'Église, Gewerbesteuer, assurance maladie et TVA due ne sont pas comptés : ajoutez-les en supplément personnel. Ne remplace pas un avis du Finanzamt."
+    en: "Indicative income tax estimate based on revenue without expenses, for a single person. Solidarity surcharge, church tax, trade tax, health insurance and VAT due are not included: add them as a personal extra. Not a notice from the tax office."
+    de: "Unverbindliche Schätzung der Einkommensteuer auf Basis des Umsatzes ohne Ausgaben, für eine Einzelperson. Solidaritätszuschlag, Kirchensteuer, Gewerbesteuer, Krankenversicherung und geschuldete Umsatzsteuer sind nicht enthalten: als persönlichen Zuschlag ergänzen. Kein Bescheid des Finanzamts."
+  source: https://www.gesetze-im-internet.de/estg/__32a.html
+  verified_on: "2026-11-24"

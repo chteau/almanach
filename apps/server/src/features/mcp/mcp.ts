@@ -25,6 +25,7 @@ import { listCompanies } from '../companies/companies.ts';
 import { documentRoutes } from '../documents/documents.routes.ts';
 import { linkedRecords } from '../federation/linked.ts';
 import { planningRoutes } from '../planning/planning.routes.ts';
+import { ReserveService, reserveRoutes } from '../planning/reserve.ts';
 import { readOnlyAfterCessation } from '../profile/situation.routes.ts';
 import { APP_VERSION } from '../system/system.ts';
 
@@ -379,6 +380,13 @@ const TOOLS = {
     input: z.object({ company }),
     run: async ({ api }) => api('/api/dashboard'),
   }),
+  get_reserve: tool({
+    scope: 'read',
+    description:
+      'Get the tax reserve: how much to keep aside now for the social contributions and taxes of the current fiscal year not paid yet (estimates of the year to date × (1 + prudent margin) + the personal extra − what was already paid at the deadlines that settle them; never below 0). `components` lists each estimate with its steps, source and verification date; `maturity` is the maturity of this function in the country pack (anything but "verified" is experimental). Amounts in cents. An indicative estimate, never tax advice: present `warning` with it. Fails with feature_unavailable when the country pack has no reserve rules.',
+    input: z.object({ company }),
+    run: async ({ api }) => api('/api/reserve'),
+  }),
   list_linked_activities: tool({
     scope: 'read',
     description:
@@ -458,8 +466,10 @@ export function mcpRoutes(deps: AppDeps): Hono<AppEnv> {
   internal.use('/api/clients/*', readOnly);
   internal.use('/api/documents/*', readOnly);
   internal.route('/api/clients', clientRoutes(db));
+  const reserve = new ReserveService(db, deps.planning, deps.packs);
+  internal.route('/api/reserve', reserveRoutes(db, reserve));
   internal.route('/api', documentRoutes(db, deps.documents));
-  internal.route('/api', planningRoutes(db, deps.planning, deps.packs, deps.reminders).api);
+  internal.route('/api', planningRoutes(db, deps.planning, deps.packs, deps.reminders, reserve).api);
 
   const byIp = new RateLimiter(120, 60_000);
   const byToken = new RateLimiter(120, 60_000);

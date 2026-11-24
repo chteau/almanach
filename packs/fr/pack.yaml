@@ -8,6 +8,11 @@ features:
   deadlines: verified
   # Mixed activity (BNC, BIC services, BIC sales): ceilings on the total, rates per activity (rules.test.ts).
   activities: verified
+  # Reserve: experimental — the scale for 2026 income is not adopted yet (latest published scale used) and only this
+  # business and the parts are known of the household.
+  reserve: experimental
+# Packs using fields added in Almanach 0.1.0 (reserve, fr_income_tax).
+minAppVersion: "0.1.0"
 name: { fr: France, en: France, de: Frankreich }
 currency: EUR
 fiscalYearStart: "01-01"
