@@ -102,6 +102,30 @@ export const docsDe: Record<keyof typeof docsEn, string> = {
   'documents.missing.seller.vat': 'Ihre USt-IdNr. (Profil), Pflicht bei Reverse Charge',
   'documents.missing.client.vat': 'die USt-IdNr. des Kunden, Pflicht bei Reverse Charge',
   'documents.missing.profile': 'Ihr Profil',
+  'documents.einvoice.label': 'PDF + Factur-X',
+  'documents.einvoice.hint':
+    'Bettet die E-Rechnung nach EN 16931 (Factur-X) in das PDF ein. Almanach erstellt die Datei, übermittelt sie aber nicht.',
+  'documents.einvoice.title':
+    'Für eine gültige Factur-X ergänzen Sie (ohne Haken bleibt das klassische PDF):',
+  'documents.einvoice.issued':
+    'Das PDF dieses Dokuments enthält seine Factur-X (EN 16931). Almanach übermittelt sie nicht.',
+  'documents.missing.einvoice.document.type': 'eine abrechenbare Dokumentart',
+  'documents.missing.einvoice.lines': 'mindestens eine Position',
+  'documents.missing.einvoice.document.currency':
+    'die Landeswährung: Factur-X in Fremdwährung wird noch nicht unterstützt',
+  'documents.missing.einvoice.document.vat_mode': 'eine Umsatzsteuerbehandlung des Landes',
+  'documents.missing.einvoice.document.vat_exemption': 'den Hinweis zur Steuerbefreiung',
+  'documents.missing.einvoice.client.kind': 'einen Geschäftskunden: keine Factur-X für Privatpersonen',
+  'documents.missing.einvoice.seller.address': 'die Straße Ihrer Adresse (Profil)',
+  'documents.missing.einvoice.seller.postal_code':
+    'die Postleitzahl Ihrer Adresse am Anfang der letzten Zeile, gefolgt vom Ort (Profil)',
+  'documents.missing.einvoice.seller.city': 'den Ort Ihrer Adresse (Profil)',
+  'documents.missing.einvoice.client.address': 'die Straße der Kundenadresse',
+  'documents.missing.einvoice.client.postal_code': 'die Postleitzahl des Kunden',
+  'documents.missing.einvoice.client.city': 'den Ort des Kunden',
+  'documents.missing.einvoice.seller.siret': 'Ihre SIRET (Profil), aus der die SIREN folgt',
+  'documents.missing.einvoice.seller.vat': 'Ihre USt-IdNr. oder Steuernummer (Profil), von EN 16931 verlangt',
+  'documents.missing.einvoice.client.vat': 'die USt-IdNr. des Kunden, Pflicht bei Steuerschuldnerschaft',
   'documents.deleteDraft': 'Entwurf löschen',
   'documents.deleteDraft.body': 'Der Entwurf wird gelöscht. Ausgestellte Dokumente werden nie gelöscht.',
   'documents.saveDraft': 'Entwurf speichern',
@@ -118,6 +142,7 @@ export const docsDe: Record<keyof typeof docsEn, string> = {
   'documents.issue.creditExceeds': 'Die Gutschrift übersteigt den Restbetrag der Rechnung ({amount}).',
 
   'documents.downloadPdf': 'PDF herunterladen',
+  'documents.downloadFacturx': 'PDF + Factur-X herunterladen',
   'documents.markSent': 'Als versendet markieren',
   'documents.sent': 'Versand',
   'documents.notSent': 'Noch nicht versendet',

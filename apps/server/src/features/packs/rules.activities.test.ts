@@ -59,6 +59,7 @@ describe('maturity per function', () => {
         prepare: 'experimental',
         expenses: 'experimental',
         vault_types: 'experimental',
+        einvoicing: 'experimental',
       },
       FR: {
         thresholds: 'verified',
@@ -69,6 +70,7 @@ describe('maturity per function', () => {
         prepare: 'experimental',
         expenses: 'experimental',
         vault_types: 'experimental',
+        einvoicing: 'verified',
       },
       GB: {
         thresholds: 'verified',

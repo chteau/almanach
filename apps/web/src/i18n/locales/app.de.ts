@@ -137,6 +137,11 @@ export const appDe: Record<keyof typeof appEn, string> = {
   'clients.email': 'E-Mail',
   'clients.phone': 'Telefon',
   'clients.address': 'Adresse',
+  'clients.street': 'Straße (eine Zeile je Angabe: Straße, Gebäude…)',
+  'clients.postalCode': 'Postleitzahl',
+  'clients.city': 'Ort',
+  'clients.einvoice.missing':
+    'Für E-Rechnungen (Factur-X) Straße, Postleitzahl und Ort angeben. Das klassische PDF hängt nicht davon ab.',
   'clients.country': 'Land',
   'clients.vat': 'USt-IdNr.',
   'clients.siret': 'SIRET',

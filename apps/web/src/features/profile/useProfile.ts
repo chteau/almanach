@@ -9,3 +9,12 @@ import { useResource } from '../../lib/useResource.ts';
 export function useProfile(): Profile | undefined {
   return useResource<{ profile: Profile; pack: PackMeta | null }>('/api/profile').data?.profile;
 }
+
+/**
+ * Loads the country pack of the active company
+ *
+ * @returns {PackMeta | null | undefined} - the pack, null in generic mode, undefined while loading or on error
+ */
+export function usePack(): PackMeta | null | undefined {
+  return useResource<{ profile: Profile; pack: PackMeta | null }>('/api/profile').data?.pack;
+}

@@ -1,5 +1,6 @@
 import {
   type BillingSettingsInput,
+  facturxRules,
   formatNumber,
   LOGO_MAX_BYTES,
   type NumberFormat,
@@ -25,6 +26,7 @@ import { api } from '../../lib/api.ts';
 import { useResource } from '../../lib/useResource.ts';
 import text from '../../styles/text.module.css';
 import { describeError } from '../install/errors.ts';
+import { usePack } from '../profile/useProfile.ts';
 import styles from './BillingSettings.module.css';
 import { useAction } from './useAction.ts';
 
@@ -34,6 +36,7 @@ interface BillingResponse {
     pdf: BillingSettingsInput['pdf'];
     defaultTermsDays: number;
     defaultNote: string | null;
+    facturxDefault: boolean;
     hasLogo: boolean;
   };
   year: number;
@@ -49,6 +52,7 @@ interface Values {
   pdf: BillingSettingsInput['pdf'];
   terms: string;
   note: string;
+  facturx: boolean;
 }
 
 /**
@@ -85,7 +89,9 @@ function BillingForm({
     pdf: data.settings.pdf,
     terms: String(data.settings.defaultTermsDays),
     note: data.settings.defaultNote ?? '',
+    facturx: data.settings.facturxDefault,
   }));
+  const offersFacturx = facturxRules(usePack() ?? undefined) !== null;
   const [values, setValues] = useState(saved);
   const action = useAction();
   const { numbering, pdf } = values;
@@ -128,7 +134,13 @@ function BillingForm({
     await action.run(async () => {
       const result = await api<{ appliesFrom: number | null }>('/api/billing', {
         method: 'PUT',
-        body: { numbering, pdf, defaultTermsDays: days, defaultNote: values.note },
+        body: {
+          numbering,
+          pdf,
+          defaultTermsDays: days,
+          defaultNote: values.note,
+          facturxDefault: values.facturx,
+        },
       });
       setSaved(values);
       onSaved();
@@ -334,6 +346,18 @@ function BillingForm({
                 maxLength={1000}
                 onChange={(event) => setValues({ ...values, note: event.target.value })}
               />
+              {offersFacturx && (
+                <Field label={t('billing.facturx')} hint={t('billing.facturx.hint')} checkbox>
+                  {(control) => (
+                    <input
+                      {...control}
+                      type="checkbox"
+                      checked={values.facturx}
+                      onChange={(event) => setValues({ ...values, facturx: event.target.checked })}
+                    />
+                  )}
+                </Field>
+              )}
             </>
           )}
         </SettingsSection>

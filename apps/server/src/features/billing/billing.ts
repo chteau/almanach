@@ -25,6 +25,8 @@ export interface BillingView {
   pdf: Omit<PdfStyle, 'logo'>;
   defaultTermsDays: number;
   defaultNote: string | null;
+  /** New invoices for business clients also produce a Factur-X, when the country offers it. */
+  facturxDefault: boolean;
   hasLogo: boolean;
 }
 
@@ -57,6 +59,7 @@ export async function loadBilling(
     pdf: row?.pdf ?? DEFAULT_PDF,
     defaultTermsDays: row?.defaultTermsDays ?? 30,
     defaultNote: row?.defaultNote ?? null,
+    facturxDefault: row?.facturxDefault ?? false,
     hasLogo: Boolean(logo),
     logo,
   };
@@ -229,6 +232,7 @@ export function billingRoutes(db: Database): Hono<AppEnv> {
       pdf: data.pdf,
       defaultTermsDays: data.defaultTermsDays,
       defaultNote: data.defaultNote ?? null,
+      facturxDefault: data.facturxDefault ?? existing.facturxDefault,
       updatedAt: new Date(),
     };
     await db

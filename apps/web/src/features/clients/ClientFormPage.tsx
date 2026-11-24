@@ -3,6 +3,7 @@ import {
   type ClientInput,
   COUNTRY_CODES,
   clientInputSchema,
+  facturxRules,
   isEuCountry,
   LOCALES,
 } from '@almanach/shared';
@@ -26,15 +27,27 @@ import { useResource } from '../../lib/useResource.ts';
 import { useUnsavedGuard } from '../../lib/useUnsavedGuard.ts';
 import { describeError } from '../install/errors.ts';
 import { CURRENCIES } from '../onboarding/form.ts';
-import { useProfile } from '../profile/useProfile.ts';
+import { usePack, useProfile } from '../profile/useProfile.ts';
 
 type Draft = Omit<
   ClientInput,
-  'email' | 'phone' | 'address' | 'vatNumber' | 'siret' | 'notes' | 'allowDuplicate'
+  | 'email'
+  | 'phone'
+  | 'address'
+  | 'addressLines'
+  | 'postalCode'
+  | 'city'
+  | 'vatNumber'
+  | 'siret'
+  | 'notes'
+  | 'allowDuplicate'
 > & {
   email: string;
   phone: string;
-  address: string;
+  /** Street lines of the structured address, one per line. */
+  street: string;
+  postalCode: string;
+  city: string;
   vatNumber: string;
   siret: string;
   notes: string;
@@ -52,7 +65,9 @@ function toDraft(client: Client): Draft {
     name: client.name,
     email: client.email ?? '',
     phone: client.phone ?? '',
-    address: client.address ?? '',
+    street: client.addressLines?.join('\n') ?? client.address ?? '',
+    postalCode: client.postalCode ?? '',
+    city: client.city ?? '',
     country: client.country,
     vatNumber: client.vatNumber ?? '',
     siret: client.siret ?? '',
@@ -101,6 +116,7 @@ function ClientForm({ initial, defaultTerms }: { initial?: Client | undefined; d
   const { t, locale } = useI18n();
   const navigate = useNavigate();
   const profile = useProfile();
+  const offersFacturx = facturxRules(usePack() ?? undefined) !== null;
   const [draft, setDraft] = useState<Draft>(() =>
     initial
       ? toDraft(initial)
@@ -109,7 +125,9 @@ function ClientForm({ initial, defaultTerms }: { initial?: Client | undefined; d
           name: '',
           email: '',
           phone: '',
-          address: '',
+          street: '',
+          postalCode: '',
+          city: '',
           country: 'FR',
           vatNumber: '',
           siret: '',
@@ -152,8 +170,14 @@ function ClientForm({ initial, defaultTerms }: { initial?: Client | undefined; d
    */
   async function save(event: SyntheticEvent | null, allowDuplicate = false): Promise<void> {
     event?.preventDefault();
+    const { street, ...rest } = draft;
     const payload: ClientInput = {
-      ...draft,
+      ...rest,
+      address: null,
+      addressLines: street
+        .split('\n')
+        .map((line) => line.trim())
+        .filter(Boolean),
       email: draft.email.trim() || null,
       ...(allowDuplicate ? { allowDuplicate } : {}),
     };
@@ -255,12 +279,31 @@ function ClientForm({ initial, defaultTerms }: { initial?: Client | undefined; d
             />
           </div>
           <TextAreaField
-            label={t('clients.address')}
-            value={draft.address}
-            onChange={(e) => change({ address: e.target.value })}
-            error={err('address')}
-            maxLength={500}
+            label={t('clients.street')}
+            value={draft.street}
+            onChange={(e) => change({ street: e.target.value })}
+            error={err('addressLines')}
+            rows={2}
+            autoComplete="street-address"
           />
+          <div className={form.grid}>
+            <TextField
+              label={t('clients.postalCode')}
+              value={draft.postalCode}
+              onChange={(e) => change({ postalCode: e.target.value })}
+              error={err('postalCode')}
+              maxLength={16}
+              autoComplete="postal-code"
+            />
+            <TextField
+              label={t('clients.city')}
+              value={draft.city}
+              onChange={(e) => change({ city: e.target.value })}
+              error={err('city')}
+              maxLength={100}
+              autoComplete="address-level2"
+            />
+          </div>
           <div className={form.grid}>
             <SelectField
               label={t('clients.country')}
@@ -295,6 +338,11 @@ function ClientForm({ initial, defaultTerms }: { initial?: Client | undefined; d
             )}
           </div>
           {showVatWarning && <Notice tone="warn">{t('clients.vat.missing')}</Notice>}
+          {offersFacturx &&
+            draft.kind === 'company' &&
+            !(draft.street.trim() && draft.postalCode.trim() && draft.city.trim()) && (
+              <Notice tone="info">{t('clients.einvoice.missing')}</Notice>
+            )}
         </fieldset>
         <fieldset className={form.section}>
           <legend>{t('clients.section.billing')}</legend>

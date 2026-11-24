@@ -1,5 +1,6 @@
 import {
   documentDraftSchema,
+  facturxRules,
   idSchema,
   type Line,
   type PaymentView,
@@ -18,8 +19,10 @@ import { parseBody } from '../../http/errors.ts';
 import type { AppEnv } from '../../http/request.ts';
 import { ownsActivity } from '../activities/activities.ts';
 import { loadBilling } from '../billing/billing.ts';
+import { toCii } from './cii.ts';
 import type { DocumentService } from './documents.service.ts';
 import { type PdfStyle, renderPdf } from './pdf.ts';
+import type { FacturxAttachment } from './pdfa.ts';
 
 /**
  * Today's date for status computations; the client may send its own time zone's date
@@ -86,9 +89,14 @@ export function documentRoutes(
    *
    * @param companyId {string} - owner
    * @param draft {DocumentDraft} - validated draft
+   * @param einvoiceFormat {'facturx' | null | undefined} - Factur-X choice stored on the draft, undefined for a new one
    * @returns {Promise<{ values: Record<string, unknown> } | { error: string }>} - row values or an error code
    */
-  async function prepare(companyId: string, draft: z.output<typeof documentDraftSchema>) {
+  async function prepare(
+    companyId: string,
+    draft: z.output<typeof documentDraftSchema>,
+    einvoiceFormat?: 'facturx' | null,
+  ) {
     const profile = await service.profile(companyId);
     const client = await service.client(companyId, draft.clientId);
     if (!profile) return { error: 'no_profile' };
@@ -109,8 +117,22 @@ export function documentRoutes(
       if (!mission) return { error: 'unknown_mission' };
     }
     const derived = await service.derive(companyId, draft, profile, client);
-    const { depositIds: _ids, ...rest } = draft;
-    return { values: { ...rest, ...derived, validUntil: draft.type === 'quote' ? draft.validUntil : null } };
+    const { depositIds: _ids, einvoice, ...rest } = draft;
+    // Factur-X: the explicit choice, else the one stored, else the default for business clients.
+    const offered = draft.type !== 'quote' && facturxRules(service.packs.get(profile.country)) !== null;
+    const wanted =
+      einvoice ??
+      (einvoiceFormat !== undefined
+        ? einvoiceFormat === 'facturx'
+        : client.kind === 'company' && (await loadBilling(db, companyId, profile.country)).facturxDefault);
+    return {
+      values: {
+        ...rest,
+        ...derived,
+        validUntil: draft.type === 'quote' ? draft.validUntil : null,
+        einvoiceFormat: offered && wanted ? 'facturx' : null,
+      },
+    };
   }
 
   router.get('/documents', async (c) => {
@@ -134,11 +156,19 @@ export function documentRoutes(
     if (!view) return c.json({ error: 'not_found' }, 404);
     const profile = await service.profile(c.var.company.id);
     const client = await service.client(c.var.company.id, view.clientId);
+    const draft = view.state === 'draft';
     const missing =
-      view.state === 'draft' && profile && client
-        ? service.missing(profile, client, view.lines, view.vatMode)
-        : [];
-    return c.json({ document: view, missing });
+      draft && profile && client ? service.missing(profile, client, view.lines, view.vatMode) : [];
+    const row = await owned(c.var.company.id, id);
+    const einvoiceMissing =
+      profile && client && row
+        ? service.einvoiceMissing(profile, client, draft ? { ...row, seller: null, buyer: null } : row)
+        : null;
+    return c.json({
+      document: view,
+      missing,
+      einvoice: einvoiceMissing === null ? null : { missing: einvoiceMissing },
+    });
   });
 
   router.post('/documents', async (c) => {
@@ -164,7 +194,7 @@ export function documentRoutes(
     const { data, response } = await parseBody(c, documentDraftSchema);
     if (response) return response;
     if (data.type !== existing.type) return c.json({ error: 'type_change' }, 422);
-    const prepared = await prepare(c.var.company.id, data);
+    const prepared = await prepare(c.var.company.id, data, existing.einvoiceFormat);
     if ('error' in prepared) return c.json({ error: prepared.error }, 422);
     await db
       .update(documents)
@@ -385,9 +415,23 @@ export function documentRoutes(
       if (!profile || !client) return c.json({ error: 'not_found' }, 404);
       ({ seller, buyer } = service.snapshots(profile, client));
     }
-    let relatedNumber: string | null = null;
-    if (existing.relatedId)
-      relatedNumber = (await owned(c.var.company.id, existing.relatedId))?.number ?? null;
+    const related = existing.relatedId ? await owned(c.var.company.id, existing.relatedId) : undefined;
+    const relatedNumber = related?.number ?? null;
+    let facturx: FacturxAttachment | undefined;
+    if (existing.einvoiceFormat === 'facturx' && existing.state !== 'draft') {
+      const profile = await service.profile(c.var.company.id);
+      const client = await service.client(c.var.company.id, existing.clientId);
+      const built =
+        profile && client
+          ? service.einvoice(
+              profile,
+              client,
+              existing,
+              relatedNumber ? { number: relatedNumber, issueDate: related?.issueDate ?? null } : null,
+            )
+          : null;
+      if (built?.invoice) facturx = { xml: toCii(built.invoice), conformance: 'EN 16931' };
+    }
     const bytes = await renderPdf({
       ...existing,
       draft: existing.state === 'draft',
@@ -395,6 +439,8 @@ export function documentRoutes(
       seller,
       buyer,
       style: await styleFor(c.var.company.id),
+      createdAt: existing.issuedAt ?? undefined,
+      facturx,
     });
     const name = `${existing.number ?? `draft-${existing.id.slice(0, 8)}`}.pdf`;
     return new Response(bytes as Uint8Array<ArrayBuffer>, {

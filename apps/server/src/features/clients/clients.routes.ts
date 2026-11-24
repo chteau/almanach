@@ -6,6 +6,7 @@ import {
   idSchema,
   LOCALES,
   type Locale,
+  normalizeAddress,
 } from '@almanach/shared';
 import { and, asc, desc, eq, ilike, or, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
@@ -123,6 +124,7 @@ export function clientRoutes(db: Database): Hono<AppEnv> {
         for (let start = 0; start < accepted.length; start += 200) {
           const chunk = accepted.slice(start, start + 200).map(({ allowDuplicate: _allow, ...client }) => ({
             ...client,
+            ...normalizeAddress(client),
             companyId,
           }));
           await tx.insert(clients).values(chunk);
@@ -182,7 +184,7 @@ export function clientRoutes(db: Database): Hono<AppEnv> {
 
     const [row] = await db
       .insert(clients)
-      .values({ ...input, companyId })
+      .values({ ...input, ...normalizeAddress(input), companyId })
       .returning();
     return c.json({ client: row && toClient(row) }, 201);
   });
@@ -196,7 +198,12 @@ export function clientRoutes(db: Database): Hono<AppEnv> {
     const [row] = await db
       .update(clients)
       // A client from Stripe edited here keeps this version: the sync no longer overwrites it.
-      .set({ ...input, stripeEdited: existing.stripeId !== null, updatedAt: new Date() })
+      .set({
+        ...input,
+        ...normalizeAddress(input),
+        stripeEdited: existing.stripeId !== null,
+        updatedAt: new Date(),
+      })
       .where(eq(clients.id, existing.id))
       .returning();
     return c.json({ client: row && toClient(row) });

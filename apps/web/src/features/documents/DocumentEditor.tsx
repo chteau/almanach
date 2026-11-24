@@ -5,6 +5,7 @@ import {
   type DocumentType,
   type DocumentView,
   documentDraftSchema,
+  facturxRules,
   type Line,
   LOCALES,
   type Mission,
@@ -17,6 +18,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { Button } from '../../components/Button/Button.tsx';
 import { ConfirmDialog } from '../../components/ConfirmDialog/ConfirmDialog.tsx';
+import { Field } from '../../components/Field/Field.tsx';
 import form from '../../components/FormPage/FormPage.module.css';
 import { Notice } from '../../components/Notice/Notice.tsx';
 import { PageHeader } from '../../components/PageHeader/PageHeader.tsx';
@@ -31,6 +33,7 @@ import { useUnsavedGuard } from '../../lib/useUnsavedGuard.ts';
 import { ActivitySelect } from '../activities/ActivitySelect.tsx';
 import { describeError } from '../install/errors.ts';
 import { CURRENCIES } from '../onboarding/form.ts';
+import { usePack } from '../profile/useProfile.ts';
 import styles from './DocumentEditor.module.css';
 import { listPath, parsePercent, parseQuantity } from './labels.ts';
 
@@ -57,6 +60,8 @@ interface Draft {
   note: string;
   depositIds: string[];
   activityId: string | null;
+  /** PDF + Factur-X requested. */
+  einvoice: boolean;
 }
 
 let nextLineKey = 0;
@@ -130,6 +135,7 @@ function toPayload(draft: Draft): { payload: DocumentDraft | null; lineErrors: R
     note: draft.note,
     depositIds: draft.depositIds,
     activityId: draft.activityId,
+    einvoice: draft.einvoice,
   };
   return documentDraftSchema.safeParse(payload).success
     ? { payload, lineErrors }
@@ -139,6 +145,10 @@ function toPayload(draft: Draft): { payload: DocumentDraft | null; lineErrors: R
 interface EditorProps {
   initial: DocumentView | null;
   missing: string[];
+  /** What a Factur-X still needs, null when the country does not offer it. */
+  einvoiceMissing: string[] | null;
+  /** PDF + Factur-X preselected on new invoices to business clients. */
+  facturxDefault: boolean;
   type: DocumentType;
   clients: Client[];
   missions: Mission[];
@@ -183,6 +193,7 @@ export function DocumentEditor(props: EditorProps) {
           note: initial.note ?? '',
           depositIds: initial.depositIds,
           activityId: initial.activityId,
+          einvoice: initial.einvoiceFormat === 'facturx',
         }
       : {
           type,
@@ -209,11 +220,14 @@ export function DocumentEditor(props: EditorProps) {
           note: props.defaultNote,
           depositIds: [],
           activityId: null,
+          einvoice: props.facturxDefault && preset?.kind === 'company',
         },
   );
   const [id, setId] = useState(initial?.id ?? null);
   const [server, setServer] = useState<DocumentView | null>(initial);
   const [missing, setMissing] = useState(props.missing);
+  const [einvoiceMissing, setEinvoiceMissing] = useState(props.einvoiceMissing ?? []);
+  const einvoiceRules = facturxRules(usePack() ?? undefined);
   const [dirty, setDirty] = useState(false);
   const [savedAt, setSavedAt] = useState<string>();
   const [failure, setFailure] = useState<string>();
@@ -246,11 +260,14 @@ export function DocumentEditor(props: EditorProps) {
         setId(current);
         window.history.replaceState(window.history.state, '', `/documents/${current}`);
       }
-      const fresh = await api<{ document: DocumentView; missing: string[] }>(
-        `/api/documents/${current}?today=${today()}`,
-      );
+      const fresh = await api<{
+        document: DocumentView;
+        missing: string[];
+        einvoice: { missing: string[] } | null;
+      }>(`/api/documents/${current}?today=${today()}`);
       setServer(fresh.document);
       setMissing(fresh.missing);
+      setEinvoiceMissing(fresh.einvoice?.missing ?? []);
       setDirty(false);
       setSavedAt(new Intl.DateTimeFormat(locale, { timeStyle: 'short' }).format(new Date()));
       setFailure(undefined);
@@ -629,6 +646,34 @@ export function DocumentEditor(props: EditorProps) {
           maxLength={2000}
           onChange={(event) => change({ note: event.target.value })}
         />
+
+        {einvoiceRules && draft.type !== 'quote' && (
+          <Field label={t('documents.einvoice.label')} hint={t('documents.einvoice.hint')} checkbox>
+            {(control) => (
+              <input
+                {...control}
+                type="checkbox"
+                checked={draft.einvoice}
+                onChange={(event) => change({ einvoice: event.target.checked })}
+              />
+            )}
+          </Field>
+        )}
+        {einvoiceRules && draft.type !== 'quote' && draft.einvoice && (
+          <>
+            {einvoiceMissing.length > 0 && (
+              <Notice tone="warn">
+                <p className={form.summary}>{t('documents.einvoice.title')}</p>
+                <ul>
+                  {einvoiceMissing.map((item) => (
+                    <li key={item}>{t(`documents.missing.einvoice.${item}` as MessageKey)}</li>
+                  ))}
+                </ul>
+              </Notice>
+            )}
+            {einvoiceRules.note && <Notice tone="info">{einvoiceRules.note[locale]}</Notice>}
+          </>
+        )}
 
         {missing.length > 0 && (
           <Notice tone="warn">

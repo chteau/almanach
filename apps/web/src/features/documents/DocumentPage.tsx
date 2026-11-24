@@ -17,13 +17,17 @@ const TYPES: DocumentType[] = ['quote', 'invoice', 'deposit', 'credit_note'];
 export function DocumentPage() {
   const { id } = useParams();
   const [params] = useSearchParams();
-  const doc = useResource<{ document: DocumentView; missing: string[] }>(
-    id ? `/api/documents/${id}?today=${today()}` : null,
-  );
+  const doc = useResource<{
+    document: DocumentView;
+    missing: string[];
+    einvoice: { missing: string[] } | null;
+  }>(id ? `/api/documents/${id}?today=${today()}` : null);
   const clients = useResource<{ clients: Client[] }>('/api/clients');
   const missions = useResource<{ missions: Mission[] }>('/api/missions');
   const deposits = useResource<{ documents: DocumentView[] }>('/api/documents?type=invoice');
-  const billing = useResource<{ settings: { defaultNote: string | null } }>(id ? null : '/api/billing');
+  const billing = useResource<{ settings: { defaultNote: string | null; facturxDefault: boolean } }>(
+    id ? null : '/api/billing',
+  );
 
   const failed = doc.error ?? clients.error ?? missions.error ?? deposits.error;
   if (failed !== undefined) {
@@ -53,6 +57,8 @@ export function DocumentPage() {
       key={current?.id ?? 'new'}
       initial={current}
       missing={doc.data?.missing ?? []}
+      einvoiceMissing={doc.data?.einvoice?.missing ?? null}
+      facturxDefault={billing.data?.settings.facturxDefault ?? false}
       type={current?.type ?? (requested && TYPES.includes(requested) ? requested : 'invoice')}
       clients={clients.data.clients}
       missions={missions.data.missions}

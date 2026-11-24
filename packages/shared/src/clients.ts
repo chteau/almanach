@@ -26,6 +26,10 @@ export const clientInputSchema = z
     email: z.email().max(254).nullable(),
     phone: optionalText(40),
     address: optionalText(500),
+    /** Structured address (street lines, postal code, city); when sent, `address` is composed from it. */
+    addressLines: z.array(z.string().trim().min(1).max(100)).max(5).optional(),
+    postalCode: optionalText(16),
+    city: optionalText(100),
     country: countrySchema,
     vatNumber: optionalText(20),
     currency: currencySchema,
@@ -51,8 +55,94 @@ export const clientInputSchema = z
 
 export type ClientInput = z.input<typeof clientInputSchema>;
 
+/** A postal address split as EN 16931 expects it (BG-5, BG-8). */
+export interface PostalAddress {
+  lines: string[];
+  postalCode: string | null;
+  city: string | null;
+}
+
+/** Countries writing the city before the postal code on the last line. */
+const CITY_FIRST = new Set(['GB', 'US', 'CA', 'AU', 'IE']);
+
+/**
+ * Printable address from its structured parts, in the country's usual order
+ *
+ * @param address {PostalAddress} - structured address
+ * @param country {string} - ISO 3166-1 alpha-2 code
+ * @returns {string | null} - address text, null when empty
+ */
+export function composeAddress(address: PostalAddress, country: string): string | null {
+  const place = CITY_FIRST.has(country)
+    ? [address.city, address.postalCode]
+    : [address.postalCode, address.city];
+  const last = place.filter(Boolean).join(' ');
+  const text = [...address.lines, last].filter(Boolean).join('\n');
+  return text || null;
+}
+
+/**
+ * Prudently splits a free-text address: only a last line "<postal code> <city>" in a format the country is
+ * known to use is recognised; anything else stays as street lines with no postal code nor city
+ *
+ * @param text {string | null} - free-text address, one part per line
+ * @param country {string} - ISO 3166-1 alpha-2 code
+ * @returns {PostalAddress} - structured address, possibly incomplete
+ */
+export function splitAddress(text: string | null, country: string): PostalAddress {
+  const lines = (text ?? '')
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const pattern = POSTAL_LINES[country];
+  const match = pattern ? lines.at(-1)?.match(pattern) : undefined;
+  if (!match?.groups || lines.length < 2) return { lines, postalCode: null, city: null };
+  return {
+    lines: lines.slice(0, -1),
+    postalCode: match.groups.code ?? null,
+    city: match.groups.city ?? null,
+  };
+}
+
+/** Last address line "<postal code> <city>" per country, for the five-digit systems where it is unambiguous. */
+const POSTAL_LINES: Record<string, RegExp> = {
+  FR: /^(?<code>\d{5})\s+(?<city>\S.*)$/,
+  DE: /^(?:D-)?(?<code>\d{5})\s+(?<city>\S.*)$/,
+};
+
+/**
+ * Keeps the printed address and its structured parts in step: structured parts sent win and compose the text;
+ * a text alone (CSV import, Stripe, API) is split prudently
+ *
+ * @param input {{ address: string | null; addressLines?: string[] | undefined; postalCode: string | null; city: string | null; country: string }} - client fields
+ * @returns {{ address: string | null; addressLines: string[] | null; postalCode: string | null; city: string | null }} - consistent fields
+ */
+export function normalizeAddress(input: {
+  address: string | null;
+  addressLines?: string[] | undefined;
+  postalCode: string | null;
+  city: string | null;
+  country: string;
+}): {
+  address: string | null;
+  addressLines: string[] | null;
+  postalCode: string | null;
+  city: string | null;
+} {
+  const parts: PostalAddress = input.addressLines
+    ? { lines: input.addressLines, postalCode: input.postalCode, city: input.city }
+    : splitAddress(input.address, input.country);
+  return {
+    address: input.addressLines ? composeAddress(parts, input.country) : input.address,
+    addressLines: parts.lines.length > 0 ? parts.lines : null,
+    postalCode: parts.postalCode,
+    city: parts.city,
+  };
+}
+
 /** A client as returned by the API. */
-export interface Client extends Omit<z.output<typeof clientInputSchema>, 'allowDuplicate'> {
+export interface Client extends Omit<z.output<typeof clientInputSchema>, 'allowDuplicate' | 'addressLines'> {
+  addressLines: string[] | null;
   id: string;
   archived: boolean;
   /** Stripe customer the client comes from, and when it was deleted there. */

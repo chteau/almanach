@@ -101,6 +101,31 @@ export const docsFr: Record<keyof typeof docsEn, string> = {
   'documents.missing.seller.vat': 'votre numéro de TVA (profil), obligatoire en autoliquidation',
   'documents.missing.client.vat': 'le numéro de TVA du client, obligatoire en autoliquidation',
   'documents.missing.profile': 'votre profil',
+  'documents.einvoice.label': 'PDF + Factur-X',
+  'documents.einvoice.hint':
+    'Intègre au PDF la facture électronique EN 16931 (Factur-X). Almanach produit le fichier mais ne le transmet pas.',
+  'documents.einvoice.title':
+    'Pour une Factur-X valide, complétez (le PDF classique reste possible en décochant) :',
+  'documents.einvoice.issued':
+    'Le PDF de ce document contient sa Factur-X (EN 16931). Almanach ne la transmet pas.',
+  'documents.missing.einvoice.document.type': 'un type de document facturable',
+  'documents.missing.einvoice.lines': 'au moins une ligne',
+  'documents.missing.einvoice.document.currency':
+    'la devise du pays : la Factur-X en devise étrangère n’est pas encore gérée',
+  'documents.missing.einvoice.document.vat_mode': 'un régime de TVA du pays',
+  'documents.missing.einvoice.document.vat_exemption': 'la mention d’exonération de TVA',
+  'documents.missing.einvoice.client.kind': 'un client professionnel : pas de Factur-X pour un particulier',
+  'documents.missing.einvoice.seller.address': 'la rue de votre adresse (profil)',
+  'documents.missing.einvoice.seller.postal_code':
+    'le code postal de votre adresse, en début de dernière ligne suivi de la ville (profil)',
+  'documents.missing.einvoice.seller.city': 'la ville de votre adresse (profil)',
+  'documents.missing.einvoice.client.address': 'la rue de l’adresse du client',
+  'documents.missing.einvoice.client.postal_code': 'le code postal du client',
+  'documents.missing.einvoice.client.city': 'la ville du client',
+  'documents.missing.einvoice.seller.siret': 'votre SIRET (profil), dont est tiré le SIREN',
+  'documents.missing.einvoice.seller.vat':
+    'votre numéro de TVA (profil), exigé par la norme EN 16931 même en franchise',
+  'documents.missing.einvoice.client.vat': 'le numéro de TVA du client, obligatoire en autoliquidation',
   'documents.deleteDraft': 'Supprimer le brouillon',
   'documents.deleteDraft.body': 'Le brouillon sera effacé. Les documents émis ne sont jamais supprimés.',
   'documents.saveDraft': 'Enregistrer le brouillon',
@@ -117,6 +142,7 @@ export const docsFr: Record<keyof typeof docsEn, string> = {
   'documents.issue.creditExceeds': 'L’avoir dépasse ce qui reste sur la facture ({amount}).',
 
   'documents.downloadPdf': 'Télécharger le PDF',
+  'documents.downloadFacturx': 'Télécharger le PDF + Factur-X',
   'documents.markSent': 'Marquer comme envoyé',
   'documents.sent': 'Envoi',
   'documents.notSent': 'Pas encore envoyé',
