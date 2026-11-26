@@ -110,9 +110,9 @@ test('first sign-in leads through onboarding, then clients and missions (P02, P0
   await page.getByRole('button', { name: 'Sign in' }).click();
   await expect(page).toHaveURL(/\/onboarding$/);
 
+  // Every bundled pack is verified: no country asks to acknowledge an experimental pack.
   await page.getByRole('radio', { name: /Germany/ }).check();
-  await page.getByRole('button', { name: 'Continue' }).click();
-  await expect(page.getByText('Confirm that you understand the pack is experimental.')).toBeVisible();
+  await expect(page.getByText('I understand and will check the figures myself.')).toHaveCount(0);
   await page.getByRole('radio', { name: /France/ }).check();
   await expect(page.getByText('I understand and will check the figures myself.')).toHaveCount(0);
   await expectAccessible(page);
