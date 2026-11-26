@@ -1,24 +1,35 @@
 country: DE
-maturity: experimental
+maturity: verified
 # Maturity per function (verified = sourced and covered by tests); a function not listed is unavailable.
-# Activities: Kleinunternehmer limits on the total, income tax once on the total; Gewerbesteuer is not estimated.
+# Values checked on gesetze-im-internet.de and bundesfinanzministerium.de on 2026-11-26 (sources in 2026.yaml);
+# hand-computed cases in apps/server/src/features/packs/rules.de.test.ts.
 features:
-  thresholds: experimental
-  estimates: experimental
-  deadlines: experimental
-  activities: experimental
-  # Reserve: experimental — Soli, church tax, trade tax and health insurance are not modelled; revenue without expenses.
-  reserve: experimental
-  # Prepared declaration: experimental — USt 1 A box numbers not cited, Ist-Versteuerung and Dauerfristverlängerung
-  # not handled, deposits left out.
-  prepare: experimental
-  # Expenses: experimental — lower the profit of the income tax estimate and give the input VAT of the VAT return;
-  # no check of what is deductible (§ 4 Abs. 4 EStG, § 15 UStG), categories not mapped to EÜR lines.
+  # Kleinunternehmer (§ 19 UStG): 25,000 € previous year, 100,000 € current year, 25,000 € in the start year.
+  thresholds: verified
+  # Income tax (§ 32a EStG 2026, Grundtarif) and Solidaritätszuschlag (SolZG, Freigrenze 20,350 €) of a single
+  # person on the profit; joint assessment (Splitting) and Sonderausgaben are not modelled, as the labels say.
+  estimates: verified
+  # USt-VA monthly/quarterly with or without Dauerfristverlängerung, Sondervorauszahlung, ESt and GewSt prepayments,
+  # annual returns (§ 149 AO); only nationwide holidays, no Landesfeiertag falls on a 2026 due date.
+  deadlines: verified
+  # Activities: Kleinunternehmer limits on the total, income tax once on the total; Gewerbesteuer is not estimated.
+  activities: verified
+  # Reserve: income tax and Soli; church tax, trade tax, health insurance and VAT due are named in the warning as
+  # not included (the person adds them as a personal extra).
+  reserve: verified
+  # Prepared declaration: Kennzahlen of USt 1 A 2026 (BMF 29.12.2025), Soll- or Ist-Versteuerung (option); what is
+  # not computed (Soll deposits, Ist credit notes, goods, Kz. 39, refunds) is listed in the warning.
+  prepare: verified
+  # Expenses: experimental — lower the profit and give the input VAT (Kz. 66); assets are deducted at once instead
+  # of depreciated (§ 6 Abs. 2, § 7 EStG), deductibility (§ 4 Abs. 4 EStG, § 15 UStG) is not checked and categories
+  # are not mapped to EÜR lines.
   expenses: experimental
   # Vault kinds: experimental — usual documents, no legal validity period is claimed.
   vault_types: experimental
-  # ZUGFeRD/Factur-X EN16931 only; XRechnung (BT-10 Leitweg-ID, CIUS rules) is not produced yet.
-  einvoicing: experimental
+  # ZUGFeRD/Factur-X EN16931 (accepted as E-Rechnung, BMF FAQ): German samples pass veraPDF, the CEN EN 16931 CII
+  # Schematron and Mustang (scripts/validate-einvoice.sh). XRechnung (needed for public bodies, Leitweg-ID) is not
+  # produced, as the pack note says.
+  einvoicing: verified
 # Packs using fields added in Almanach 0.1.0 (reserve, fr_income_tax, prepare, expenses, vault).
 minAppVersion: "0.1.0"
 vault:
@@ -58,9 +69,9 @@ vault:
       remindDays: [30, 7]
 expensesNote:
   {
-    fr: "Les dépenses saisies réduisent le bénéfice de l'estimation d'impôt et donnent la TVA déductible de la déclaration de TVA. Almanach ne vérifie pas qu'elles sont déductibles.",
-    en: "Recorded expenses lower the profit of the income tax estimate and give the input VAT of the VAT return. Almanach does not check that they are deductible.",
-    de: "Erfasste Ausgaben mindern den Gewinn der Einkommensteuerschätzung und ergeben die Vorsteuer der Umsatzsteuer-Voranmeldung. Almanach prüft nicht, ob sie abzugsfähig sind.",
+    fr: "Les dépenses saisies réduisent le bénéfice de l'estimation d'impôt et donnent la TVA déductible (Kz. 66). Petite entreprise (§ 19 UStG) : saisissez le montant TTC sans TVA, elle n'est pas déductible. Un bien de plus de 800 € HT s'amortit : Almanach le déduit en une fois. Almanach ne vérifie pas que les dépenses sont déductibles.",
+    en: "Recorded expenses lower the profit of the income tax estimate and give the input VAT (box 66). Small business (§ 19 UStG): enter the gross amount with no VAT, as it is not deductible. An asset above €800 net is depreciated: Almanach deducts it at once. Almanach does not check that expenses are deductible.",
+    de: "Erfasste Ausgaben mindern den Gewinn der Einkommensteuerschätzung und ergeben die Vorsteuer (Kz. 66). Kleinunternehmer (§ 19 UStG): Bruttobetrag ohne Vorsteuer erfassen, sie ist nicht abziehbar. Ein Wirtschaftsgut über 800 € netto wird abgeschrieben: Almanach zieht es sofort ab. Almanach prüft nicht, ob Ausgaben abzugsfähig sind.",
   }
 name: { fr: Allemagne, en: Germany, de: Deutschland }
 currency: EUR
@@ -85,6 +96,32 @@ options:
         fr: "Régime des petites entreprises (§ 19 UStG)",
         en: "Small business scheme (§ 19 UStG)",
         de: "Kleinunternehmerregelung (§ 19 UStG)",
+      }
+  - id: ist_versteuerung
+    label:
+      {
+        fr: "Imposition d'après les recettes encaissées (Ist-Versteuerung, § 20 UStG)",
+        en: "Cash accounting for VAT (Ist-Versteuerung, § 20 UStG)",
+        de: "Ist-Versteuerung (§ 20 UStG)",
+      }
+    hint:
+      {
+        fr: "Accordée sur demande par le Finanzamt (CA de l'année précédente jusqu'à 800 000 € ou profession libérale) : la TVA est due sur les paiements reçus.",
+        en: "Granted by the tax office on request (previous-year revenue up to €800,000 or liberal profession): VAT is due on payments received.",
+        de: "Auf Antrag vom Finanzamt gestattet (Vorjahresumsatz bis 800.000 € oder freier Beruf): Umsatzsteuer nach vereinnahmten Entgelten.",
+      }
+  - id: dauerfristverlaengerung
+    label:
+      {
+        fr: "Prolongation permanente du délai de TVA (Dauerfristverlängerung)",
+        en: "Permanent VAT deadline extension (Dauerfristverlängerung)",
+        de: "Dauerfristverlängerung (§ 46 UStDV)",
+      }
+    hint:
+      {
+        fr: "Déclarations de TVA un mois plus tard ; en mensuel, Sondervorauszahlung d'un onzième au 10 février.",
+        en: "VAT returns one month later; monthly filers pay a one-eleventh special prepayment by 10 February.",
+        de: "Voranmeldungen einen Monat später; bei monatlicher Abgabe Sondervorauszahlung von einem Elftel bis 10. Februar.",
       }
 identifiers:
   - id: steuernummer
@@ -116,8 +153,9 @@ invoice:
       fr: "Prestation non imposable en Allemagne"
       en: "Service not taxable in Germany"
       de: "Nicht im Inland steuerbare Leistung"
-  # ZUGFeRD from profile EN16931 is accepted as E-Rechnung (§ 14 UStG); Kleinunternehmer may keep issuing other
-  # invoices (§ 34a UStDV). Profiles accepted by the BMF still to be checked: experimental.
+  # ZUGFeRD from version 2.0.1, except profiles MINIMUM and BASIC-WL, is an E-Rechnung; Kleinunternehmer are exempt
+  # from issuing one (§ 34a UStDV); issuing is mandatory from 2027 above 800,000 € previous-year revenue, from 2028
+  # otherwise (BMF FAQ E-Rechnung, checked 2026-11-26).
   einvoice:
     formats:
       - { id: facturx, profile: EN16931, syntax: CII }
@@ -126,14 +164,14 @@ invoice:
       - scope: receive
         from: "2025-01-01"
         source: https://www.bundesfinanzministerium.de/Content/DE/FAQ/e-rechnung.html
-        verified_on: "2026-11-24"
+        verified_on: "2026-11-26"
       - scope: issue
         from: "2028-01-01"
         appliesTo: { statuses: [freiberufler, gewerbe] }
         source: https://www.bundesfinanzministerium.de/Content/DE/FAQ/e-rechnung.html
-        verified_on: "2026-11-24"
+        verified_on: "2026-11-26"
     taxId: steuernummer
     note:
-      fr: "Almanach produit une ZUGFeRD/Factur-X EN16931 sans la transmettre ; XRechnung n'est pas encore proposé."
-      en: "Almanach produces a ZUGFeRD/Factur-X EN16931 without transmitting it; XRechnung is not offered yet."
-      de: "Almanach erstellt eine ZUGFeRD/Factur-X EN16931, übermittelt sie aber nicht; XRechnung wird noch nicht angeboten."
+      fr: "Almanach produit une ZUGFeRD/Factur-X EN16931, reconnue comme E-Rechnung, sans la transmettre. XRechnung n'est pas proposé : il reste nécessaire pour facturer une administration (Leitweg-ID). Émission obligatoire en 2027 si le CA de l'année précédente dépasse 800 000 €, en 2028 sinon ; les petites entreprises (§ 19 UStG) en sont dispensées."
+      en: "Almanach produces a ZUGFeRD/Factur-X EN16931, accepted as an E-Rechnung, without transmitting it. XRechnung is not offered: you still need it to invoice a public body (Leitweg-ID). Issuing becomes mandatory in 2027 above €800,000 previous-year revenue, in 2028 otherwise; small businesses (§ 19 UStG) are exempt."
+      de: "Almanach erstellt eine ZUGFeRD/Factur-X EN16931, die als E-Rechnung gilt, übermittelt sie aber nicht. XRechnung wird nicht angeboten: für Rechnungen an Behörden (Leitweg-ID) weiterhin nötig. Ausstellungspflicht ab 2027 bei mehr als 800.000 € Vorjahresumsatz, sonst ab 2028; Kleinunternehmer (§ 19 UStG) sind ausgenommen."

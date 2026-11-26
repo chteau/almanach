@@ -10,11 +10,11 @@ if (!fr) throw new Error('French pack missing');
 const samples = Object.fromEntries(frenchSamples(fr).map((sample) => [sample.name, sample]));
 
 describe('Factur-X', () => {
-  test('packs: France verified, Germany experimental, UK and US without e-invoicing', () => {
+  test('packs: France and Germany verified, UK and US without e-invoicing', () => {
     expect(packFeatures(fr).einvoicing).toBe('verified');
     expect(facturxRules(fr)?.exemptionCodes.franchise).toBe('VATEX-FR-FRANCHISE');
     const de = registry.get('DE');
-    expect(de && packFeatures(de).einvoicing).toBe('experimental');
+    expect(de && packFeatures(de).einvoicing).toBe('verified');
     expect(facturxRules(registry.get('GB'))).toBeNull();
     expect(facturxRules(registry.get('US'))).toBeNull();
   });

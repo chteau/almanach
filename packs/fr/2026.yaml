@@ -27,7 +27,8 @@ holidays:
 # les statuts dont le chiffre d'affaires compte pour chaque seuil, quand des instances liées suivent les
 # autres activités de la même micro-entreprise (activités secondaires ou instances liées). Toutes en services
 # (BNC + BIC services) : seul le plafond services s'applique, sur le cumul (83 600 €, franchise 37 500 €).
-# Vérifié le 2026-11-24 sur impots.gouv.fr (plafonds) et le BOFiP BOI-TVA-DECLA-40-10-10 (franchise).
+# Vérifié le 2026-11-26 sur impots.gouv.fr (plafonds 2026-2028, page modifiée le 14/10/2026) et le BOFiP
+# BOI-TVA-DECLA-40-10-10 (franchise, version en vigueur depuis le 01/07/2026).
 thresholds:
   - id: micro_ceiling_services
     label:
@@ -45,7 +46,7 @@ thresholds:
       en: "Above €83,600 of revenue (excluding VAT) two calendar years in a row, you leave the micro regime on 1 January of the following year. A single year above has no immediate effect."
       de: "Bei mehr als 83.600 € Nettoumsatz in zwei aufeinanderfolgenden Kalenderjahren endet das Mikro-Regime am 1. Januar des Folgejahres. Ein einzelnes Jahr darüber bleibt ohne sofortige Folge."
     source: https://www.impots.gouv.fr/professionnel/questions/pour-rester-micro-entrepreneur-quel-montant-de-chiffre-daffaires-ou-de
-    verified_on: "2026-11-18"
+    verified_on: "2026-11-26"
   - id: micro_ceiling_sales
     label:
       {
@@ -62,7 +63,7 @@ thresholds:
       en: "Above €203,100 of revenue (excluding VAT) two calendar years in a row, you leave the micro regime on 1 January of the following year."
       de: "Bei mehr als 203.100 € Nettoumsatz in zwei aufeinanderfolgenden Kalenderjahren endet das Mikro-Regime am 1. Januar des Folgejahres."
     source: https://www.impots.gouv.fr/professionnel/questions/pour-rester-micro-entrepreneur-quel-montant-de-chiffre-daffaires-ou-de
-    verified_on: "2026-11-18"
+    verified_on: "2026-11-26"
   - id: vat_franchise_services
     label:
       {
@@ -80,7 +81,7 @@ thresholds:
       en: "Between €37,500 and €41,250 you keep the franchise this year and become liable for VAT on 1 January. Above €41,250, VAT is due from the day the threshold is crossed: charge it from that sale onwards."
       de: "Zwischen 37.500 € und 41.250 € bleibt die Befreiung dieses Jahr bestehen; ab 1. Januar wird Umsatzsteuer fällig. Über 41.250 € ist sie ab dem Tag der Überschreitung geschuldet."
     source: https://bofip.impots.gouv.fr/bofip/849-PGP.html/identifiant=BOI-TVA-DECLA-40-10-10-20260701
-    verified_on: "2026-11-18"
+    verified_on: "2026-11-26"
   - id: vat_franchise_sales
     label:
       {
@@ -98,7 +99,7 @@ thresholds:
       en: "Between €85,000 and €93,500 you keep the franchise this year and become liable for VAT on 1 January. Above €93,500, VAT is due from the day the threshold is crossed."
       de: "Zwischen 85.000 € und 93.500 € bleibt die Befreiung dieses Jahr bestehen; ab 1. Januar wird Umsatzsteuer fällig. Über 93.500 € ist sie ab dem Tag der Überschreitung geschuldet."
     source: https://bofip.impots.gouv.fr/bofip/849-PGP.html/identifiant=BOI-TVA-DECLA-40-10-10-20260701
-    verified_on: "2026-11-18"
+    verified_on: "2026-11-26"
 
 # Activité mixte : une seule déclaration Urssaf, une ligne par activité, chacune à son propre taux
 # (autoentrepreneur.urssaf.fr, questions fréquentes). Le moteur calcule chaque estimation sur le chiffre
@@ -127,7 +128,7 @@ estimates:
           en: "ACRE: reduced rate until the end of the 3rd calendar quarter after the start (50 % of the normal rate for a start before 1 July 2026, 75 % afterwards)."
           de: "ACRE: ermäßigter Satz bis zum Ende des 3. Kalenderquartals nach Beginn (50 % des Normalsatzes bei Gründung vor dem 1. Juli 2026, danach 75 %)."
     source: https://entreprendre.service-public.gouv.fr/vosdroits/F36232
-    verified_on: "2026-11-18"
+    verified_on: "2026-11-26"
   - id: contributions_cipav
     label:
       {
@@ -155,7 +156,7 @@ estimates:
       <<: *acre
       rates: [{ from: "2026-01-01", rateBp: 2120 }]
     source: https://entreprendre.service-public.gouv.fr/vosdroits/F36232
-    verified_on: "2026-11-18"
+    verified_on: "2026-11-26"
   - id: contributions_sales
     label:
       {
@@ -169,7 +170,9 @@ estimates:
       <<: *acre
       rates: [{ from: "2026-01-01", rateBp: 1230 }]
     source: https://entreprendre.service-public.gouv.fr/vosdroits/F36232
-    verified_on: "2026-11-18"
+    verified_on: "2026-11-26"
+  # Taux du versement libératoire : fiche impots.gouv.fr « Les régimes réservés aux petites entreprises » 2026 (la page
+  # « questions » citée auparavant ne donne plus ces taux, vérifié le 2026-11-26).
   - id: income_tax_bnc
     label:
       {
@@ -180,8 +183,8 @@ estimates:
     appliesTo: { statuses: [micro_bnc], options: [versement_liberatoire] }
     base: revenue
     formula: { kind: flat, rates: [{ from: "2026-01-01", rateBp: 220 }] }
-    source: https://www.impots.gouv.fr/professionnel/questions/en-tant-que-micro-entrepreneur-sous-quelles-conditions-puis-je-opter-pour-l
-    verified_on: "2026-11-18"
+    source: https://www.impots.gouv.fr/sites/default/files/media/3_Documentation/depliants/pro_fiche_regimes_reserves_aux_petites_entreprises_2026.pdf
+    verified_on: "2026-11-26"
   - id: income_tax_bic_services
     label:
       {
@@ -192,8 +195,8 @@ estimates:
     appliesTo: { statuses: [micro_bic_services], options: [versement_liberatoire] }
     base: revenue
     formula: { kind: flat, rates: [{ from: "2026-01-01", rateBp: 170 }] }
-    source: https://www.impots.gouv.fr/professionnel/questions/en-tant-que-micro-entrepreneur-sous-quelles-conditions-puis-je-opter-pour-l
-    verified_on: "2026-11-18"
+    source: https://www.impots.gouv.fr/sites/default/files/media/3_Documentation/depliants/pro_fiche_regimes_reserves_aux_petites_entreprises_2026.pdf
+    verified_on: "2026-11-26"
   - id: income_tax_sales
     label:
       {
@@ -204,8 +207,8 @@ estimates:
     appliesTo: { statuses: [micro_bic_sales], options: [versement_liberatoire] }
     base: revenue
     formula: { kind: flat, rates: [{ from: "2026-01-01", rateBp: 100 }] }
-    source: https://www.impots.gouv.fr/professionnel/questions/en-tant-que-micro-entrepreneur-sous-quelles-conditions-puis-je-opter-pour-l
-    verified_on: "2026-11-18"
+    source: https://www.impots.gouv.fr/sites/default/files/media/3_Documentation/depliants/pro_fiche_regimes_reserves_aux_petites_entreprises_2026.pdf
+    verified_on: "2026-11-26"
   # Contribution à la formation professionnelle : non comprise dans les taux ci-dessus (F37353).
   # Son calendrier de paiement diffère selon les sources officielles ; elle n'est donc rattachée à aucune échéance.
   - id: cfp_liberal
@@ -219,7 +222,7 @@ estimates:
     base: revenue
     formula: { kind: flat, rates: [{ from: "2026-01-01", rateBp: 20 }] }
     source: https://entreprendre.service-public.gouv.fr/vosdroits/F23459
-    verified_on: "2026-11-18"
+    verified_on: "2026-11-26"
   - id: cfp_commercial
     label:
       {
@@ -231,7 +234,7 @@ estimates:
     base: revenue
     formula: { kind: flat, rates: [{ from: "2026-01-01", rateBp: 10 }] }
     source: https://entreprendre.service-public.gouv.fr/vosdroits/F23459
-    verified_on: "2026-11-18"
+    verified_on: "2026-11-26"
   - id: cfp_artisan
     label:
       {
@@ -243,12 +246,15 @@ estimates:
     base: revenue
     formula: { kind: flat, rates: [{ from: "2026-01-01", rateBp: 30 }] }
     source: https://entreprendre.service-public.gouv.fr/vosdroits/F23459
-    verified_on: "2026-11-18"
+    verified_on: "2026-11-26"
 
   # Impôt sur le revenu au barème, sans versement libératoire : barème progressif par part (quotient familial),
   # plafonnement des demi-parts supplémentaires et décote. Le barème applicable aux revenus de 2026 sera fixé par la
-  # loi de finances pour 2027, pas encore adoptée le 2026-11-24 : on applique le dernier barème publié (revenus 2025,
-  # loi de finances pour 2026, F1419 « Vérifié le 12 novembre 2026 » ; brochure pratique IR 2026, calcul de l'impôt).
+  # loi de finances pour 2027, pas encore adoptée le 2026-11-26 (rejetée par l'Assemblée le 4 novembre, en discussion
+  # au Sénat : https://www.senat.fr/travaux-parlementaires/textes-legislatifs/la-loi-en-clair/projet-de-loi-de-finances-pour-2027.html) :
+  # on applique le dernier barème publié (revenus 2025, loi de finances pour 2026 ; F1419 « Vérifié le 12 novembre
+  # 2026 » ; brochure pratique IR 2026, calcul de l'impôt : tranches, décote 1 982 / 897 € et 3 277 / 1 483 €, 45,25 %,
+  # plafond 1 807 € par demi-part, vérifiés le 2026-11-26).
   # Base : chiffre d'affaires de cette micro-entreprise moins l'abattement de chaque activité. Les autres revenus du
   # foyer ne sont pas connus d'Almanach : l'estimation ne les compte pas. Parts et imposition commune : réglage de la
   # personne (une part par défaut). Non modélisés : plafond spécifique du parent isolé (4 262 €), réductions et
@@ -276,7 +282,7 @@ estimates:
         couple: { limitCents: 327700, baseCents: 148300, rateBp: 4525 }
       halfPartCapCents: 180700
     source: https://www.impots.gouv.fr/www2/fichiers/documentation/brochure/ir_2026/pdf_som/21-calcul_impot_369a382.pdf
-    verified_on: "2026-11-24"
+    verified_on: "2026-11-26"
 
 # Abattements forfaitaires du régime micro-fiscal (art. 50-0 et 102 ter du CGI), appliqués quand le versement
 # libératoire n'est pas choisi. Activité mixte : l'abattement propre à chaque activité s'applique à la part de
@@ -293,7 +299,7 @@ allowances:
     rateBp: 3400
     minimumCents: 30500
     source: https://entreprendre.service-public.gouv.fr/vosdroits/F23267
-    verified_on: "2026-11-24"
+    verified_on: "2026-11-26"
   - id: allowance_bic_services
     label:
       {
@@ -305,7 +311,7 @@ allowances:
     rateBp: 5000
     minimumCents: 30500
     source: https://entreprendre.service-public.gouv.fr/vosdroits/F23267
-    verified_on: "2026-11-24"
+    verified_on: "2026-11-26"
   - id: allowance_sales
     label:
       {
@@ -317,7 +323,7 @@ allowances:
     rateBp: 7100
     minimumCents: 30500
     source: https://entreprendre.service-public.gouv.fr/vosdroits/F23267
-    verified_on: "2026-11-24"
+    verified_on: "2026-11-26"
 
 deadlines:
   - id: urssaf_monthly
@@ -344,7 +350,8 @@ deadlines:
         - { due: "2026-07-31", periodStart: "2026-06-01", periodEnd: "2026-06-30" }
         - { due: "2026-08-31", periodStart: "2026-07-01", periodEnd: "2026-07-31" }
         - { due: "2026-09-30", periodStart: "2026-08-01", periodEnd: "2026-08-31" }
-        # Urssaf : l'échéance du samedi 31 octobre 2026 n'est exceptionnellement pas reportée au 2 novembre.
+        # Urssaf : l'échéance du samedi 31 octobre 2026 n'est exceptionnellement pas reportée au 2 novembre (actualité
+        # autoentrepreneur.urssaf.fr du 27/10/2026 « date limite avancée au samedi 31 octobre », vérifiée le 2026-11-26).
         - { due: "2026-10-31", periodStart: "2026-09-01", periodEnd: "2026-09-30", fixed: true }
         - { due: "2026-11-30", periodStart: "2026-10-01", periodEnd: "2026-10-31" }
         - { due: "2026-12-31", periodStart: "2026-11-01", periodEnd: "2026-11-30" }
@@ -360,8 +367,15 @@ deadlines:
         income_tax_sales,
       ]
     declaresRevenue: true
-    # Déclaration préparée : CA encaissé de la période, une ligne par activité (le CA est déclaré par catégorie
-    # d'activité, chacune à son taux). Montant = cotisations (et versement libératoire) estimées de la période.
+    # Déclaration préparée : une seule déclaration, le CA encaissé (brut, hors TVA) ventilé « en autant de lignes que
+    # vous exercez d'activités » (FAQ autoentrepreneur.urssaf.fr). Libellés des cases cités par cette FAQ : « Chiffre
+    # d'affaires des autres prestations de service » (libéral non réglementé), « Recettes pour profession libérale
+    # relevant de la CIPAV », « Chiffre d'affaires des prestations de services commerciales ou artisanales » ; catégorie
+    # « BIC Ventes » (fiche « Déterminer mon chiffre d'affaires »). Sans encaissement : déclarer 0 (même FAQ).
+    # Montant = cotisations (et versement libératoire) estimées de la période. Non compris : la taxe pour frais de
+    # chambre consulaire (artisans et commerçants, payée avec les cotisations, F37483 ; taux de 0,044 % et 0,015 % non
+    # exprimables en points de base) et la CFP (versée à chaque échéance selon l'Urssaf, en novembre selon F23459) : la
+    # note le dit, le portail calcule le montant exact. Vérifié le 2026-11-26.
     prepare:
       basis: collected
       span: period
@@ -369,36 +383,51 @@ deadlines:
         - id: ca_bnc
           label:
             {
-              fr: "CA des prestations de services BNC",
-              en: "BNC services revenue",
-              de: "Umsatz BNC-Dienstleistungen",
+              fr: "Chiffre d'affaires des autres prestations de service (BNC)",
+              en: "Revenue from other services (BNC)",
+              de: "Umsatz aus sonstigen Dienstleistungen (BNC)",
             }
           measure: revenue
           statuses: [micro_bnc]
+          withoutOptions: [cipav]
+        - id: ca_bnc_cipav
+          label:
+            {
+              fr: "Recettes pour profession libérale relevant de la CIPAV",
+              en: "Receipts of a liberal profession under the Cipav",
+              de: "Einnahmen eines freien Berufs der Cipav",
+            }
+          measure: revenue
+          statuses: [micro_bnc]
+          options: [cipav]
         - id: ca_bic_services
           label:
             {
-              fr: "CA des prestations de services BIC",
-              en: "BIC services revenue",
-              de: "Umsatz BIC-Dienstleistungen",
+              fr: "Chiffre d'affaires des prestations de services commerciales ou artisanales (BIC)",
+              en: "Revenue from commercial or craft services (BIC)",
+              de: "Umsatz aus gewerblichen oder handwerklichen Dienstleistungen (BIC)",
             }
           measure: revenue
           statuses: [micro_bic_services]
         - id: ca_bic_sales
           label:
-            { fr: "CA des ventes de marchandises", en: "Sales of goods revenue", de: "Umsatz Warenverkauf" }
+            {
+              fr: "Chiffre d'affaires des ventes de marchandises (BIC Ventes)",
+              en: "Revenue from sales of goods (BIC sales)",
+              de: "Umsatz aus Warenverkauf (BIC-Verkäufe)",
+            }
           measure: revenue
           statuses: [micro_bic_sales]
       amount: { method: estimates }
       note:
-        fr: "Montants encaissés, arrondis à l'euro sur le portail. Déclarez 0 si rien n'a été encaissé : la déclaration reste obligatoire."
-        en: "Amounts collected, rounded to the euro on the portal. Declare 0 if nothing was collected: the declaration is still required."
-        de: "Vereinnahmte Beträge, im Portal auf Euro gerundet. Bei null Einnahmen 0 melden: die Meldung bleibt Pflicht."
-      source: https://entreprendre.service-public.gouv.fr/vosdroits/F23257
-      verified_on: "2026-11-24"
+        fr: "Chiffre d'affaires encaissé, brut et hors TVA, une ligne par activité. Déclarez 0 si rien n'a été encaissé : la déclaration reste obligatoire. Le montant estimé comprend les cotisations et le versement libératoire ; la taxe pour frais de chambre consulaire (artisans, commerçants) et la contribution à la formation professionnelle sont calculées par le portail Urssaf."
+        en: "Revenue collected, gross and excluding VAT, one line per activity. Declare 0 if nothing was collected: the declaration is still required. The estimated amount covers contributions and the flat-rate income tax; the chamber of commerce or trades tax (craft and commercial businesses) and the vocational training contribution are computed by the Urssaf portal."
+        de: "Vereinnahmter Umsatz, brutto und ohne Umsatzsteuer, eine Zeile je Tätigkeit. Bei null Einnahmen 0 melden: die Meldung bleibt Pflicht. Der geschätzte Betrag umfasst die Beiträge und die pauschale Einkommensteuer; die Kammerabgabe (Handwerk, Handel) und der Berufsbildungsbeitrag werden vom Urssaf-Portal berechnet."
+      source: https://www.autoentrepreneur.urssaf.fr/portail/accueil/une-question/questions-frequentes.html
+      verified_on: "2026-11-26"
     link: https://www.autoentrepreneur.urssaf.fr
     source: https://entreprendre.service-public.gouv.fr/vosdroits/F23257
-    verified_on: "2026-11-18"
+    verified_on: "2026-11-26"
   - id: urssaf_quarterly
     kind: social
     label:
@@ -430,8 +459,15 @@ deadlines:
         income_tax_sales,
       ]
     declaresRevenue: true
-    # Déclaration préparée : CA encaissé de la période, une ligne par activité (le CA est déclaré par catégorie
-    # d'activité, chacune à son taux). Montant = cotisations (et versement libératoire) estimées de la période.
+    # Déclaration préparée : une seule déclaration, le CA encaissé (brut, hors TVA) ventilé « en autant de lignes que
+    # vous exercez d'activités » (FAQ autoentrepreneur.urssaf.fr). Libellés des cases cités par cette FAQ : « Chiffre
+    # d'affaires des autres prestations de service » (libéral non réglementé), « Recettes pour profession libérale
+    # relevant de la CIPAV », « Chiffre d'affaires des prestations de services commerciales ou artisanales » ; catégorie
+    # « BIC Ventes » (fiche « Déterminer mon chiffre d'affaires »). Sans encaissement : déclarer 0 (même FAQ).
+    # Montant = cotisations (et versement libératoire) estimées de la période. Non compris : la taxe pour frais de
+    # chambre consulaire (artisans et commerçants, payée avec les cotisations, F37483 ; taux de 0,044 % et 0,015 % non
+    # exprimables en points de base) et la CFP (versée à chaque échéance selon l'Urssaf, en novembre selon F23459) : la
+    # note le dit, le portail calcule le montant exact. Vérifié le 2026-11-26.
     prepare:
       basis: collected
       span: period
@@ -439,36 +475,51 @@ deadlines:
         - id: ca_bnc
           label:
             {
-              fr: "CA des prestations de services BNC",
-              en: "BNC services revenue",
-              de: "Umsatz BNC-Dienstleistungen",
+              fr: "Chiffre d'affaires des autres prestations de service (BNC)",
+              en: "Revenue from other services (BNC)",
+              de: "Umsatz aus sonstigen Dienstleistungen (BNC)",
             }
           measure: revenue
           statuses: [micro_bnc]
+          withoutOptions: [cipav]
+        - id: ca_bnc_cipav
+          label:
+            {
+              fr: "Recettes pour profession libérale relevant de la CIPAV",
+              en: "Receipts of a liberal profession under the Cipav",
+              de: "Einnahmen eines freien Berufs der Cipav",
+            }
+          measure: revenue
+          statuses: [micro_bnc]
+          options: [cipav]
         - id: ca_bic_services
           label:
             {
-              fr: "CA des prestations de services BIC",
-              en: "BIC services revenue",
-              de: "Umsatz BIC-Dienstleistungen",
+              fr: "Chiffre d'affaires des prestations de services commerciales ou artisanales (BIC)",
+              en: "Revenue from commercial or craft services (BIC)",
+              de: "Umsatz aus gewerblichen oder handwerklichen Dienstleistungen (BIC)",
             }
           measure: revenue
           statuses: [micro_bic_services]
         - id: ca_bic_sales
           label:
-            { fr: "CA des ventes de marchandises", en: "Sales of goods revenue", de: "Umsatz Warenverkauf" }
+            {
+              fr: "Chiffre d'affaires des ventes de marchandises (BIC Ventes)",
+              en: "Revenue from sales of goods (BIC sales)",
+              de: "Umsatz aus Warenverkauf (BIC-Verkäufe)",
+            }
           measure: revenue
           statuses: [micro_bic_sales]
       amount: { method: estimates }
       note:
-        fr: "Montants encaissés, arrondis à l'euro sur le portail. Déclarez 0 si rien n'a été encaissé : la déclaration reste obligatoire."
-        en: "Amounts collected, rounded to the euro on the portal. Declare 0 if nothing was collected: the declaration is still required."
-        de: "Vereinnahmte Beträge, im Portal auf Euro gerundet. Bei null Einnahmen 0 melden: die Meldung bleibt Pflicht."
-      source: https://entreprendre.service-public.gouv.fr/vosdroits/F23257
-      verified_on: "2026-11-24"
+        fr: "Chiffre d'affaires encaissé, brut et hors TVA, une ligne par activité. Déclarez 0 si rien n'a été encaissé : la déclaration reste obligatoire. Le montant estimé comprend les cotisations et le versement libératoire ; la taxe pour frais de chambre consulaire (artisans, commerçants) et la contribution à la formation professionnelle sont calculées par le portail Urssaf."
+        en: "Revenue collected, gross and excluding VAT, one line per activity. Declare 0 if nothing was collected: the declaration is still required. The estimated amount covers contributions and the flat-rate income tax; the chamber of commerce or trades tax (craft and commercial businesses) and the vocational training contribution are computed by the Urssaf portal."
+        de: "Vereinnahmter Umsatz, brutto und ohne Umsatzsteuer, eine Zeile je Tätigkeit. Bei null Einnahmen 0 melden: die Meldung bleibt Pflicht. Der geschätzte Betrag umfasst die Beiträge und die pauschale Einkommensteuer; die Kammerabgabe (Handwerk, Handel) und der Berufsbildungsbeitrag werden vom Urssaf-Portal berechnet."
+      source: https://www.autoentrepreneur.urssaf.fr/portail/accueil/une-question/questions-frequentes.html
+      verified_on: "2026-11-26"
     link: https://www.autoentrepreneur.urssaf.fr
     source: https://entreprendre.service-public.gouv.fr/vosdroits/F23257
-    verified_on: "2026-11-18"
+    verified_on: "2026-11-26"
   - id: cfe
     kind: tax
     label:
@@ -484,7 +535,7 @@ deadlines:
     schedule: { type: dates, dates: [{ due: "2026-12-15" }] }
     link: https://www.impots.gouv.fr/professionnel
     source: https://entreprendre.service-public.gouv.fr/vosdroits/F23547
-    verified_on: "2026-11-18"
+    verified_on: "2026-11-26"
 
 # Réserve « à mettre de côté » : cotisations, versement libératoire ou impôt au barème, et CFP de l'année à date.
 # Les déclarations Urssaf faites soldent les cotisations et le versement libératoire de leur période. La marge de

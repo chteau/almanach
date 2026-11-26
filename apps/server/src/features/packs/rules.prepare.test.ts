@@ -111,6 +111,26 @@ describe('prepared declarations', () => {
     expect(result.lines.map((line) => line.cents)).toEqual([0]);
   });
 
+  test('France, Cipav liberal + BIC services: the Cipav box replaces the other liberal box', () => {
+    const { rules, prepare } = rulesOf('FR', 'urssaf_quarterly');
+    const result = prepareDeclaration({
+      ...base,
+      rules,
+      prepare,
+      profile: profile('micro_bnc', { options: ['cipav'], activities: ['micro_bic_services'] }),
+      receipts: [
+        { date: '2026-08-10', cents: 400_000 },
+        { date: '2026-09-15', cents: 150_000, category: 'micro_bic_services' },
+      ],
+      periodStart: '2026-07-01',
+      periodEnd: '2026-09-30',
+    });
+    expect(result.lines.map((line) => [line.id, line.cents])).toEqual([
+      ['ca_bnc_cipav', 400_000],
+      ['ca_bic_services', 150_000],
+    ]);
+  });
+
   test('Germany, quarter: bases at 19 % and 7 %, reverse charge, credit note deducted, VAT due', () => {
     const { rules, prepare } = rulesOf('DE', 'ust_voranmeldung_quarterly');
     const invoiced: InvoicedItem[] = [

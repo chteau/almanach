@@ -1,16 +1,18 @@
-# Deutschland — Steuerjahr 2026. Werte aus UStG, EStG, AO, GewStG (gesetze-im-internet.de) und BMF-Schreiben.
+# Deutschland — Steuerjahr 2026. Werte aus UStG, UStDV, EStG, SolZG, AO, GewStG (gesetze-im-internet.de) und
+# BMF-Schreiben (bundesfinanzministerium.de). Alle Werte am 2026-11-26 geprüft.
 # Gewerbesteuer wird nicht geschätzt: der Hebesatz hängt von der Gemeinde ab.
 # Mehrere Tätigkeiten (Freiberufler + Gewerbe): „Das Unternehmen umfasst die gesamte gewerbliche oder berufliche
 # Tätigkeit des Unternehmers" (§ 2 Abs. 1 UStG, https://www.gesetze-im-internet.de/ustg_1980/__2.html), die
 # Kleinunternehmergrenzen zählen also jede Tätigkeit. Gewerbesteuer betrifft nur den Gewerbebetrieb im Sinne des
 # EStG (§ 2 Abs. 1 GewStG, https://www.gesetze-im-internet.de/gewstg/__2.html), daher gilt die Vorauszahlungsfrist
-# nur mit einer Gewerbe-Tätigkeit. Geprüft am 2026-11-24.
+# nur mit einer Gewerbe-Tätigkeit.
 year: 2026
 # § 108 Abs. 3 AO: Fällt das Ende einer Frist auf einen Sonntag, Feiertag oder Sonnabend, endet sie mit dem nächsten Werktag.
 shift: next_business_day
 shiftSource: https://www.gesetze-im-internet.de/ao_1977/__108.html
 holidaysSource: https://www.balm.bund.de/DE/Themen/RechtsentwicklungRechtsvorschriften/Rechtsvorschriften/Strassenverkehrsrecht/LKW-Fahrverbote/Feiertagsfahrverbote2024/Feiertagsfahrverbote2026neu.html
-# Nur bundesweite Feiertage; Landesfeiertage (z. B. Fronleichnam) verschieben Fristen nur im jeweiligen Land.
+# Nur bundesweite Feiertage. Landesfeiertage 2026 (6.1., 8.3., 4.6. Fronleichnam, 15.8., 20.9., 31.10., 1.11.,
+# 18.11.) fallen auf keinen Fälligkeitstag dieses Jahres (rules.de.test.ts), verschieben also keine Frist.
 holidays:
   - { date: "2026-01-01", name: Neujahr }
   - { date: "2026-04-03", name: Karfreitag }
@@ -23,6 +25,10 @@ holidays:
   - { date: "2026-12-26", name: 2. Weihnachtstag }
   - { date: "2027-01-01", name: Neujahr }
 
+# § 19 Abs. 1 und 2 UStG: Gesamtumsatz nach vereinnahmten Entgelten, Vorjahr ≤ 25.000 €, laufendes Jahr ≤ 100.000 €.
+# Im Jahr der Aufnahme der Tätigkeit gilt allein die Grenze von 25.000 € auf den tatsächlichen Umsatz, ohne
+# Hochrechnung (Abschnitt 19.1 Abs. 3 UStAE, BMF-Schreiben vom 18.03.2025). Almanach zählt Zahlungseingänge netto
+# (ohne die in Rechnung gestellte Umsatzsteuer).
 thresholds:
   - id: kleinunternehmer_previous_year
     label:
@@ -35,11 +41,11 @@ thresholds:
     window: previous_fiscal_year
     limitCents: 2500000
     consequence:
-      fr: "Si le chiffre d'affaires 2025 dépassait 25 000 €, le régime du § 19 UStG ne s'applique pas en 2026 : facturez la TVA et déposez des déclarations."
-      en: "If 2025 revenue was above €25,000, the § 19 UStG scheme does not apply in 2026: charge VAT and file returns."
-      de: "Lag der Gesamtumsatz 2025 über 25.000 €, gilt § 19 UStG 2026 nicht: Umsatzsteuer ausweisen und Voranmeldungen abgeben."
+      fr: "Si le chiffre d'affaires 2025 (hors TVA) dépassait 25 000 €, le régime du § 19 UStG ne s'applique pas en 2026 : facturez la TVA et déposez des déclarations."
+      en: "If 2025 revenue (before VAT) was above €25,000, the § 19 UStG scheme does not apply in 2026: charge VAT and file returns."
+      de: "Lag der Gesamtumsatz 2025 (netto) über 25.000 €, gilt § 19 UStG 2026 nicht: Umsatzsteuer ausweisen und Voranmeldungen abgeben."
     source: https://www.gesetze-im-internet.de/ustg_1980/__19.html
-    verified_on: "2026-11-18"
+    verified_on: "2026-11-26"
   - id: kleinunternehmer_current_year
     label:
       {
@@ -50,13 +56,16 @@ thresholds:
     appliesTo: { options: [kleinunternehmer] }
     window: fiscal_year
     limitCents: 10000000
+    startYearLimitCents: 2500000
     consequence:
-      fr: "Dès l'opération qui fait dépasser 100 000 €, la TVA est due sur cette opération et toutes les suivantes. Les opérations antérieures restent exonérées."
-      en: "From the very sale that takes revenue over €100,000, VAT is due on it and on every later sale. Earlier sales stay exempt."
-      de: "Bereits der Umsatz, mit dem die Grenze von 100.000 € überschritten wird, ist steuerpflichtig, ebenso alle folgenden. Frühere Umsätze bleiben steuerfrei."
+      fr: "Dès l'opération qui fait dépasser la limite (100 000 €, ou 25 000 € l'année du début d'activité), la TVA est due sur cette opération et toutes les suivantes. Les opérations antérieures restent exonérées."
+      en: "From the very sale that takes revenue over the limit (€100,000, or €25,000 in the year the business starts), VAT is due on it and on every later sale. Earlier sales stay exempt."
+      de: "Bereits der Umsatz, mit dem die Grenze (100.000 €, im Jahr der Aufnahme der Tätigkeit 25.000 €) überschritten wird, ist steuerpflichtig, ebenso alle folgenden. Frühere Umsätze bleiben steuerfrei."
     source: https://www.bundesfinanzministerium.de/Content/DE/Downloads/BMF_Schreiben/Steuerarten/Umsatzsteuer/Umsatzsteuer-Anwendungserlass/2025-03-18-sonderregelung-kleinunternehmer.pdf
-    verified_on: "2026-11-18"
+    verified_on: "2026-11-26"
 
+# Einkommensteuer einer Einzelperson (Grundtarif) auf den Gewinn: Umsatz minus erfasste Ausgaben, ohne
+# Sonderausgaben (Vorsorgeaufwendungen) und ohne andere Einkünfte; Zusammenveranlagung (Splitting) nicht abgebildet.
 estimates:
   - id: income_tax
     label:
@@ -67,9 +76,11 @@ estimates:
       }
     base: profit
     # Freiberufler and Gewerbe activities of one person: Einkünfte aus Gewerbebetrieb and aus selbständiger Arbeit
-    # are added up (§ 2 Abs. 1 Nr. 2 und 3, Abs. 3 EStG, https://www.gesetze-im-internet.de/estg/__2.html, checked
-    # 2026-11-24) before the tariff applies, so it is computed once on the total.
+    # are added up (§ 2 Abs. 1 Nr. 2 und 3, Abs. 3 EStG, https://www.gesetze-im-internet.de/estg/__2.html) before the
+    # tariff applies, so it is computed once on the total.
     scope: person
+    # § 32a Abs. 1 EStG „ab dem Veranlagungszeitraum 2026": Grundfreibetrag 12 348 €, Zonen bis 17 799, 69 878 und
+    # 277 825 €; zvE und Steuer auf volle Euro abgerundet.
     formula:
       kind: de_income_tax
       zones: [12348, 17799, 69878, 277825]
@@ -78,8 +89,34 @@ estimates:
       zone4: [0.42, 11135.63]
       zone5: [0.45, 19470.38]
     source: https://www.gesetze-im-internet.de/estg/__32a.html
-    verified_on: "2026-11-18"
+    verified_on: "2026-11-26"
+  - id: solidarity_surcharge
+    label:
+      {
+        fr: "Contribution de solidarité (Solidaritätszuschlag)",
+        en: "Solidarity surcharge (Solidaritätszuschlag)",
+        de: "Solidaritätszuschlag",
+      }
+    base: profit
+    scope: person
+    # § 3 Abs. 3 SolZG: Freigrenze 20 350 € Einkommensteuer (Einzelveranlagung), anzuwenden ab VZ 2026 (§ 6 Abs. 27
+    # SolZG, https://www.gesetze-im-internet.de/solzg_1995/__6.html). § 4 SolZG: 5,5 %, höchstens 11,9 % des
+    # Unterschieds zur Freigrenze; Bruchteile eines Cents bleiben außer Ansatz
+    # (https://www.gesetze-im-internet.de/solzg_1995/__4.html).
+    formula: { kind: de_solidarity, of: income_tax, rateBp: 550, exemptionCents: 2035000, excessRateBp: 1190 }
+    source: https://www.gesetze-im-internet.de/solzg_1995/__3.html
+    verified_on: "2026-11-26"
 
+# Umsatzsteuer-Voranmeldung (§ 18 Abs. 1 und 2 UStG): bis zum 10. Tag nach Ablauf des Voranmeldungszeitraums,
+# Kalendervierteljahr oder -monat (Vorjahressteuer über 9.000 €); Befreiung bis 2.000 € Vorjahressteuer
+# (Zeitraum „yearly"). Dauerfristverlängerung (§ 46 UStDV): einen Monat später; bei monatlicher Abgabe
+# Sondervorauszahlung von einem Elftel der Vorjahres-Vorauszahlungen bis zum 10. Februar (§§ 47, 48 UStDV).
+# Kennzahlen des Vordrucks USt 1 A 2026 (BMF-Schreiben vom 29.12.2025, III C 3 - S 7344/00039/007/036):
+# Kz. 81 und 86 Bemessungsgrundlagen 19 % und 7 % (volle Euro), Kz. 21 nicht steuerbare sonstige Leistungen nach
+# § 18b Satz 1 Nr. 2 UStG (Zeitraum der Leistungsausführung, § 18b Satz 3), Kz. 45 übrige nicht steuerbare Umsätze,
+# Kz. 66 Vorsteuer, Zeile 37 Umsatzsteuer, Kz. 39 Sondervorauszahlung (Dezember), Kz. 83 verbleibender Betrag.
+# Soll-Versteuerung nach Rechnungsdatum; Ist-Versteuerung (§ 20 UStG, Option ist_versteuerung) nach Zahlungseingang:
+# die Steuer entsteht mit Ablauf des Zeitraums der Vereinnahmung (§ 13 Abs. 1 Nr. 1 Buchst. b UStG).
 deadlines:
   - id: ust_voranmeldung_monthly
     kind: tax
@@ -90,63 +127,63 @@ deadlines:
         de: Umsatzsteuer-Voranmeldung (monatlich),
       }
     description:
-      fr: "Déclarer et payer la TVA du mois via ELSTER. Le délai est prolongé d'un mois avec la Dauerfristverlängerung."
-      en: "File and pay the month's VAT through ELSTER. A permanent one-month extension (Dauerfristverlängerung) can be requested."
-      de: "Umsatzsteuer des Monats über ELSTER anmelden und zahlen. Mit Dauerfristverlängerung einen Monat später."
-    appliesTo: { periods: [monthly], withoutOptions: [kleinunternehmer] }
+      fr: "Déclarer et payer la TVA du mois via ELSTER le 10 du mois suivant. Avec la Dauerfristverlängerung, cochez l'option correspondante."
+      en: "File and pay the month's VAT through ELSTER by the 10th of the next month. With a permanent extension (Dauerfristverlängerung), choose that option."
+      de: "Umsatzsteuer des Monats bis zum 10. des Folgemonats über ELSTER anmelden und zahlen. Mit Dauerfristverlängerung die entsprechende Option wählen."
+    appliesTo: { periods: [monthly], withoutOptions: [kleinunternehmer, dauerfristverlaengerung] }
     schedule: { type: monthly, day: 10, monthOffset: 1 }
     declaresRevenue: true
-    # Voranmeldung vorbereitet: Soll-Versteuerung (Rechnungsdatum), keine Kennzahlen des Vordrucks (nicht geprüft).
-    # Zahllast = Umsatzsteuer minus erfasste Vorsteuer; ohne erfasste Ausgaben ist sie die ganze Umsatzsteuer.
-    prepare:
+    prepare: &ust_va_prepare
       basis: invoiced
+      collectedWithOption: ist_versteuerung
       span: period
       lines:
         - id: base_19
           label:
             {
-              fr: "Base HT au taux de 19 %",
-              en: "Net sales at 19 %",
-              de: "Steuerpflichtige Umsätze 19 % (netto)",
+              fr: "Kz. 81 — Base HT au taux de 19 % (euros entiers)",
+              en: "Box 81 — Net sales at 19 % (whole euros)",
+              de: "Kz. 81 — Steuerpflichtige Umsätze 19 %, Bemessungsgrundlage (volle Euro)",
             }
           measure: vat_base
           vatRateBp: 1900
         - id: base_7
           label:
             {
-              fr: "Base HT au taux de 7 %",
-              en: "Net sales at 7 %",
-              de: "Steuerpflichtige Umsätze 7 % (netto)",
+              fr: "Kz. 86 — Base HT au taux de 7 % (euros entiers)",
+              en: "Box 86 — Net sales at 7 % (whole euros)",
+              de: "Kz. 86 — Steuerpflichtige Umsätze 7 %, Bemessungsgrundlage (volle Euro)",
             }
           measure: vat_base
           vatRateBp: 700
         - id: vat_collected
-          label: { fr: "TVA collectée", en: "VAT charged", de: "Umsatzsteuer" }
+          label:
+            { fr: "Ligne 37 — TVA collectée", en: "Line 37 — VAT charged", de: "Zeile 37 — Umsatzsteuer" }
           measure: vat_collected
         - id: reverse_charge
           label:
             {
-              fr: "Prestations intra-UE en autoliquidation (base)",
-              en: "EU reverse-charge services (net)",
-              de: "Innergemeinschaftliche sonstige Leistungen, Reverse Charge (netto)",
+              fr: "Kz. 21 — Prestations de services à des entreprises de l'UE, autoliquidées (§ 18b UStG)",
+              en: "Box 21 — Services to EU businesses, reverse charge (§ 18b UStG)",
+              de: "Kz. 21 — Nicht steuerbare sonstige Leistungen gemäß § 18b Satz 1 Nr. 2 UStG",
             }
           measure: vat_mode_base
           vatMode: reverse_charge
         - id: export
           label:
             {
-              fr: "Exportations et opérations non imposables (base)",
-              en: "Exports and non-taxable supplies (net)",
-              de: "Ausfuhren und nicht steuerbare Umsätze (netto)",
+              fr: "Kz. 45 — Autres opérations non imposables (lieu hors d'Allemagne)",
+              en: "Box 45 — Other non-taxable supplies (place of supply outside Germany)",
+              de: "Kz. 45 — Übrige nicht steuerbare Umsätze (Leistungsort nicht im Inland)",
             }
           measure: vat_mode_base
           vatMode: export
         - id: input_vat
           label:
             {
-              fr: "TVA déductible (dépenses saisies)",
-              en: "Input VAT (recorded expenses)",
-              de: "Vorsteuer (erfasste Ausgaben)",
+              fr: "Kz. 66 — TVA déductible (dépenses saisies)",
+              en: "Box 66 — Input VAT (recorded expenses)",
+              de: "Kz. 66 — Vorsteuerbeträge (erfasste Ausgaben)",
             }
           measure: vat_deductible
       amount:
@@ -154,14 +191,61 @@ deadlines:
         add: [vat_collected]
         subtract: [input_vat]
         warning:
-          fr: "Calculé sur les factures émises (imposition d'après les recettes convenues) et les dépenses saisies dans Almanach. Les numéros de case du formulaire ne sont pas indiqués."
-          en: "Based on invoices issued (accrual taxation) and the expenses recorded in Almanach. Form box numbers are not given."
-          de: "Berechnet aus ausgestellten Rechnungen (Soll-Versteuerung) und den in Almanach erfassten Ausgaben. Kennzahlen des Vordrucks werden nicht angegeben."
-      source: https://www.gesetze-im-internet.de/ustg_1980/__18.html
-      verified_on: "2026-11-24"
+          fr: "Montant de la Kz. 83. Imposition d'après les recettes convenues : factures émises de la période ; avec l'option Ist-Versteuerung : paiements reçus, avec la part de TVA de chaque facture ou acompte. Les prestations autoliquidées (Kz. 21) comptent à la date de facture, à déclarer aussi dans l'état récapitulatif (ZM) au BZSt. Non pris en compte : acomptes reçus avant la facture finale en imposition d'après les recettes convenues (TVA due à l'encaissement), avoirs en Ist-Versteuerung (seulement quand vous remboursez), livraisons de biens (Kz. 41, 43), Sondervorauszahlung à déduire en Kz. 39 de la déclaration de décembre. Un crédit de TVA s'affiche 0 : reportez-le avec un signe moins."
+          en: "Amount of box 83. Accrual taxation: invoices issued in the period; with the Ist-Versteuerung option: payments received, with the VAT share of each invoice or deposit. Reverse-charge services (box 21) count on their invoice date and also go into the EC sales list (ZM) to the BZSt. Not included: deposits received before the final invoice under accrual taxation (VAT is due when received), credit notes under Ist-Versteuerung (count only when you refund), supplies of goods (boxes 41, 43), the Sondervorauszahlung to deduct in box 39 of the December return. A VAT refund shows as 0: enter it with a minus sign."
+          de: "Betrag der Kz. 83. Soll-Versteuerung: ausgestellte Rechnungen des Zeitraums; mit der Option Ist-Versteuerung: Zahlungseingänge mit dem Umsatzsteueranteil der jeweiligen Rechnung oder Anzahlung. Reverse-Charge-Leistungen (Kz. 21) zählen zum Rechnungsdatum und gehören auch in die Zusammenfassende Meldung an das BZSt. Nicht berücksichtigt: Anzahlungen vor der Schlussrechnung bei Soll-Versteuerung (Steuer entsteht mit Vereinnahmung), Gutschriften bei Ist-Versteuerung (erst mit der Rückzahlung), Warenlieferungen (Kz. 41, 43), die in Kz. 39 der Dezember-Voranmeldung abzuziehende Sondervorauszahlung. Ein Überschuss wird als 0 angezeigt: mit Minuszeichen eintragen."
+      source: https://www.bundesfinanzministerium.de/Content/DE/Downloads/BMF_Schreiben/Steuerarten/Umsatzsteuer/2025-12-29-vordruckmuster-USt-voranmeldung-2026.pdf
+      verified_on: "2026-11-26"
     link: https://www.elster.de
     source: https://www.gesetze-im-internet.de/ustg_1980/__18.html
-    verified_on: "2026-11-18"
+    verified_on: "2026-11-26"
+  - id: ust_voranmeldung_monthly_extended
+    kind: tax
+    label:
+      {
+        fr: "Déclaration de TVA mensuelle (USt-VA, délai prolongé)",
+        en: "Monthly VAT return (USt-VA, extended deadline)",
+        de: "Umsatzsteuer-Voranmeldung (monatlich, Dauerfristverlängerung)",
+      }
+    description:
+      fr: "Déclarer et payer la TVA du mois via ELSTER le 10 du deuxième mois suivant (Dauerfristverlängerung, § 46 UStDV). La Sondervorauszahlung se déduit dans la déclaration de décembre (Kz. 39)."
+      en: "File and pay the month's VAT through ELSTER by the 10th of the second month after it (Dauerfristverlängerung, § 46 UStDV). The Sondervorauszahlung is deducted in the December return (box 39)."
+      de: "Umsatzsteuer des Monats bis zum 10. des übernächsten Monats über ELSTER anmelden und zahlen (Dauerfristverlängerung, § 46 UStDV). Die Sondervorauszahlung wird in der Voranmeldung für Dezember abgezogen (Kz. 39)."
+    appliesTo: { periods: [monthly], options: [dauerfristverlaengerung], withoutOptions: [kleinunternehmer] }
+    schedule: { type: monthly, day: 10, monthOffset: 2 }
+    declaresRevenue: true
+    prepare: *ust_va_prepare
+    link: https://www.elster.de
+    source: https://www.gesetze-im-internet.de/ustdv_1980/__46.html
+    verified_on: "2026-11-26"
+  - id: ust_sondervorauszahlung
+    kind: tax
+    label:
+      {
+        fr: "Sondervorauszahlung de TVA (délai prolongé)",
+        en: VAT special prepayment (Sondervorauszahlung),
+        de: Umsatzsteuer-Sondervorauszahlung,
+      }
+    description:
+      fr: "Déclarer (formulaire USt 1 H) et payer un onzième des acomptes de TVA de 2025, Sondervorauszahlung 2025 ajoutée, pour garder la Dauerfristverlängerung."
+      en: "File (form USt 1 H) and pay one eleventh of the 2025 VAT prepayments, the 2025 Sondervorauszahlung added back, to keep the Dauerfristverlängerung."
+      de: "Ein Elftel der Umsatzsteuer-Vorauszahlungen 2025, zuzüglich der Sondervorauszahlung 2025, anmelden (Vordruck USt 1 H) und entrichten, um die Dauerfristverlängerung zu behalten."
+    appliesTo: { periods: [monthly], options: [dauerfristverlaengerung], withoutOptions: [kleinunternehmer] }
+    schedule: { type: dates, dates: [{ due: "2026-02-10" }] }
+    prepare:
+      basis: collected
+      span: period
+      amount:
+        method: user_entered
+        warning:
+          fr: "Un onzième de la somme des Kz. 83 de 2025 et de la Sondervorauszahlung 2025 ; saisissez le montant calculé."
+          en: "One eleventh of the sum of the 2025 box 83 amounts and the 2025 Sondervorauszahlung; enter the amount you computed."
+          de: "Ein Elftel der Summe der Kz. 83 des Jahres 2025 und der Sondervorauszahlung 2025; berechneten Betrag eintragen."
+      source: https://www.gesetze-im-internet.de/ustdv_1980/__47.html
+      verified_on: "2026-11-26"
+    link: https://www.elster.de
+    source: https://www.gesetze-im-internet.de/ustdv_1980/__48.html
+    verified_on: "2026-11-26"
   - id: ust_voranmeldung_quarterly
     kind: tax
     label:
@@ -171,10 +255,10 @@ deadlines:
         de: Umsatzsteuer-Voranmeldung (vierteljährlich),
       }
     description:
-      fr: "Déclarer et payer la TVA du trimestre via ELSTER."
-      en: "File and pay the quarter's VAT through ELSTER."
-      de: "Umsatzsteuer des Quartals über ELSTER anmelden und zahlen."
-    appliesTo: { periods: [quarterly], withoutOptions: [kleinunternehmer] }
+      fr: "Déclarer et payer la TVA du trimestre via ELSTER le 10 du mois suivant."
+      en: "File and pay the quarter's VAT through ELSTER by the 10th of the next month."
+      de: "Umsatzsteuer des Quartals bis zum 10. des Folgemonats über ELSTER anmelden und zahlen."
+    appliesTo: { periods: [quarterly], withoutOptions: [kleinunternehmer, dauerfristverlaengerung] }
     schedule:
       type: dates
       dates:
@@ -183,80 +267,44 @@ deadlines:
         - { due: "2026-10-10", periodStart: "2026-07-01", periodEnd: "2026-09-30" }
         - { due: "2027-01-10", periodStart: "2026-10-01", periodEnd: "2026-12-31" }
     declaresRevenue: true
-    # Voranmeldung vorbereitet: Soll-Versteuerung (Rechnungsdatum), keine Kennzahlen des Vordrucks (nicht geprüft).
-    # Zahllast = Umsatzsteuer minus erfasste Vorsteuer; ohne erfasste Ausgaben ist sie die ganze Umsatzsteuer.
-    prepare:
-      basis: invoiced
-      span: period
-      lines:
-        - id: base_19
-          label:
-            {
-              fr: "Base HT au taux de 19 %",
-              en: "Net sales at 19 %",
-              de: "Steuerpflichtige Umsätze 19 % (netto)",
-            }
-          measure: vat_base
-          vatRateBp: 1900
-        - id: base_7
-          label:
-            {
-              fr: "Base HT au taux de 7 %",
-              en: "Net sales at 7 %",
-              de: "Steuerpflichtige Umsätze 7 % (netto)",
-            }
-          measure: vat_base
-          vatRateBp: 700
-        - id: vat_collected
-          label: { fr: "TVA collectée", en: "VAT charged", de: "Umsatzsteuer" }
-          measure: vat_collected
-        - id: reverse_charge
-          label:
-            {
-              fr: "Prestations intra-UE en autoliquidation (base)",
-              en: "EU reverse-charge services (net)",
-              de: "Innergemeinschaftliche sonstige Leistungen, Reverse Charge (netto)",
-            }
-          measure: vat_mode_base
-          vatMode: reverse_charge
-        - id: export
-          label:
-            {
-              fr: "Exportations et opérations non imposables (base)",
-              en: "Exports and non-taxable supplies (net)",
-              de: "Ausfuhren und nicht steuerbare Umsätze (netto)",
-            }
-          measure: vat_mode_base
-          vatMode: export
-        - id: input_vat
-          label:
-            {
-              fr: "TVA déductible (dépenses saisies)",
-              en: "Input VAT (recorded expenses)",
-              de: "Vorsteuer (erfasste Ausgaben)",
-            }
-          measure: vat_deductible
-      amount:
-        method: lines
-        add: [vat_collected]
-        subtract: [input_vat]
-        warning:
-          fr: "Calculé sur les factures émises (imposition d'après les recettes convenues) et les dépenses saisies dans Almanach. Les numéros de case du formulaire ne sont pas indiqués."
-          en: "Based on invoices issued (accrual taxation) and the expenses recorded in Almanach. Form box numbers are not given."
-          de: "Berechnet aus ausgestellten Rechnungen (Soll-Versteuerung) und den in Almanach erfassten Ausgaben. Kennzahlen des Vordrucks werden nicht angegeben."
-      source: https://www.gesetze-im-internet.de/ustg_1980/__18.html
-      verified_on: "2026-11-24"
+    prepare: *ust_va_prepare
     link: https://www.elster.de
     source: https://www.gesetze-im-internet.de/ustg_1980/__18.html
-    verified_on: "2026-11-18"
+    verified_on: "2026-11-26"
+  - id: ust_voranmeldung_quarterly_extended
+    kind: tax
+    label:
+      {
+        fr: "Déclaration de TVA trimestrielle (USt-VA, délai prolongé)",
+        en: "Quarterly VAT return (USt-VA, extended deadline)",
+        de: "Umsatzsteuer-Voranmeldung (vierteljährlich, Dauerfristverlängerung)",
+      }
+    description:
+      fr: "Déclarer et payer la TVA du trimestre via ELSTER le 10 du deuxième mois suivant (Dauerfristverlängerung, sans Sondervorauszahlung)."
+      en: "File and pay the quarter's VAT through ELSTER by the 10th of the second month after it (Dauerfristverlängerung, no Sondervorauszahlung)."
+      de: "Umsatzsteuer des Quartals bis zum 10. des übernächsten Monats über ELSTER anmelden und zahlen (Dauerfristverlängerung, ohne Sondervorauszahlung)."
+    appliesTo:
+      { periods: [quarterly], options: [dauerfristverlaengerung], withoutOptions: [kleinunternehmer] }
+    schedule:
+      type: dates
+      dates:
+        - { due: "2026-05-10", periodStart: "2026-01-01", periodEnd: "2026-03-31" }
+        - { due: "2026-08-10", periodStart: "2026-04-01", periodEnd: "2026-06-30" }
+        - { due: "2026-11-10", periodStart: "2026-07-01", periodEnd: "2026-09-30" }
+        - { due: "2027-02-10", periodStart: "2026-10-01", periodEnd: "2026-12-31" }
+    declaresRevenue: true
+    prepare: *ust_va_prepare
+    link: https://www.elster.de
+    source: https://www.gesetze-im-internet.de/ustdv_1980/__46.html
+    verified_on: "2026-11-26"
   - id: est_vorauszahlung
     kind: tax
     label:
       { fr: "Acompte d'impôt sur le revenu", en: Income tax prepayment, de: Einkommensteuer-Vorauszahlung }
     description:
-      fr: "Acompte trimestriel fixé par le Finanzamt dans l'avis de prépaiement."
-      en: "Quarterly prepayment set by the tax office in its prepayment notice."
-      de: "Vierteljährliche Vorauszahlung laut Vorauszahlungsbescheid des Finanzamts."
+      fr: "Acompte trimestriel fixé par le Finanzamt dans l'avis de prépaiement (impôt sur le revenu et Solidaritätszuschlag)."
+      en: "Quarterly prepayment set by the tax office in its prepayment notice (income tax and solidarity surcharge)."
+      de: "Vierteljährliche Vorauszahlung laut Vorauszahlungsbescheid des Finanzamts (Einkommensteuer und Solidaritätszuschlag)."
     schedule:
       type: dates
       dates: [{ due: "2026-03-10" }, { due: "2026-06-10" }, { due: "2026-09-10" }, { due: "2026-12-10" }]
@@ -266,14 +314,14 @@ deadlines:
       amount:
         method: user_entered
         warning:
-          fr: "Montant fixé par avis ; saisissez-le depuis votre avis pour le voir ici et dans la réserve."
-          en: "Amount set by notice; enter it from your notice to see it here."
-          de: "Betrag laut Bescheid; aus dem Bescheid eintragen, um ihn hier zu sehen."
+          fr: "Montant fixé par avis ; saisissez l'impôt sur le revenu et le Solidaritätszuschlag de votre avis (sans impôt d'Église) pour les voir ici et dans la réserve."
+          en: "Amount set by notice; enter the income tax and solidarity surcharge of your notice (without church tax) to see them here and in the reserve."
+          de: "Betrag laut Bescheid; Einkommensteuer und Solidaritätszuschlag (ohne Kirchensteuer) aus dem Bescheid eintragen, um sie hier und in der Rücklage zu sehen."
       source: https://www.gesetze-im-internet.de/estg/__37.html
-      verified_on: "2026-11-24"
+      verified_on: "2026-11-26"
     link: https://www.elster.de
     source: https://www.gesetze-im-internet.de/estg/__37.html
-    verified_on: "2026-11-18"
+    verified_on: "2026-11-26"
   - id: gewst_vorauszahlung
     kind: tax
     label:
@@ -296,14 +344,16 @@ deadlines:
       amount:
         method: user_entered
         warning:
-          fr: "Montant fixé par avis ; saisissez-le depuis votre avis pour le voir ici et dans la réserve."
+          fr: "Montant fixé par avis ; saisissez-le depuis votre avis pour le voir ici."
           en: "Amount set by notice; enter it from your notice to see it here."
           de: "Betrag laut Bescheid; aus dem Bescheid eintragen, um ihn hier zu sehen."
       source: https://www.gesetze-im-internet.de/gewstg/__19.html
-      verified_on: "2026-11-24"
+      verified_on: "2026-11-26"
     link: https://www.gesetze-im-internet.de/gewstg/__19.html
     source: https://www.gesetze-im-internet.de/gewstg/__19.html
-    verified_on: "2026-11-18"
+    verified_on: "2026-11-26"
+  # § 149 Abs. 2 AO: sieben Monate nach Ablauf des Kalenderjahres (31.07.2027, ein Sonnabend: Montag 02.08.2027).
+  # Die verlängerten Fristen des Art. 97 § 36 EGAO enden mit dem Besteuerungszeitraum 2024.
   - id: annual_returns
     kind: tax
     label:
@@ -313,30 +363,56 @@ deadlines:
         de: "Jahressteuererklärungen 2026 (ESt, USt)",
       }
     description:
-      fr: "Dépôt sans conseiller fiscal des déclarations d'impôt sur le revenu (avec EÜR) et de TVA pour 2026 : sept mois après la fin de l'année."
-      en: "Filing of the 2026 income tax return (with EÜR profit statement) and VAT return without a tax advisor: seven months after year end."
-      de: "Abgabe der Einkommensteuer- (mit EÜR) und Umsatzsteuererklärung 2026 ohne Steuerberater: sieben Monate nach Jahresende."
+      fr: "Dépôt sans conseiller fiscal des déclarations d'impôt sur le revenu (avec EÜR) et de TVA pour 2026 : sept mois après la fin de l'année. Activité commerciale : le cas échéant aussi la déclaration de Gewerbesteuer (§ 14a GewStG)."
+      en: "Filing of the 2026 income tax return (with EÜR profit statement) and VAT return without a tax advisor: seven months after year end. Trade: where required, also the trade tax return (§ 14a GewStG)."
+      de: "Abgabe der Einkommensteuer- (mit EÜR) und Umsatzsteuererklärung 2026 ohne Steuerberater: sieben Monate nach Jahresende. Gewerbebetrieb: gegebenenfalls auch die Gewerbesteuererklärung (§ 14a GewStG)."
+    appliesTo: { withoutOptions: [kleinunternehmer] }
     schedule:
       { type: dates, dates: [{ due: "2027-07-31", periodStart: "2026-01-01", periodEnd: "2026-12-31" }] }
-    estimates: [income_tax]
+    estimates: [income_tax, solidarity_surcharge]
     declaresRevenue: true
     link: https://www.elster.de
     source: https://www.gesetze-im-internet.de/ao_1977/__149.html
-    verified_on: "2026-11-18"
+    verified_on: "2026-11-26"
+  # Kleinunternehmer: keine Umsatzsteuererklärung, § 18 Abs. 1 bis 4 UStG findet keine Anwendung (Abschnitt 19.1
+  # Abs. 7 UStAE, BMF-Schreiben vom 18.03.2025), sofern das Finanzamt sie nicht anfordert.
+  - id: annual_returns_kleinunternehmer
+    kind: tax
+    label:
+      {
+        fr: "Déclaration annuelle 2026 (impôt sur le revenu)",
+        en: "2026 annual return (income tax)",
+        de: "Einkommensteuererklärung 2026",
+      }
+    description:
+      fr: "Dépôt sans conseiller fiscal de la déclaration d'impôt sur le revenu 2026 (avec EÜR) : sept mois après la fin de l'année. Petite entreprise : pas de déclaration annuelle de TVA, sauf demande du Finanzamt. Activité commerciale : le cas échéant aussi la déclaration de Gewerbesteuer (§ 14a GewStG)."
+      en: "Filing of the 2026 income tax return (with EÜR profit statement) without a tax advisor: seven months after year end. Small business: no annual VAT return unless the tax office asks for one. Trade: where required, also the trade tax return (§ 14a GewStG)."
+      de: "Abgabe der Einkommensteuererklärung 2026 (mit EÜR) ohne Steuerberater: sieben Monate nach Jahresende. Kleinunternehmer: keine Umsatzsteuererklärung, außer das Finanzamt fordert sie an. Gewerbebetrieb: gegebenenfalls auch die Gewerbesteuererklärung (§ 14a GewStG)."
+    appliesTo: { options: [kleinunternehmer] }
+    schedule:
+      { type: dates, dates: [{ due: "2027-07-31", periodStart: "2026-01-01", periodEnd: "2026-12-31" }] }
+    estimates: [income_tax, solidarity_surcharge]
+    declaresRevenue: true
+    link: https://www.elster.de
+    source: https://www.gesetze-im-internet.de/ao_1977/__149.html
+    verified_on: "2026-11-26"
 
-# Rücklage: geschätzte Einkommensteuer des laufenden Jahres (Tarif § 32a EStG auf den Umsatz, da noch keine
-# Ausgaben erfasst werden: vorsichtige Überschätzung). Die Vorauszahlungen des Jahres (§ 37 EStG) mindern sie.
-# Nicht berücksichtigt: Solidaritätszuschlag, Kirchensteuer, Gewerbesteuer, Kranken- und Pflegeversicherung,
+# Rücklage: geschätzte Einkommensteuer und Solidaritätszuschlag des laufenden Jahres auf den Gewinn (Umsatz minus
+# erfasste Ausgaben), für eine Einzelperson ohne Sonderausgaben: eher zu hoch als zu niedrig. Die Vorauszahlungen
+# des Jahres (§ 37 EStG, mit Solidaritätszuschlag) mindern sie. Nicht berücksichtigt und in der Warnung genannt:
+# Kirchensteuer (Land und Konfession), Gewerbesteuer (Hebesatz der Gemeinde, teilweise auf die Einkommensteuer
+# angerechnet, § 35 EStG, https://www.gesetze-im-internet.de/estg/__35.html), Kranken- und Pflegeversicherung,
 # geschuldete Umsatzsteuer. Die Marge von 10 % ist eine Produktentscheidung, kein gesetzlicher Wert.
 reserve:
-  include: [income_tax]
+  include: [income_tax, solidarity_surcharge]
   settles:
     - { deadline: est_vorauszahlung, fiscalYear: current }
     - { deadline: annual_returns, fiscalYear: previous }
+    - { deadline: annual_returns_kleinunternehmer, fiscalYear: previous }
   marginBp: 1000
   warning:
-    fr: "Estimation indicative de l'impôt sur le revenu, calculée sur le chiffre d'affaires sans dépenses, pour une personne seule. Solidaritätszuschlag, impôt d'Église, Gewerbesteuer, assurance maladie et TVA due ne sont pas comptés : ajoutez-les en supplément personnel. Ne remplace pas un avis du Finanzamt."
-    en: "Indicative income tax estimate based on revenue without expenses, for a single person. Solidarity surcharge, church tax, trade tax, health insurance and VAT due are not included: add them as a personal extra. Not a notice from the tax office."
-    de: "Unverbindliche Schätzung der Einkommensteuer auf Basis des Umsatzes ohne Ausgaben, für eine Einzelperson. Solidaritätszuschlag, Kirchensteuer, Gewerbesteuer, Krankenversicherung und geschuldete Umsatzsteuer sind nicht enthalten: als persönlichen Zuschlag ergänzen. Kein Bescheid des Finanzamts."
+    fr: "Estimation indicative de l'impôt sur le revenu et du Solidaritätszuschlag d'une personne seule, calculée sur le chiffre d'affaires moins les dépenses saisies, sans dépenses spéciales (assurances) ni autres revenus. Non compris : impôt d'Église (selon le Land et la confession), Gewerbesteuer (selon le taux de la commune, en partie imputée sur l'impôt sur le revenu), assurance maladie et dépendance, TVA due : ajoutez-les en supplément personnel. Ne remplace pas un avis du Finanzamt."
+    en: "Indicative income tax and solidarity surcharge estimate for a single person, based on revenue less recorded expenses, without special expenses (insurance) or other income. Not included: church tax (depends on the state and denomination), trade tax (depends on the municipality's rate, partly credited against income tax), health and care insurance, VAT due: add them as a personal extra. Not a notice from the tax office."
+    de: "Unverbindliche Schätzung von Einkommensteuer und Solidaritätszuschlag für eine Einzelperson, auf Basis des Umsatzes abzüglich erfasster Ausgaben, ohne Sonderausgaben (Versicherungen) und andere Einkünfte. Nicht enthalten: Kirchensteuer (je nach Land und Konfession), Gewerbesteuer (je nach Hebesatz der Gemeinde, teilweise auf die Einkommensteuer angerechnet), Kranken- und Pflegeversicherung, geschuldete Umsatzsteuer: als persönlichen Zuschlag ergänzen. Kein Bescheid des Finanzamts."
   source: https://www.gesetze-im-internet.de/estg/__32a.html
-  verified_on: "2026-11-24"
+  verified_on: "2026-11-26"

@@ -57,6 +57,16 @@ describe('every rule file', () => {
     }
   });
 
+  test('a pack with verified vault kinds cites an https source and a verification date for each kind', () => {
+    for (const pack of packs.list()) {
+      if (pack.features?.vault_types !== 'verified') continue;
+      for (const kind of pack.vault?.kinds ?? []) {
+        expect(kind.source?.startsWith('https://')).toBe(true);
+        expect(kind.verified_on).toBeDefined();
+      }
+    }
+  });
+
   test('references only statuses and options its pack declares', () => {
     for (const pack of packs.list()) {
       const statuses = new Set(pack.statuses.map((status) => status.id));
@@ -68,7 +78,9 @@ describe('every rule file', () => {
           ...rules.estimates,
           ...rules.deadlines,
           ...rules.holidays.filter((holiday) => holiday.appliesTo),
-        ].map((item) => item.appliesTo ?? {});
+        ]
+          .map((item) => item.appliesTo ?? {})
+          .concat(rules.deadlines.flatMap((deadline) => deadline.prepare?.lines ?? []));
         for (const condition of conditions) {
           for (const status of condition.statuses ?? []) expect(statuses.has(status)).toBe(true);
           for (const option of [...(condition.options ?? []), ...(condition.withoutOptions ?? [])]) {

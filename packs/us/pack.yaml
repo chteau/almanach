@@ -1,22 +1,32 @@
 country: US
-maturity: experimental
-# Maturity per function (verified = sourced and covered by tests); a function not listed is unavailable.
-# No revenue threshold is published for the United States. Activities: one Schedule C per business, SE tax and
-# income tax once on the total.
+maturity: verified
+# Maturity per function (verified = sourced and covered by tests in apps/server/src/features/packs/rules.us.test.ts);
+# a function not listed is unavailable. Federal taxes only: state and local taxes are out of scope, said on each
+# status, the reserve and the deadlines. Checked against irs.gov and uscode.house.gov on 2026-11-26.
+# `thresholds` is not offered: there is no federal VAT or sales tax registration limit, and the Form 1099-NEC /
+# 1099-K reporting amounts are filing duties of the payer or payment platform, not limits on the freelancer (all
+# income is taxable whether or not a form is received), so they would not mean anything to track.
+# `einvoicing` is not offered: there is no federal e-invoicing mandate.
 features:
-  estimates: experimental
-  deadlines: experimental
-  activities: experimental
-  # Reserve: experimental — state taxes not modelled; revenue without expenses.
-  reserve: experimental
-  # Prepared declaration: experimental — safe harbor and annualized method sourced from Pub. 505 (2026), but
-  # married filing separately limit, state taxes and expenses are not handled.
-  prepare: experimental
-  # Expenses: experimental — lower the Schedule C profit of the SE tax and income tax estimates; allowability and
-  # Schedule C lines not checked.
-  expenses: experimental
-  # Vault kinds: experimental — usual documents, no legal validity period is claimed.
-  vault_types: experimental
+  # Estimates: SE tax, Additional Medicare Tax, income tax with standard deduction and QBI deduction (2026), single
+  # or married filing jointly; head of household and married filing separately are not modelled (said on statuses).
+  estimates: verified
+  # Deadlines: 1040-ES dates of Form 1040-ES (2026) and Pub. 505, return due date of 26 USC 6072, holiday shift.
+  deadlines: verified
+  # Activities: one Schedule C per business, SE tax and income tax once on the total (Schedule SE instructions).
+  activities: verified
+  # Reserve: federal estimates to date minus the 2026 estimated payments, state taxes excluded and said so.
+  reserve: verified
+  # Prepared declaration: safe harbor and annualized method (Pub. 505 Worksheet 2-9) for 1040-ES; Schedule C lines
+  # for Form 1040 (one combined set with several businesses, said in the note).
+  prepare: verified
+  # Expenses: lower the Schedule C profit, meals at 50 % (26 USC 274(n)); each category mapped to a Schedule C line.
+  # Whether an expense is deductible at all is not checked, said in the expenses note.
+  expenses: verified
+  # Vault kinds: CP 575 (irs.gov: "Keep this notice in your permanent records"), W-9 given to clients who file
+  # information returns (irs.gov), business licenses that may expire (sba.gov); the insurance certificate claims no
+  # rule. Reminder delays are product choices, no legal validity period is claimed.
+  vault_types: verified
 # Packs using fields added in Almanach 0.1.0 (reserve, fr_income_tax, prepare, expenses, vault).
 minAppVersion: "0.1.0"
 vault:
@@ -28,6 +38,8 @@ vault:
           en: "EIN confirmation letter (CP 575)",
           de: "EIN-Bestätigungsschreiben (CP 575)",
         }
+      source: https://www.irs.gov/individuals/understanding-your-cp575-notice
+      verified_on: "2026-11-26"
     - id: w9_copy
       label:
         {
@@ -35,6 +47,8 @@ vault:
           en: "Copy of the W-9 given to clients",
           de: "Kopie des an Kunden übergebenen W-9",
         }
+      source: https://www.irs.gov/forms-pubs/about-form-w-9
+      verified_on: "2026-11-26"
     - id: business_license
       label:
         {
@@ -44,15 +58,20 @@ vault:
         }
       expires: true
       remindDays: [60, 30]
+      source: https://www.sba.gov/business-guide/launch-your-business/apply-licenses-permits
+      verified_on: "2026-11-26"
     - id: insurance_certificate
       label: { fr: "Certificat d'assurance", en: "Certificate of insurance", de: "Versicherungsnachweis" }
       expires: true
       remindDays: [30, 7]
+      # SBA guide: general liability for any business, professional liability for businesses serving customers.
+      source: https://www.sba.gov/business-guide/launch-your-business/get-business-insurance
+      verified_on: "2026-11-26"
 expensesNote:
   {
-    fr: "Les dépenses saisies réduisent le bénéfice (Schedule C) des estimations de self-employment tax et d'impôt sur le revenu. Almanach ne vérifie pas qu'elles sont déductibles.",
-    en: "Recorded expenses lower the profit (Schedule C) of the self-employment tax and income tax estimates. Almanach does not check that they are deductible.",
-    de: "Erfasste Ausgaben mindern den Gewinn (Schedule C) der Schätzungen von Self-Employment Tax und Einkommensteuer. Almanach prüft nicht, ob sie abzugsfähig sind.",
+    fr: "Les dépenses saisies réduisent le bénéfice (Schedule C) des estimations de self-employment tax et d'impôt sur le revenu, les repas pour 50 % seulement. Chaque catégorie remplit une ligne de la Schedule C. Almanach ne vérifie pas qu'elles sont déductibles (part professionnelle, matériel à amortir).",
+    en: "Recorded expenses lower the profit (Schedule C) of the self-employment tax and income tax estimates, meals at 50% only. Each category fills a Schedule C line. Almanach does not check that they are deductible (business share, equipment to depreciate).",
+    de: "Erfasste Ausgaben mindern den Gewinn (Schedule C) der Schätzungen von Self-Employment Tax und Einkommensteuer, Bewirtung nur zu 50 %. Jede Kategorie füllt eine Zeile der Schedule C. Almanach prüft nicht, ob sie abzugsfähig sind (betrieblicher Anteil, abzuschreibende Ausrüstung).",
   }
 name: { fr: États-Unis, en: United States, de: Vereinigte Staaten }
 currency: USD
@@ -66,8 +85,20 @@ statuses:
         en: Sole proprietor,
         de: Einzelunternehmer (sole proprietor),
       }
+    hint:
+      {
+        fr: "Impôts fédéraux uniquement : impôts d'État et locaux non estimés. Déclaration célibataire ou commune ; chef de famille et époux séparés non gérés.",
+        en: "Federal taxes only: state and local taxes are not estimated. Single or married filing jointly; head of household and married filing separately are not handled.",
+        de: "Nur Bundessteuern: bundesstaatliche und lokale Steuern werden nicht geschätzt. Ledig oder gemeinsame Veranlagung; Haushaltsvorstand und getrennte Veranlagung werden nicht unterstützt.",
+      }
   - id: single_member_llc
     label: { fr: LLC à associé unique, en: Single-member LLC, de: Einpersonen-LLC }
+    hint:
+      {
+        fr: "Impôts fédéraux uniquement : impôts d'État et locaux non estimés. Déclaration célibataire ou commune ; chef de famille et époux séparés non gérés.",
+        en: "Federal taxes only: state and local taxes are not estimated. Single or married filing jointly; head of household and married filing separately are not handled.",
+        de: "Nur Bundessteuern: bundesstaatliche und lokale Steuern werden nicht geschätzt. Ledig oder gemeinsame Veranlagung; Haushaltsvorstand und getrennte Veranlagung werden nicht unterstützt.",
+      }
 declarationPeriods: [quarterly]
 options:
   - id: married_joint

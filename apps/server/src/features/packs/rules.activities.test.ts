@@ -51,15 +51,15 @@ describe('maturity per function', () => {
     const features = Object.fromEntries(packs.list().map((pack) => [pack.country, packFeatures(pack)]));
     expect(features).toEqual({
       DE: {
-        thresholds: 'experimental',
-        estimates: 'experimental',
-        deadlines: 'experimental',
-        activities: 'experimental',
-        reserve: 'experimental',
-        prepare: 'experimental',
+        thresholds: 'verified',
+        estimates: 'verified',
+        deadlines: 'verified',
+        activities: 'verified',
+        reserve: 'verified',
+        prepare: 'verified',
         expenses: 'experimental',
         vault_types: 'experimental',
-        einvoicing: 'experimental',
+        einvoicing: 'verified',
       },
       FR: {
         thresholds: 'verified',
@@ -67,9 +67,9 @@ describe('maturity per function', () => {
         deadlines: 'verified',
         activities: 'verified',
         reserve: 'experimental',
-        prepare: 'experimental',
-        expenses: 'experimental',
-        vault_types: 'experimental',
+        prepare: 'verified',
+        expenses: 'verified',
+        vault_types: 'verified',
         einvoicing: 'verified',
       },
       GB: {
@@ -77,18 +77,18 @@ describe('maturity per function', () => {
         estimates: 'verified',
         deadlines: 'verified',
         reserve: 'verified',
-        prepare: 'experimental',
-        expenses: 'experimental',
-        vault_types: 'experimental',
+        prepare: 'verified',
+        expenses: 'verified',
+        vault_types: 'verified',
       },
       US: {
-        estimates: 'experimental',
-        deadlines: 'experimental',
-        activities: 'experimental',
-        reserve: 'experimental',
-        prepare: 'experimental',
-        expenses: 'experimental',
-        vault_types: 'experimental',
+        estimates: 'verified',
+        deadlines: 'verified',
+        activities: 'verified',
+        reserve: 'verified',
+        prepare: 'verified',
+        expenses: 'verified',
+        vault_types: 'verified',
       },
     });
   });
@@ -126,8 +126,8 @@ describe('Germany: Freiberufler and Gewerbe', () => {
 
   test('income tax once on the total (§ 2 EStG), not per activity', () => {
     // § 32a EStG on 60,000 €: z = 4.2201, (173.10 z + 2,397) z + 1,034.87 = 14,233 € (two times 30,000 € would be
-    // 2 × 4,217 € = 8,434 €).
-    expect(byId('DE', both, receipts)).toEqual({ income_tax: 1_423_300 });
+    // 2 × 4,217 € = 8,434 €). Below the 20,350 € Freigrenze: no Solidaritätszuschlag.
+    expect(byId('DE', both, receipts)).toEqual({ income_tax: 1_423_300, solidarity_surcharge: 0 });
     const rows = activityBreakdown(rulesOf('DE', 2026), both, receipts);
     expect(rows.map((row) => [row.status, row.revenueCents, row.estimates.length])).toEqual([
       ['freiberufler', 3_000_000, 0],

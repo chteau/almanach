@@ -124,7 +124,10 @@ export const docsDe: Record<keyof typeof docsEn, string> = {
   'documents.missing.einvoice.client.postal_code': 'die Postleitzahl des Kunden',
   'documents.missing.einvoice.client.city': 'den Ort des Kunden',
   'documents.missing.einvoice.seller.siret': 'Ihre SIRET (Profil), aus der die SIREN folgt',
-  'documents.missing.einvoice.seller.vat': 'Ihre USt-IdNr. oder Steuernummer (Profil), von EN 16931 verlangt',
+  'documents.missing.einvoice.seller.vat':
+    'Ihre USt-IdNr. (Profil), von EN 16931 verlangt: die Steuernummer allein genügt nicht',
+  'documents.missing.einvoice.seller.identifier':
+    'eine Kennung des Verkäufers außer der USt-IdNr. (Registernummer), von EN 16931 bei nicht steuerbaren Umsätzen verlangt',
   'documents.missing.einvoice.client.vat': 'die USt-IdNr. des Kunden, Pflicht bei Steuerschuldnerschaft',
   'documents.deleteDraft': 'Entwurf löschen',
   'documents.deleteDraft.body': 'Der Entwurf wird gelöscht. Ausgestellte Dokumente werden nie gelöscht.',

@@ -1,14 +1,29 @@
-# United States (federal only) — tax year 2026.
-# Figures from IRS Rev. Proc. 2025-32 (2026 inflation adjustments, including the 2025 One Big Beautiful Bill Act),
-# Form 1040-ES (2026) and the Internal Revenue Code. State taxes are not covered.
+# United States (federal only) — tax year 2026. State and local taxes are not covered (said on the statuses,
+# the reserve and the estimated tax payment).
+# Scope: sole proprietor or single-member LLC (Schedule C), self-employment income only, filing single or married
+# filing jointly with the standard deduction. Head of household, married filing separately, wages, other income,
+# itemized deductions, credits and the 2025-2028 deductions of Schedule 1-A (tips, overtime, seniors) are not
+# modelled. Every figure below was checked on 2026-11-26 against:
+# - Rev. Proc. 2025-32 (2026 inflation adjustments, OBBBA included): https://www.irs.gov/pub/irs-drop/rp-25-32.pdf
+#   § 4.01 tables 1 and 3 (brackets), § 4.14 (standard deduction $16,100 / $32,200), § 4.26 (QBI threshold
+#   $201,750 / $403,500, phase-in range up to $276,750 / $553,500), § 2.12 ($400 minimum QBI deduction).
+# - Form 1040-ES (2026): https://www.irs.gov/pub/irs-pdf/f1040es.pdf (92.35 %, 2.9 %, 12.4 % up to $184,500,
+#   half of SE tax deducted, due dates, $1,000 rule, 90 % / 100 % / 110 % safe harbor).
+# - Pub. 505 (2026): https://www.irs.gov/publications/p505 (periods, Worksheet 2-9, Additional Medicare Tax).
+# - Social Security wage base 2026 $184,500: https://www.ssa.gov/oact/COLA/cbb.html (also in Form 1040-ES).
+# - Internal Revenue Code (uscode.house.gov): §§ 1401 (SE tax, 0.9 % Additional Medicare Tax), 164(f) (half of
+#   SE tax deductible, Additional Medicare Tax excluded), 199A (QBI deduction), 274(n) (meals 50 %), 6072 (return
+#   due 15 April), 7503 (weekend and holiday shift).
 # Several businesses of one person: one Schedule C per business ("If you owned more than one business, complete a
 # separate Schedule C for each business", https://www.irs.gov/instructions/i1040sc), but self-employment tax is
 # due on "the combined net earnings from all of your businesses" (https://www.irs.gov/instructions/i1040sse) and
-# income tax on the total income, so both are computed once on the total (scope: person). Checked 2026-11-24.
+# income tax on the total income, so every estimate is computed once on the total (scope: person).
 year: 2026
 # 26 USC 7503: a deadline on a Saturday, Sunday or legal holiday moves to the next business day.
 shift: next_business_day
-shiftSource: https://www.law.cornell.edu/uscode/text/26/7503
+shiftSource: https://uscode.house.gov/us/usc/t26/s7503/
+# Legal holidays of Pub. 509 (2026), "Legal holidays" (statewide holidays, which only matter for a return filed
+# in that state's IRS office, are not listed). 1 January 2027 is fixed by 5 USC 6103.
 holidaysSource: https://www.irs.gov/pub/irs-pdf/p509.pdf
 holidays:
   - { date: "2026-01-01", name: New Year's Day }
@@ -19,19 +34,21 @@ holidays:
   - { date: "2026-06-19", name: Juneteenth National Independence Day }
   - { date: "2026-07-03", name: Independence Day (observed) }
   - { date: "2026-09-07", name: Labor Day }
-  - { date: "2026-10-12", name: Columbus Day }
+  - { date: "2026-10-12", name: Indigenous Peoples' Day }
   - { date: "2026-11-11", name: Veterans Day }
   - { date: "2026-11-26", name: Thanksgiving Day }
   - { date: "2026-12-25", name: Christmas Day }
   - { date: "2027-01-01", name: New Year's Day }
 
 estimates:
+  # Schedule SE: net earnings = 92.35 % of the Schedule C profit; none below $400; 12.4 % Social Security up to the
+  # 2026 wage base of $184,500 (no wages assumed) and 2.9 % Medicare on all of it (26 USC 1401(a), (b)(1)).
   - id: self_employment_tax
     label:
       {
-        fr: "Self-employment tax (Social Security et Medicare)",
-        en: Self-employment tax,
-        de: "Self-Employment Tax (Sozialversicherung)",
+        fr: "Self-employment tax fédérale (Social Security et Medicare)",
+        en: Federal self-employment tax (Social Security and Medicare),
+        de: "Bundes-Self-Employment-Tax (Social Security und Medicare)",
       }
     base: profit
     scope: person
@@ -42,8 +59,49 @@ estimates:
       wageBaseCents: 18450000
       medicareBp: 290
       minimumNetEarningsCents: 40000
-    source: https://www.irs.gov/businesses/small-businesses-self-employed/self-employment-tax-social-security-and-medicare-taxes
-    verified_on: "2026-11-18"
+    source: https://www.irs.gov/pub/irs-pdf/f1040es.pdf
+    verified_on: "2026-11-26"
+  # Additional Medicare Tax (Form 8959): 0.9 % of self-employment income (92.35 % net earnings) above $200,000, or
+  # $250,000 on a joint return; thresholds fixed by law, not indexed (26 USC 1401(b)(2)). Not part of the half of
+  # SE tax deducted from income (26 USC 164(f)), so it is a separate estimate.
+  - id: additional_medicare_single
+    label:
+      {
+        fr: "Additional Medicare Tax fédérale (célibataire)",
+        en: Federal Additional Medicare Tax (single),
+        de: "Bundes-Additional-Medicare-Tax (ledig)",
+      }
+    appliesTo: { withoutOptions: [married_joint] }
+    base: profit
+    scope: person
+    formula:
+      kind: profit_bands
+      baseShareBp: 9235
+      bands:
+        - { fromCents: 20000000, rateBp: 90 }
+    source: https://uscode.house.gov/us/usc/t26/s1401/
+    verified_on: "2026-11-26"
+  - id: additional_medicare_joint
+    label:
+      {
+        fr: "Additional Medicare Tax fédérale (déclaration commune)",
+        en: Federal Additional Medicare Tax (married filing jointly),
+        de: "Bundes-Additional-Medicare-Tax (gemeinsam)",
+      }
+    appliesTo: { options: [married_joint] }
+    base: profit
+    scope: person
+    formula:
+      kind: profit_bands
+      baseShareBp: 9235
+      bands:
+        - { fromCents: 25000000, rateBp: 90 }
+    source: https://uscode.house.gov/us/usc/t26/s1401/
+    verified_on: "2026-11-26"
+  # Income tax: profit minus half of SE tax (AGI), minus the standard deduction, minus the QBI deduction (20 % of
+  # profit minus half of SE tax, at most 20 % of taxable income; phased out above the threshold as for a business
+  # without W-2 wages or qualified property, which only understates the deduction of a non-service business with
+  # employees; at least $400 once that income reaches $1,000, 26 USC 199A(i)). Brackets of Rev. Proc. 2025-32.
   - id: income_tax_single
     label:
       {
@@ -59,6 +117,8 @@ estimates:
       allowanceCents: 1610000
       deductHalfOf: [self_employment_tax]
       businessIncomeDeductionBp: 2000
+      businessIncomeDeductionLimit:
+        { thresholdCents: 20175000, phaseInCents: 7500000, minimumCents: 40000, minimumIncomeCents: 100000 }
       bands:
         - { upToCents: 1240000, rateBp: 1000 }
         - { upToCents: 5040000, rateBp: 1200 }
@@ -68,7 +128,7 @@ estimates:
         - { upToCents: 64060000, rateBp: 3500 }
         - { upToCents: null, rateBp: 3700 }
     source: https://www.irs.gov/pub/irs-drop/rp-25-32.pdf
-    verified_on: "2026-11-18"
+    verified_on: "2026-11-26"
   - id: income_tax_joint
     label:
       {
@@ -84,6 +144,8 @@ estimates:
       allowanceCents: 3220000
       deductHalfOf: [self_employment_tax]
       businessIncomeDeductionBp: 2000
+      businessIncomeDeductionLimit:
+        { thresholdCents: 40350000, phaseInCents: 15000000, minimumCents: 40000, minimumIncomeCents: 100000 }
       bands:
         - { upToCents: 2480000, rateBp: 1000 }
         - { upToCents: 10080000, rateBp: 1200 }
@@ -93,21 +155,33 @@ estimates:
         - { upToCents: 76870000, rateBp: 3500 }
         - { upToCents: null, rateBp: 3700 }
     source: https://www.irs.gov/pub/irs-drop/rp-25-32.pdf
-    verified_on: "2026-11-18"
+    verified_on: "2026-11-26"
+
+# Business meals: only 50 % is deductible (26 USC 274(n)(1); Schedule C line 24b, "The business meals deduction is
+# 50%"). Every other category counts in full; whether an expense is deductible at all is the person's call.
+expenseShares:
+  - category: meals
+    deductibleBp: 5000
+    source: https://uscode.house.gov/us/usc/t26/s274/
+    verified_on: "2026-11-26"
 
 deadlines:
+  # Form 1040-ES (2026) "When To Pay Estimated Tax" and Pub. 505 (2026) table of payment periods: 15 April, 15 June,
+  # 15 September 2026 and 15 January 2027, for 1 Jan-31 Mar, 1 Apr-31 May, 1 Jun-31 Aug and 1 Sep-31 Dec. None of
+  # them falls on a weekend or holiday in 2026-27 (the shift rule above would apply). The January payment may be
+  # skipped by filing the 2026 return and paying the balance by 1 February 2027 (said in the description).
   - id: estimated_tax
     kind: tax
     label:
       {
-        fr: "Acompte d'impôt estimé (1040-ES)",
-        en: Estimated tax payment (1040-ES),
-        de: "Steuervorauszahlung (1040-ES)",
+        fr: "Acompte d'impôt estimé fédéral (1040-ES)",
+        en: Federal estimated tax payment (1040-ES),
+        de: "Bundessteuervorauszahlung (1040-ES)",
       }
     description:
-      fr: "Paiement trimestriel de l'impôt sur le revenu et de la self-employment tax de 2026, si vous prévoyez de devoir au moins 1 000 $."
-      en: "Quarterly payment of 2026 income tax and self-employment tax, if you expect to owe at least $1,000."
-      de: "Vierteljährliche Vorauszahlung der Einkommensteuer und Self-Employment Tax 2026, wenn Sie mindestens 1.000 $ schulden werden."
+      fr: "Paiement trimestriel de l'impôt fédéral sur le revenu et de la self-employment tax de 2026, si vous prévoyez de devoir au moins 1 000 $. Celui de janvier est facultatif si vous déposez la déclaration 2026 et payez le solde au plus tard le 1er février 2027. Les acomptes d'impôt d'État ne sont pas inclus."
+      en: "Quarterly payment of 2026 federal income tax and self-employment tax, if you expect to owe at least $1,000. The January one may be skipped if you file your 2026 return and pay the balance by February 1, 2027. State estimated taxes are not included."
+      de: "Vierteljährliche Vorauszahlung der Bundeseinkommensteuer und Self-Employment Tax 2026, wenn Sie mindestens 1.000 $ schulden werden. Die Januarzahlung entfällt, wenn Sie die Erklärung 2026 bis zum 1. Februar 2027 einreichen und den Rest zahlen. Vorauszahlungen der Bundesstaaten sind nicht enthalten."
     schedule:
       type: dates
       dates:
@@ -116,8 +190,15 @@ deadlines:
         - { due: "2026-09-15", periodStart: "2026-06-01", periodEnd: "2026-08-31" }
         - { due: "2027-01-15", periodStart: "2026-09-01", periodEnd: "2026-12-31" }
     # Safe harbor by default: each instalment is 25 % of last year's total tax (100 %), 27.5 % (110 %) when last
-    # year's AGI was above $150,000 (Pub. 505 (2026), chapter 2). Optional annualized income installment method
-    # (Worksheet 2-9: factors 4, 2.4, 1.5, 1 and 22.5 %, 45 %, 67.5 %, 90 % for periods ending 3/31, 5/31, 8/31, 12/31).
+    # year's AGI was above $150,000 (Form 1040-ES (2026) General Rule and Special Rules; Pub. 505 (2026) chapter 2).
+    # Paying the smaller of this and 90 % of this year's tax avoids the penalty; the 90 % side is the annualized
+    # method below. Optional annualized income installment method, Pub. 505 (2026) Worksheet 2-9: income and
+    # expenses to date multiplied by 4, 2.4, 1.5, 1 for periods ending 3/31, 5/31, 8/31, 12/31, tax of that yearly
+    # amount, times 22.5 %, 45 %, 67.5 %, 90 %, minus the earlier payments. Section B of the worksheet (prorated
+    # wage base $46,125 / $76,875 / $123,000 / $184,500 times annualization amounts 0.496 / 0.2976 / 0.186 / 0.124)
+    # gives the same SE tax as taxing the annualized profit, which is what Almanach does. Neither Pub. 505 nor the
+    # Form 2210 instructions say how to annualize the Additional Medicare Tax; Almanach taxes the annualized
+    # profit, which is never less than the tax on the profit to date (prudent).
     prepare:
       basis: collected
       span: period
@@ -126,53 +207,173 @@ deadlines:
         alternatives: [annualized]
         shareBp: 2500
         higherIncome: { aboveCents: 15000000, shareBp: 2750 }
-        estimates: [self_employment_tax, income_tax_single, income_tax_joint]
+        estimates:
+          [
+            self_employment_tax,
+            additional_medicare_single,
+            additional_medicare_joint,
+            income_tax_single,
+            income_tax_joint,
+          ]
         periods:
           - { periodEnd: "03-31", factorBp: 40000, shareBp: 2250 }
           - { periodEnd: "05-31", factorBp: 24000, shareBp: 4500 }
           - { periodEnd: "08-31", factorBp: 15000, shareBp: 6750 }
           - { periodEnd: "12-31", factorBp: 10000, shareBp: 9000 }
         warning:
-          fr: "Safe harbor : entrez l'impôt total et l'AGI de votre déclaration de l'an passé. Le seuil de 75 000 $ des époux déclarant séparément et les impôts d'État ne sont pas gérés ; la méthode annualisée part du chiffre d'affaires sans dépenses."
-          en: "Safe harbor: enter the total tax and AGI of last year's return. The $75,000 limit for married filing separately and state taxes are not handled; the annualized method uses revenue without expenses."
-          de: "Safe Harbor: Gesamtsteuer und AGI der Vorjahreserklärung eintragen. Die Grenze von 75.000 $ für getrennt veranlagte Ehegatten und bundesstaatliche Steuern werden nicht berücksichtigt; die annualisierte Methode nutzt den Umsatz ohne Ausgaben."
+          fr: "Safe harbor : entrez l'impôt fédéral total et l'AGI de votre déclaration de l'an passé (couvrant 12 mois). Le seuil de 75 000 $ des époux déclarant séparément, les salaires et autres revenus et les impôts d'État ne sont pas gérés. La méthode annualisée exige de joindre le Form 2210 (Schedule AI) à la déclaration."
+          en: "Safe harbor: enter the total federal tax and AGI of last year's return (covering 12 months). The $75,000 limit for married filing separately, wages and other income, and state taxes are not handled. The annualized method requires attaching Form 2210 (Schedule AI) to your return."
+          de: "Safe Harbor: Gesamte Bundessteuer und AGI der Vorjahreserklärung (über 12 Monate) eintragen. Die Grenze von 75.000 $ für getrennt veranlagte Ehegatten, Löhne und andere Einkünfte sowie bundesstaatliche Steuern werden nicht berücksichtigt. Bei der annualisierten Methode ist Form 2210 (Schedule AI) der Erklärung beizufügen."
       source: https://www.irs.gov/publications/p505
-      verified_on: "2026-11-24"
+      verified_on: "2026-11-26"
     link: https://www.irs.gov/payments
     source: https://www.irs.gov/pub/irs-pdf/f1040es.pdf
-    verified_on: "2026-11-18"
+    verified_on: "2026-11-26"
+  # Return due on 15 April following the calendar year (26 USC 6072(a)); 15 April 2027 is a Thursday.
   - id: form_1040
     kind: tax
     label:
       {
-        fr: "Déclaration annuelle (Form 1040, Schedule C et SE)",
-        en: "Annual return (Form 1040, Schedules C and SE)",
-        de: "Jahreserklärung (Form 1040, Schedule C und SE)",
+        fr: "Déclaration fédérale annuelle (Form 1040, Schedule C et SE)",
+        en: "Federal annual return (Form 1040, Schedules C and SE)",
+        de: "Bundes-Jahreserklärung (Form 1040, Schedule C und SE)",
       }
     description:
-      fr: "Déclaration de l'année 2026 et paiement du solde."
-      en: "Tax return for 2026 and payment of any balance due."
-      de: "Steuererklärung 2026 und Zahlung des Restbetrags."
+      fr: "Déclaration fédérale de l'année 2026 et paiement du solde. La déclaration d'impôt d'État éventuelle est à faire à part."
+      en: "Federal tax return for 2026 and payment of any balance due. Any state tax return is filed separately."
+      de: "Bundessteuererklärung 2026 und Zahlung des Restbetrags. Eine etwaige Steuererklärung des Bundesstaats ist gesondert abzugeben."
     schedule:
       { type: dates, dates: [{ due: "2027-04-15", periodStart: "2026-01-01", periodEnd: "2026-12-31" }] }
-    estimates: [self_employment_tax, income_tax_single, income_tax_joint]
+    estimates:
+      [
+        self_employment_tax,
+        additional_medicare_single,
+        additional_medicare_joint,
+        income_tax_single,
+        income_tax_joint,
+      ]
     declaresRevenue: true
+    # Schedule C (2026) lines filled from Almanach's figures, cash method (revenue collected in 2026). Each expense
+    # category goes to the line its usual content belongs on (Schedule C instructions); meals at 50 % on line 24b.
+    # Equipment goes to line 27b as the de minimis safe harbor ($2,500 per item or invoice, "Only deduct these
+    # amounts as other expenses"); bigger items belong on line 13 through Form 4562, said in the note.
+    prepare:
+      basis: collected
+      span: period
+      lines:
+        - id: line_1
+          label:
+            {
+              fr: "Ligne 1 — Recettes brutes",
+              en: "Line 1 — Gross receipts",
+              de: "Zeile 1 — Bruttoeinnahmen",
+            }
+          measure: revenue
+        - id: line_8
+          label: { fr: "Ligne 8 — Publicité", en: "Line 8 — Advertising", de: "Zeile 8 — Werbung" }
+          measure: expenses
+          categories: [marketing]
+        - id: line_9
+          label:
+            {
+              fr: "Ligne 9 — Frais de voiture (frais réels)",
+              en: "Line 9 — Car and truck expenses (actual)",
+              de: "Zeile 9 — Fahrzeugkosten (tatsächlich)",
+            }
+          measure: expenses
+          categories: [vehicle]
+        - id: line_15
+          label:
+            {
+              fr: "Ligne 15 — Assurances (hors santé)",
+              en: "Line 15 — Insurance (other than health)",
+              de: "Zeile 15 — Versicherungen (ohne Kranken)",
+            }
+          measure: expenses
+          categories: [insurance]
+        - id: line_18
+          label:
+            { fr: "Ligne 18 — Frais de bureau", en: "Line 18 — Office expense", de: "Zeile 18 — Bürokosten" }
+          measure: expenses
+          categories: [supplies]
+        - id: line_20b
+          label:
+            {
+              fr: "Ligne 20b — Loyer d'autres biens professionnels",
+              en: "Line 20b — Rent of other business property",
+              de: "Zeile 20b — Miete sonstiger Geschäftsräume",
+            }
+          measure: expenses
+          categories: [rent]
+        - id: line_24a
+          label: { fr: "Ligne 24a — Déplacements", en: "Line 24a — Travel", de: "Zeile 24a — Reisekosten" }
+          measure: expenses
+          categories: [travel]
+        - id: line_24b
+          label:
+            {
+              fr: "Ligne 24b — Repas déductibles (50 %)",
+              en: "Line 24b — Deductible meals (50%)",
+              de: "Zeile 24b — Abzugsfähige Bewirtung (50 %)",
+            }
+          measure: expenses
+          categories: [meals]
+        - id: line_25
+          label:
+            {
+              fr: "Ligne 25 — Services (téléphone, internet)",
+              en: "Line 25 — Utilities (phone, internet)",
+              de: "Zeile 25 — Versorgung (Telefon, Internet)",
+            }
+          measure: expenses
+          categories: [telecom]
+        - id: line_27b
+          label:
+            {
+              fr: "Ligne 27b — Autres dépenses (partie V)",
+              en: "Line 27b — Other expenses (Part V)",
+              de: "Zeile 27b — Sonstige Ausgaben (Teil V)",
+            }
+          measure: expenses
+          categories: [software, equipment, fees, training, other]
+        - id: line_28
+          label:
+            {
+              fr: "Ligne 28 — Total des dépenses",
+              en: "Line 28 — Total expenses",
+              de: "Zeile 28 — Summe der Ausgaben",
+            }
+          measure: expenses
+      note:
+        fr: "Une Schedule C par activité : avec plusieurs activités, ces totaux les regroupent, répartissez-les. Ligne 31 (bénéfice net) = ligne 1 − ligne 28 sans stock ni bureau à domicile. Vérifiez la ligne de chaque dépense : honoraires de comptable ou d'avocat en ligne 17, commissions en ligne 10, matériel de plus de 2 500 $ en ligne 13 (Form 4562). Le solde à payer est l'impôt total moins vos acomptes 2026. Impôts d'État non couverts."
+        en: "One Schedule C per business: with several activities these totals combine them, split them. Line 31 (net profit) = line 1 − line 28 without inventory or home office. Check the line of each expense: accountant or lawyer fees go on line 17, commissions on line 10, equipment over $2,500 on line 13 (Form 4562). The balance due is the total tax minus your 2026 estimated payments. State taxes not covered."
+        de: "Eine Schedule C je Tätigkeit: Bei mehreren Tätigkeiten fassen diese Summen sie zusammen, bitte aufteilen. Zeile 31 (Nettogewinn) = Zeile 1 − Zeile 28 ohne Lagerbestand und Arbeitszimmer. Prüfen Sie die Zeile jeder Ausgabe: Steuerberater- oder Anwaltskosten in Zeile 17, Provisionen in Zeile 10, Ausrüstung über 2.500 $ in Zeile 13 (Form 4562). Der Restbetrag ist die Gesamtsteuer abzüglich Ihrer Vorauszahlungen 2026. Bundesstaatliche Steuern nicht enthalten."
+      source: https://www.irs.gov/pub/irs-pdf/f1040sc.pdf
+      verified_on: "2026-11-26"
     link: https://www.irs.gov/filing
-    source: https://www.law.cornell.edu/uscode/text/26/6072
-    verified_on: "2026-11-18"
+    source: https://uscode.house.gov/us/usc/t26/s6072/
+    verified_on: "2026-11-26"
 
-# Reserve: federal self-employment tax and income tax of 2026 to date, on revenue (no expenses tracked yet). The
-# 2026 estimated tax payments (1040-ES, periods within 2026) reduce it; the payment due in January 2026 covers
+# Reserve: federal self-employment tax, Additional Medicare Tax and income tax of 2026 to date, on revenue minus
+# the recorded expenses (meals at 50 %). The 2026 estimated tax payments (1040-ES, periods within 2026) reduce it;
+# the payment due in January 2026 covers 2025, and the balance paid with the 2025 return in April 2026 settles
 # 2025. State and local taxes are not modelled. The 10 % margin is a product choice, not a legal value.
 reserve:
-  include: [self_employment_tax, income_tax_single, income_tax_joint]
+  include:
+    [
+      self_employment_tax,
+      additional_medicare_single,
+      additional_medicare_joint,
+      income_tax_single,
+      income_tax_joint,
+    ]
   settles:
     - { deadline: estimated_tax, fiscalYear: period }
     - { deadline: form_1040, fiscalYear: previous }
   marginBp: 1000
   warning:
-    fr: "Estimation indicative de l'impôt fédéral et de la self-employment tax, calculée sur le chiffre d'affaires sans dépenses ni autres revenus. Les impôts d'État ne sont pas comptés : ajoutez-les en supplément personnel. Ne remplace pas un avis de l'IRS."
-    en: "Indicative federal income tax and self-employment tax estimate, based on revenue without expenses or other income. State taxes are not included: add them as a personal extra. Not an IRS notice."
-    de: "Unverbindliche Schätzung der Bundeseinkommensteuer und Self-Employment Tax auf Basis des Umsatzes ohne Ausgaben oder andere Einkünfte. Bundesstaatliche Steuern sind nicht enthalten: als persönlichen Zuschlag ergänzen. Kein Bescheid des IRS."
+    fr: "Estimation indicative de l'impôt fédéral sur le revenu et de la self-employment tax, sur le chiffre d'affaires moins les dépenses saisies, sans autres revenus. Les impôts d'État et locaux ne sont pas comptés : ajoutez-les en supplément personnel. Ne remplace pas un avis de l'IRS."
+    en: "Indicative federal income tax and self-employment tax estimate, on revenue minus recorded expenses, without other income. State and local taxes are not included: add them as a personal extra. Not an IRS notice."
+    de: "Unverbindliche Schätzung der Bundeseinkommensteuer und Self-Employment Tax auf Basis des Umsatzes abzüglich erfasster Ausgaben, ohne andere Einkünfte. Bundesstaatliche und lokale Steuern sind nicht enthalten: als persönlichen Zuschlag ergänzen. Kein Bescheid des IRS."
   source: https://www.irs.gov/pub/irs-pdf/f1040es.pdf
-  verified_on: "2026-11-24"
+  verified_on: "2026-11-26"

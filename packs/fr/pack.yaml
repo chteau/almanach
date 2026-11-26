@@ -8,18 +8,22 @@ features:
   deadlines: verified
   # Mixed activity (BNC, BIC services, BIC sales): ceilings on the total, rates per activity (rules.test.ts).
   activities: verified
-  # Reserve: experimental — the scale for 2026 income is not adopted yet (latest published scale used) and only this
-  # business and the parts are known of the household.
+  # Reserve: experimental — the income tax scale for 2026 income will be set by the 2027 finance law, not adopted on
+  # 2026-11-26 (rejected by the Assemblée nationale on 4 November, under examination in the Senate:
+  # https://www.senat.fr/travaux-parlementaires/textes-legislatifs/la-loi-en-clair/projet-de-loi-de-finances-pour-2027.html);
+  # the latest published scale (2025 income, F1419 checked 2026-11-26) is used instead. Only this business and the
+  # parts are known of the household. Contributions, flat-rate tax and CFP parts are sourced (2026.yaml).
   reserve: experimental
-  # Prepared declaration: experimental — the split of revenue per activity category is not confirmed on an
-  # official page (F23257, checked 2026-11-24, only says revenue collected and zero declarations are required).
-  prepare: experimental
-  # Expenses: experimental — shown for information only: the micro regime deducts a flat-rate allowance, never
-  # actual expenses (art. 50-0 and 102 ter CGI, allowance rules in 2026.yaml).
-  expenses: experimental
-  # Vault kinds: experimental — usual documents, no legal validity period is claimed (dates are entered from the
-  # document itself).
-  vault_types: experimental
+  # Prepared declaration: one declaration, revenue split "en autant de lignes que vous exercez d'activités", boxes
+  # named as on the Urssaf FAQ (Cipav box apart), 0 when nothing collected (autoentrepreneur.urssaf.fr FAQ, checked
+  # 2026-11-26); rules.prepare.test.ts.
+  prepare: verified
+  # Expenses: shown for information only — the micro regime deducts a flat-rate allowance, never actual expenses
+  # (F23267, Urssaf "Déterminer mon chiffre d'affaires", checked 2026-11-26); rules.prepare.test.ts.
+  expenses: verified
+  # Vault kinds: each kind cites the official page describing the document; no legal validity period is claimed
+  # (expiry dates are entered from the document itself, reminder days are a product choice); rules.test.ts.
+  vault_types: verified
   # Factur-X EN16931: every sample passes veraPDF (PDF/A-3B) and the CEN EN 16931 CII Schematron (docs/einvoicing.md).
   einvoicing: verified
 # Packs using fields added in Almanach 0.1.0 (reserve, fr_income_tax, prepare, expenses, vault).
@@ -35,6 +39,9 @@ vault:
         }
       expires: true
       remindDays: [30, 7]
+      # Compulsory for regulated activities and some trades only (F23668).
+      source: https://entreprendre.service-public.gouv.fr/vosdroits/F23668
+      verified_on: "2026-11-26"
     - id: sirene_situation
       label:
         {
@@ -42,17 +49,25 @@ vault:
           en: "SIRENE registration notice (Insee)",
           de: "SIRENE-Eintragungsbescheinigung (Insee)",
         }
+      source: https://entreprendre.service-public.gouv.fr/vosdroits/R17969
+      verified_on: "2026-11-26"
+    # An individual business gets an extrait K (Kbis is for companies) or the free RNE proof of registration (F21000).
     - id: registration_extract
       label:
         {
-          fr: "Attestation d'immatriculation (RNE) ou extrait Kbis",
-          en: "Registration certificate (RNE) or Kbis extract",
-          de: "Eintragungsnachweis (RNE) oder Kbis-Auszug",
+          fr: "Justificatif d'immatriculation au RNE ou extrait K",
+          en: "Proof of registration in the RNE or K extract",
+          de: "RNE-Eintragungsnachweis oder K-Auszug",
         }
+      source: https://entreprendre.service-public.gouv.fr/vosdroits/F21000
+      verified_on: "2026-11-26"
     - id: domiciliation
       label: { fr: "Contrat de domiciliation", en: "Business address contract", de: "Domizilierungsvertrag" }
       expires: true
       remindDays: [60, 30]
+      # Contract with an approved domiciliation company, 3 months minimum (F2160).
+      source: https://entreprendre.service-public.gouv.fr/vosdroits/F2160
+      verified_on: "2026-11-26"
     - id: urssaf_vigilance
       label:
         {
@@ -62,6 +77,15 @@ vault:
         }
       expires: true
       remindDays: [30, 7]
+      # Printable from the auto-entrepreneur online account (FAQ); valid 6 months, asked by clients for contracts of
+      # 5 000 € excl. VAT or more (F31422, art. L243-15 CSS and L8222-1 Code du travail).
+      source: https://www.autoentrepreneur.urssaf.fr/portail/accueil/une-question/questions-frequentes.html
+      verified_on: "2026-11-26"
+# Expenses note: no actual expense is deductible from revenue, the flat-rate allowance (34 %, 50 %, 71 %) stands for
+# them — https://entreprendre.service-public.gouv.fr/vosdroits/F23267 ("ce ne sont donc pas les charges réelles qui
+# sont déduites") and https://www.autoentrepreneur.urssaf.fr/portail/accueil/une-question/toutes-les-fiches-pratiques/determiner-mon-chiffre-daffaires.html
+# ("Aucune charge ou dépense n'est donc déductible"), both verified_on 2026-11-26. The schema has no source field for
+# this note.
 expensesNote:
   {
     fr: "En micro-entreprise, les dépenses réelles ne sont pas déductibles : l'abattement forfaitaire s'applique à leur place. Elles sont affichées ici à titre indicatif et ne changent aucun calcul.",
@@ -184,12 +208,12 @@ invoice:
       - scope: receive
         from: "2026-09-01"
         source: https://www.impots.gouv.fr/professionnel/je-decouvre-la-facturation-electronique
-        verified_on: "2026-11-24"
+        verified_on: "2026-11-26"
       - scope: issue
         from: "2027-09-01"
         appliesTo: { statuses: [micro_bnc, micro_bic_services, micro_bic_sales] }
         source: https://www.impots.gouv.fr/professionnel/je-decouvre-la-facturation-electronique
-        verified_on: "2026-11-24"
+        verified_on: "2026-11-26"
     # SIREN = first nine digits of the SIRET, ISO 6523 scheme 0002 (BT-30, BT-47).
     legalId: { identifier: siret, scheme: "0002", length: 9 }
     # CEF VATEX code list v9 (in force 2026-11-15), checked 2026-11-24.

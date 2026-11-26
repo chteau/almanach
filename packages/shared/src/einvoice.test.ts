@@ -167,6 +167,26 @@ describe('EN 16931 model', () => {
     ]);
   });
 
+  test('a German Steuernummer (BT-32) alone does not identify the seller (BR-CO-26)', () => {
+    const german: EinvoiceContext = {
+      currency: 'EUR',
+      rules: { ...context.rules, legalId: undefined, taxId: 'steuernummer', exemptionCodes: {} },
+    };
+    const seller = {
+      ...source().seller,
+      country: 'DE',
+      vatNumber: null,
+      identifiers: { steuernummer: '21/815/08150' },
+    };
+    expect(einvoiceMissing(source({ seller }), german)).toEqual(['seller.vat']);
+    expect(einvoiceMissing(source({ seller, vatMode: 'export' }), german)).toEqual(['seller.identifier']);
+    const withVat = { ...seller, vatNumber: 'DE136695976' };
+    expect(einvoiceMissing(source({ seller: withVat }), german)).toEqual([]);
+    expect(buildEinvoice(source({ seller: withVat, number: 'R-1' }), german).invoice?.seller.taxId).toBe(
+      '21/815/08150',
+    );
+  });
+
   test('formats scaled decimals exactly', () => {
     expect(decimal(1_234_500n, 6, 2)).toBe('1.2345');
     expect(decimal(120_000_000n, 6, 2)).toBe('120.00');

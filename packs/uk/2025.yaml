@@ -24,7 +24,7 @@ deadlines:
       { type: dates, dates: [{ due: "2026-10-05", periodStart: "2025-04-06", periodEnd: "2026-04-05" }] }
     link: https://www.gov.uk/register-for-self-assessment
     source: https://www.gov.uk/register-for-self-assessment
-    verified_on: "2026-11-24"
+    verified_on: "2026-11-26"
   - id: payment_on_account_2
     kind: tax
     label:
@@ -36,7 +36,7 @@ deadlines:
     schedule: { type: dates, dates: [{ due: "2026-07-31" }] }
     link: https://www.gov.uk/understand-self-assessment-bill/payments-on-account
     source: https://www.gov.uk/understand-self-assessment-bill/payments-on-account
-    verified_on: "2026-11-24"
+    verified_on: "2026-11-26"
   - id: self_assessment_paper
     kind: tax
     label:
@@ -53,7 +53,7 @@ deadlines:
       { type: dates, dates: [{ due: "2026-10-31", periodStart: "2025-04-06", periodEnd: "2026-04-05" }] }
     link: https://www.gov.uk/self-assessment-tax-returns/deadlines
     source: https://www.gov.uk/self-assessment-tax-returns/deadlines
-    verified_on: "2026-11-24"
+    verified_on: "2026-11-26"
   - id: self_assessment_online
     kind: tax
     label:
@@ -63,12 +63,41 @@ deadlines:
         de: Online-Erklärung und Restzahlung,
       }
     description:
-      fr: "Déclaration en ligne de l'année fiscale 2025-26, paiement du solde et du premier acompte de 2026-27."
-      en: "Online tax return for 2025-26, balancing payment and first payment on account for 2026-27."
-      de: "Online-Erklärung für 2025-26, Restzahlung und erste Vorauszahlung für 2026-27."
+      fr: "Déclaration en ligne de l'année fiscale 2025-26, paiement du solde et du premier acompte de 2026-27. Le 31 janvier 2027 est un dimanche : sauf par Faster Payments ou carte, le paiement doit parvenir à HMRC le vendredi 29 janvier."
+      en: "Online tax return for 2025-26, balancing payment and first payment on account for 2026-27. 31 January 2027 is a Sunday: except by Faster Payments or card, the payment must reach HMRC by Friday 29 January."
+      de: "Online-Erklärung für 2025-26, Restzahlung und erste Vorauszahlung für 2026-27. Der 31. Januar 2027 ist ein Sonntag: Außer per Faster Payments oder Karte muss die Zahlung HMRC bis Freitag, 29. Januar, erreichen."
     schedule:
       { type: dates, dates: [{ due: "2027-01-31", periodStart: "2025-04-06", periodEnd: "2026-04-05" }] }
     declaresRevenue: true
+    # Self-employment (short) page 2025-26 (SA103S 2026, HMRC 12/25), for turnover below £90,000: box 9 turnover
+    # (received, cash basis), box 20 total allowable expenses (a total alone is accepted below £90,000), or box 10.1
+    # trading income allowance instead of any expense. Weekend rule: https://www.gov.uk/pay-self-assessment-tax-bill.
+    prepare:
+      basis: collected
+      span: period
+      lines:
+        - id: turnover
+          label:
+            {
+              fr: "Case 9 — Chiffre d'affaires (turnover)",
+              en: "Box 9 — Turnover",
+              de: "Feld 9 — Umsatz (turnover)",
+            }
+          measure: revenue
+        - id: expenses
+          label:
+            {
+              fr: "Case 20 — Total des dépenses admissibles",
+              en: "Box 20 — Total allowable expenses",
+              de: "Feld 20 — Abzugsfähige Ausgaben gesamt",
+            }
+          measure: expenses
+      note:
+        fr: "Chiffres de la page Self-employment (short) 2025-26 (SA103S), réservée à un chiffre d'affaires annuel sous 90 000 £. Si vous demandez la trading allowance (case 10.1, jusqu'à 1 000 £), laissez les cases 11 à 20 vides. Assujetti à la TVA : recettes et dépenses sont hors TVA, déclarez-les ainsi."
+        en: "Figures for the 2025-26 Self-employment (short) page (SA103S), for annual turnover below £90,000. If you claim the trading allowance (box 10.1, up to £1,000), leave boxes 11 to 20 empty. VAT registered: turnover and expenses are without VAT; enter them that way."
+        de: "Zahlen für die Seite Self-employment (short) 2025-26 (SA103S), für einen Jahresumsatz unter 90.000 £. Wenn Sie den Trading Allowance (Feld 10.1, bis 1.000 £) beanspruchen, lassen Sie die Felder 11 bis 20 leer. Umsatzsteuerregistriert: Einnahmen und Ausgaben sind ohne Umsatzsteuer; melden Sie sie so."
+      source: https://www.gov.uk/government/publications/self-assessment-self-employment-short-sa103s
+      verified_on: "2026-11-26"
     link: https://www.gov.uk/self-assessment-tax-returns/deadlines
     source: https://www.gov.uk/self-assessment-tax-returns/deadlines
-    verified_on: "2026-11-24"
+    verified_on: "2026-11-26"

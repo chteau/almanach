@@ -1,17 +1,18 @@
 # United Kingdom — tax year 2026-27 (6 April 2026 to 5 April 2027).
 # Every figure was checked on gov.uk on the date given in verified_on.
-# Estimates treat all takings as profit (Almanach does not track expenses), less the £1,000 trading allowance
-# that can be claimed instead of expenses (see `allowances`).
+# Estimates take the takings collected (cash basis) less the recorded expenses or, when larger, the £1,000 trading
+# allowance claimed instead of expenses (see `allowances`).
 # Several trades of one sole trader: income tax and Class 4 are computed once on the total (scope: person):
 # Class 4 is due on profits "derived from the carrying on or exercise of one or more trades, professions or
-# vocations" (https://www.legislation.gov.uk/ukpga/1992/4/section/15, checked 2026-11-24); VAT registration
+# vocations" (https://www.legislation.gov.uk/ukpga/1992/4/section/15, checked 2026-11-26); VAT registration
 # looks at "the value of his taxable supplies", every business of the person together
-# (https://www.legislation.gov.uk/ukpga/1994/23/schedule/1, checked 2026-11-24).
+# (https://www.legislation.gov.uk/ukpga/1994/23/schedule/1, checked 2026-11-26).
 # Class 2 National Insurance is treated as paid and only voluntary (£3.65 a week below £7,105 of profits):
 # https://www.gov.uk/self-employed-national-insurance-rates. Not modelled: VAT flat rate scheme, partnerships,
 # limited companies.
 year: 2026
-# HMRC deadlines do not move when they fall on a weekend or bank holiday.
+# HMRC deadlines stay on their date when it falls on a weekend or bank holiday; only a payment by a method other
+# than Faster Payments or card must then reach HMRC on the last working day before (said on the deadlines concerned).
 shift: none
 shiftSource: https://www.gov.uk/pay-self-assessment-tax-bill
 holidaysSource: https://www.gov.uk/bank-holidays
@@ -48,7 +49,7 @@ thresholds:
       en: "Above £90,000 of VAT taxable turnover in the last 12 months, you must register for VAT within 30 days of the end of the month you went over; registration takes effect from the first day of the second month after. If you expect to go over £90,000 in the next 30 days alone, register by the end of that 30-day period: registration takes effect from the date you realised. Once registered, you can cancel if your taxable turnover falls below £88,000."
       de: "Über 90.000 £ steuerpflichtigem Umsatz in den letzten 12 Monaten müssen Sie sich innerhalb von 30 Tagen nach Ende des Überschreitungsmonats für die Umsatzsteuer registrieren; die Registrierung gilt ab dem ersten Tag des übernächsten Monats. Erwarten Sie, allein in den nächsten 30 Tagen 90.000 £ zu überschreiten, registrieren Sie sich bis zum Ende dieser 30 Tage: Die Registrierung gilt ab dem Tag, an dem Sie es wussten. Nach der Registrierung können Sie die Löschung beantragen, wenn der steuerpflichtige Umsatz unter 88.000 £ fällt."
     source: https://www.gov.uk/register-for-vat
-    verified_on: "2026-11-24"
+    verified_on: "2026-11-26"
   # Watched over the last 12 months as an indication: gov.uk lets you ask to cancel when taxable turnover falls
   # below £88,000.
   - id: vat_deregistration
@@ -67,7 +68,7 @@ thresholds:
       en: "Your VAT taxable turnover over the last 12 months is below £88,000: you can ask HMRC to cancel your VAT registration (you do not have to). Nothing is done automatically."
       de: "Ihr steuerpflichtiger Umsatz der letzten 12 Monate liegt unter 88.000 £: Sie können bei HMRC die Löschung Ihrer Umsatzsteuerregistrierung beantragen (keine Pflicht). Nichts geschieht automatisch."
     source: https://www.gov.uk/register-for-vat/cancel-your-registration
-    verified_on: "2026-11-24"
+    verified_on: "2026-11-26"
 
 estimates:
   - id: income_tax
@@ -84,7 +85,7 @@ estimates:
         - { upToCents: 12514000, rateBp: 4000 }
         - { upToCents: null, rateBp: 4500 }
     source: https://www.gov.uk/income-tax-rates
-    verified_on: "2026-11-24"
+    verified_on: "2026-11-26"
   - id: income_tax_scotland
     label: { fr: "Impôt sur le revenu (Écosse)", en: Scottish Income Tax, de: Einkommensteuer (Schottland) }
     appliesTo: { options: [scotland] }
@@ -102,7 +103,7 @@ estimates:
         - { upToCents: 12514000, rateBp: 4500 }
         - { upToCents: null, rateBp: 4800 }
     source: https://www.gov.uk/scottish-income-tax
-    verified_on: "2026-11-24"
+    verified_on: "2026-11-26"
   - id: class4_nic
     label:
       {
@@ -118,7 +119,7 @@ estimates:
         - { fromCents: 1257000, rateBp: 600 }
         - { fromCents: 5027000, rateBp: 200 }
     source: https://www.gov.uk/self-employed-national-insurance-rates
-    verified_on: "2026-11-24"
+    verified_on: "2026-11-26"
 
 # Up to £1,000 of trading income a year is tax-free; above it the allowance can be deducted instead of expenses.
 # It is one allowance per individual, whatever the number of trades, and cannot be used with trade income from a
@@ -136,7 +137,7 @@ allowances:
     minimumCents: 100000
     deductsFromProfit: true
     source: https://www.gov.uk/guidance/tax-free-allowances-on-property-and-trading-income
-    verified_on: "2026-11-24"
+    verified_on: "2026-11-26"
 
 deadlines:
   - id: self_assessment_registration
@@ -156,7 +157,7 @@ deadlines:
       { type: dates, dates: [{ due: "2027-10-05", periodStart: "2026-04-06", periodEnd: "2027-04-05" }] }
     link: https://www.gov.uk/register-for-self-assessment
     source: https://www.gov.uk/register-for-self-assessment
-    verified_on: "2026-11-24"
+    verified_on: "2026-11-26"
   - id: mtd_quarterly_update
     kind: tax
     label:
@@ -179,6 +180,10 @@ deadlines:
         - { due: "2027-05-07", periodStart: "2026-04-06", periodEnd: "2027-04-05" }
     declaresRevenue: true
     # Prepared figures only: Almanach does not send updates to HMRC (no recognised software). Cumulative since 6 April.
+    # Updates use the Self Assessment categories; "customers with an annual turnover (sales) of less than £90,000 can
+    # report their total income and expenses" (HMRC, https://developer.service.hmrc.gov.uk/guides/income-tax-mtd-end-to-end-service-guide/documentation/make-updates-during-tax-year.html,
+    # 2026-11-26). VAT registered: Almanach counts income and expenses without VAT, the other presentation the notes
+    # describe being VAT included with the net VAT paid to HMRC as an expense (SA103F notes 2026, https://www.gov.uk/government/publications/self-assessment-self-employment-full-sa103f).
     prepare:
       basis: collected
       span: fiscal_year_to_period_end
@@ -189,29 +194,30 @@ deadlines:
         - id: expenses
           label:
             {
-              fr: "Dépenses admissibles (total)",
-              en: "Allowable expenses (total)",
-              de: "Abzugsfähige Ausgaben (gesamt)",
+              fr: "Dépenses admissibles (total, consolidated expenses)",
+              en: "Allowable expenses (total, consolidated expenses)",
+              de: "Abzugsfähige Ausgaben (gesamt, consolidated expenses)",
             }
           measure: expenses
       note:
-        fr: "Chiffres à reporter dans votre logiciel compatible MTD, qui demande les dépenses par catégorie. Almanach ne transmet rien à HMRC."
-        en: "Figures to copy into your MTD-compatible software, which asks for expenses by category. Almanach sends nothing to HMRC."
-        de: "Zahlen zur Übernahme in Ihre MTD-kompatible Software, die Ausgaben nach Kategorien verlangt. Almanach übermittelt nichts an HMRC."
+        fr: "Chiffres à reporter dans votre logiciel compatible MTD ; Almanach ne transmet rien à HMRC. Sous 90 000 £ de chiffre d'affaires annuel, le total des dépenses suffit ; au-delà, répartissez-le par catégorie dans le logiciel. Assujetti à la TVA : recettes et dépenses sont hors TVA, déclarez-les ainsi."
+        en: "Figures to copy into your MTD-compatible software; Almanach sends nothing to HMRC. Below £90,000 of annual turnover the expenses total is enough; above it, split it by category in the software. VAT registered: turnover and expenses are without VAT; enter them that way."
+        de: "Zahlen zur Übernahme in Ihre MTD-kompatible Software; Almanach übermittelt nichts an HMRC. Unter 90.000 £ Jahresumsatz genügt die Ausgabensumme; darüber teilen Sie sie in der Software nach Kategorien auf. Umsatzsteuerregistriert: Einnahmen und Ausgaben sind ohne Umsatzsteuer; melden Sie sie so."
       source: https://www.gov.uk/guidance/use-making-tax-digital-for-income-tax/send-quarterly-updates
-      verified_on: "2026-11-24"
+      verified_on: "2026-11-26"
     link: https://www.gov.uk/guidance/use-making-tax-digital-for-income-tax/send-quarterly-updates
     source: https://www.gov.uk/guidance/use-making-tax-digital-for-income-tax/send-quarterly-updates
-    verified_on: "2026-11-24"
+    verified_on: "2026-11-26"
   - id: payment_on_account_1
     kind: tax
     label:
       { fr: "Premier acompte (payment on account)", en: First payment on account, de: Erste Vorauszahlung }
     description:
-      fr: "Premier acompte de l'impôt 2026-27, égal à la moitié de l'impôt de l'année précédente. Non dû si l'impôt de l'an dernier était inférieur à 1 000 £ ou si plus de 80 % a été prélevé à la source."
-      en: "First advance payment towards your 2026-27 tax bill, half of last year's bill. Not due if last year's bill was under £1,000 or more than 80% of it was taken at source."
-      de: "Erste Vorauszahlung auf die Steuer 2026-27, die Hälfte der Vorjahressteuer. Entfällt, wenn die Vorjahressteuer unter 1.000 £ lag oder mehr als 80 % an der Quelle einbehalten wurden."
+      fr: "Premier acompte de l'impôt 2026-27, égal à la moitié de l'impôt de l'année précédente. Non dû si l'impôt de l'an dernier était inférieur à 1 000 £ ou si plus de 80 % a été prélevé à la source. Le 31 janvier 2027 est un dimanche : sauf par Faster Payments ou carte, le paiement doit parvenir à HMRC le vendredi 29 janvier."
+      en: "First advance payment towards your 2026-27 tax bill, half of last year's bill. Not due if last year's bill was under £1,000 or more than 80% of it was taken at source. 31 January 2027 is a Sunday: except by Faster Payments or card, the payment must reach HMRC by Friday 29 January."
+      de: "Erste Vorauszahlung auf die Steuer 2026-27, die Hälfte der Vorjahressteuer. Entfällt, wenn die Vorjahressteuer unter 1.000 £ lag oder mehr als 80 % an der Quelle einbehalten wurden. Der 31. Januar 2027 ist ein Sonntag: Außer per Faster Payments oder Karte muss die Zahlung HMRC bis Freitag, 29. Januar, erreichen."
     schedule: { type: dates, dates: [{ due: "2027-01-31" }] }
+    # Weekend rule: https://www.gov.uk/pay-self-assessment-tax-bill (2026-11-26).
     prepare:
       basis: collected
       span: period
@@ -223,18 +229,18 @@ deadlines:
           en: "Half of last year's bill (Class 4 included): enter it from your HMRC calculation. Not due under £1,000 or when more than 80 % was taken at source."
           de: "Die Hälfte der Vorjahressteuer (inkl. Class 4): aus der HMRC-Berechnung eintragen. Entfällt unter 1.000 £ oder wenn mehr als 80 % an der Quelle einbehalten wurden."
       source: https://www.gov.uk/understand-self-assessment-bill/payments-on-account
-      verified_on: "2026-11-24"
+      verified_on: "2026-11-26"
     link: https://www.gov.uk/understand-self-assessment-bill/payments-on-account
     source: https://www.gov.uk/understand-self-assessment-bill/payments-on-account
-    verified_on: "2026-11-24"
+    verified_on: "2026-11-26"
   - id: payment_on_account_2
     kind: tax
     label:
       { fr: "Second acompte (payment on account)", en: Second payment on account, de: Zweite Vorauszahlung }
     description:
-      fr: "Second acompte de l'impôt 2026-27."
-      en: "Second advance payment towards your 2026-27 tax bill."
-      de: "Zweite Vorauszahlung auf die Steuer 2026-27."
+      fr: "Second acompte de l'impôt 2026-27. Le 31 juillet 2027 est un samedi : sauf par Faster Payments ou carte, le paiement doit parvenir à HMRC le vendredi 30 juillet."
+      en: "Second advance payment towards your 2026-27 tax bill. 31 July 2027 is a Saturday: except by Faster Payments or card, the payment must reach HMRC by Friday 30 July."
+      de: "Zweite Vorauszahlung auf die Steuer 2026-27. Der 31. Juli 2027 ist ein Samstag: Außer per Faster Payments oder Karte muss die Zahlung HMRC bis Freitag, 30. Juli, erreichen."
     schedule: { type: dates, dates: [{ due: "2027-07-31" }] }
     prepare:
       basis: collected
@@ -247,10 +253,10 @@ deadlines:
           en: "Half of last year's bill (Class 4 included): enter it from your HMRC calculation. Not due under £1,000 or when more than 80 % was taken at source."
           de: "Die Hälfte der Vorjahressteuer (inkl. Class 4): aus der HMRC-Berechnung eintragen. Entfällt unter 1.000 £ oder wenn mehr als 80 % an der Quelle einbehalten wurden."
       source: https://www.gov.uk/understand-self-assessment-bill/payments-on-account
-      verified_on: "2026-11-24"
+      verified_on: "2026-11-26"
     link: https://www.gov.uk/understand-self-assessment-bill/payments-on-account
     source: https://www.gov.uk/understand-self-assessment-bill/payments-on-account
-    verified_on: "2026-11-24"
+    verified_on: "2026-11-26"
   - id: self_assessment_paper
     kind: tax
     label:
@@ -267,7 +273,7 @@ deadlines:
       { type: dates, dates: [{ due: "2027-10-31", periodStart: "2026-04-06", periodEnd: "2027-04-05" }] }
     link: https://www.gov.uk/self-assessment-tax-returns/deadlines
     source: https://www.gov.uk/self-assessment-tax-returns/deadlines
-    verified_on: "2026-11-24"
+    verified_on: "2026-11-26"
   - id: self_assessment_online
     kind: tax
     label:
@@ -277,20 +283,44 @@ deadlines:
         de: Online-Erklärung und Restzahlung,
       }
     description:
-      fr: "Déclaration en ligne de l'année fiscale 2026-27 et paiement du solde (plus le premier acompte de 2027-28). L'estimation traite toutes les recettes comme du bénéfice : déduisez vos frais réels ou, à la place, la trading allowance de 1 000 £. Les cotisations Class 2 ne sont plus dues ; sous 7 105 £ de bénéfice, vous pouvez en verser volontairement (3,65 £ par semaine)."
-      en: "Online tax return for 2026-27 and balancing payment (with the first payment on account for 2027-28). The estimate treats all takings as profit: deduct your allowable expenses or, instead, the £1,000 trading allowance. Class 2 contributions are no longer due; with profits under £7,105 you can pay them voluntarily (£3.65 a week)."
-      de: "Online-Erklärung für 2026-27 und Restzahlung (mit der ersten Vorauszahlung für 2027-28). Die Schätzung behandelt alle Einnahmen als Gewinn: Ziehen Sie Ihre Betriebsausgaben oder stattdessen den Trading Allowance von 1.000 £ ab. Class-2-Beiträge sind nicht mehr fällig; bei Gewinnen unter 7.105 £ können Sie sie freiwillig zahlen (3,65 £ pro Woche)."
+      fr: "Déclaration en ligne de l'année fiscale 2026-27 et paiement du solde (plus le premier acompte de 2027-28). L'estimation déduit des recettes vos dépenses saisies ou, si elle est plus élevée, la trading allowance de 1 000 £. Les cotisations Class 2 ne sont plus dues ; sous 7 105 £ de bénéfice, vous pouvez en verser volontairement (3,65 £ par semaine)."
+      en: "Online tax return for 2026-27 and balancing payment (with the first payment on account for 2027-28). The estimate deducts from the takings your recorded expenses or, when larger, the £1,000 trading allowance. Class 2 contributions are no longer due; with profits under £7,105 you can pay them voluntarily (£3.65 a week)."
+      de: "Online-Erklärung für 2026-27 und Restzahlung (mit der ersten Vorauszahlung für 2027-28). Die Schätzung zieht von den Einnahmen Ihre erfassten Ausgaben oder, wenn höher, den Trading Allowance von 1.000 £ ab. Class-2-Beiträge sind nicht mehr fällig; bei Gewinnen unter 7.105 £ können Sie sie freiwillig zahlen (3,65 £ pro Woche)."
     schedule:
       { type: dates, dates: [{ due: "2028-01-31", periodStart: "2026-04-06", periodEnd: "2027-04-05" }] }
     estimates: [income_tax, income_tax_scotland, class4_nic]
     declaresRevenue: true
+    # Self-employment (short) page, for turnover below £90,000: box 9 turnover (received, cash basis), box 20 total
+    # allowable expenses (a total alone is accepted below £90,000), or box 10.1 trading income allowance instead.
+    # Box numbers of the 2025-26 page; HMRC has not published the 2026-27 one yet, so labels carry no box number.
+    prepare:
+      basis: collected
+      span: period
+      lines:
+        - id: turnover
+          label: { fr: "Chiffre d'affaires (turnover)", en: "Turnover", de: "Umsatz (turnover)" }
+          measure: revenue
+        - id: expenses
+          label:
+            {
+              fr: "Total des dépenses admissibles",
+              en: "Total allowable expenses",
+              de: "Abzugsfähige Ausgaben gesamt",
+            }
+          measure: expenses
+      note:
+        fr: "Chiffres de la page Self-employment (short), réservée à un chiffre d'affaires annuel sous 90 000 £. Si vous demandez la trading allowance (jusqu'à 1 000 £), ne déclarez aucune dépense. Assujetti à la TVA : recettes et dépenses sont hors TVA, déclarez-les ainsi."
+        en: "Figures for the Self-employment (short) page, for annual turnover below £90,000. If you claim the trading allowance (up to £1,000), enter no expenses. VAT registered: turnover and expenses are without VAT; enter them that way."
+        de: "Zahlen für die Seite Self-employment (short), für einen Jahresumsatz unter 90.000 £. Wenn Sie den Trading Allowance (bis 1.000 £) beanspruchen, tragen Sie keine Ausgaben ein. Umsatzsteuerregistriert: Einnahmen und Ausgaben sind ohne Umsatzsteuer; melden Sie sie so."
+      source: https://www.gov.uk/government/publications/self-assessment-self-employment-short-sa103s
+      verified_on: "2026-11-26"
     link: https://www.gov.uk/self-assessment-tax-returns/deadlines
     source: https://www.gov.uk/self-assessment-tax-returns/deadlines
-    verified_on: "2026-11-24"
+    verified_on: "2026-11-26"
 
-# Reserve: Income Tax and Class 4 of the 2026-27 tax year to date, on takings less the trading allowance (no
-# expenses tracked yet). The payments on account due 31 January and 31 July 2027 are for 2026-27 (each half of the
-# previous year's bill, https://www.gov.uk/understand-self-assessment-bill/payments-on-account, 2026-11-24) and
+# Reserve: Income Tax and Class 4 of the 2026-27 tax year to date, on takings less the recorded expenses or the
+# trading allowance when larger. The payments on account due 31 January and 31 July 2027 are for 2026-27 (each half of the
+# previous year's bill, https://www.gov.uk/understand-self-assessment-bill/payments-on-account, 2026-11-26) and
 # reduce it; the balancing payment on 31 January 2028 settles the year itself. The 10 % margin is a product choice.
 reserve:
   include: [income_tax, income_tax_scotland, class4_nic]
@@ -300,8 +330,8 @@ reserve:
     - { deadline: self_assessment_online, fiscalYear: previous }
   marginBp: 1000
   warning:
-    fr: "Estimation indicative de l'impôt sur le revenu et de la Class 4, calculée sur le chiffre d'affaires moins le trading allowance, sans autres revenus. Ne remplace pas votre décompte HMRC."
-    en: "Indicative Income Tax and Class 4 estimate, based on takings less the trading allowance, without other income. Not your HMRC calculation."
-    de: "Unverbindliche Schätzung von Einkommensteuer und Class 4 auf Basis des Umsatzes abzüglich Trading Allowance, ohne andere Einkünfte. Ersetzt nicht die Berechnung von HMRC."
+    fr: "Estimation indicative de l'impôt sur le revenu et de la Class 4, calculée sur les recettes encaissées moins vos dépenses saisies ou le trading allowance, sans autres revenus. Recettes comptées hors TVA. Ne remplace pas votre décompte HMRC."
+    en: "Indicative Income Tax and Class 4 estimate, based on takings collected less your recorded expenses or the trading allowance, without other income. Takings are counted without VAT. Not your HMRC calculation."
+    de: "Unverbindliche Schätzung von Einkommensteuer und Class 4 auf Basis der vereinnahmten Einnahmen abzüglich erfasster Ausgaben oder Trading Allowance, ohne andere Einkünfte. Einnahmen ohne Umsatzsteuer gerechnet. Ersetzt nicht die Berechnung von HMRC."
   source: https://www.gov.uk/understand-self-assessment-bill/payments-on-account
-  verified_on: "2026-11-24"
+  verified_on: "2026-11-26"

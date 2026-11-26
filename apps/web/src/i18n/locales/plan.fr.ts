@@ -771,6 +771,7 @@ export const planFr: Record<keyof typeof planEn, string> = {
   'prepared.step.prior_year_tax': "Impôt de l'an passé × {rate} %",
   'prepared.step.prior_year_tax_higher_income': "Impôt de l'an passé × {rate} % (revenu au-dessus du seuil)",
   'prepared.step.annualized_income': 'Revenu à date annualisé (× {rate} %)',
+  'prepared.step.annualized_expenses': 'Dépenses à date annualisées (× {rate} %)',
   'prepared.step.annualized_tax': 'Impôt sur le revenu annualisé',
   'prepared.step.cumulative_share': 'Part cumulée due ({rate} %)',
   'prepared.step.paid_before': 'Déjà payé aux échéances précédentes',

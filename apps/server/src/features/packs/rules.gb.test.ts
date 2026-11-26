@@ -4,11 +4,13 @@ import {
   computeEstimates,
   expandDeadlines,
   measureThresholds,
+  prepareDeclaration,
   type RuleProfile,
 } from '@almanach/shared';
+import { allowableExpenses } from '../planning/planning.service.ts';
 import { PackRegistry } from './packs.ts';
 
-// United Kingdom pack, checked on gov.uk on 2026-11-24. Expected amounts are worked out by hand in the comments.
+// United Kingdom pack, checked on gov.uk on 2026-11-26. Expected amounts are worked out by hand in the comments.
 const packs = await PackRegistry.load();
 const soleTrader: RuleProfile = {
   status: 'sole_trader',
@@ -67,13 +69,29 @@ describe('United Kingdom pack', () => {
     expect(pack?.invoice.vatRateBp).toBe(2000);
   });
 
-  test('every rule cites gov.uk and was checked on 2026-11-24', () => {
+  test('every function is verified; activities and e-invoicing are not offered', () => {
+    expect(packs.get('GB')?.features).toEqual({
+      thresholds: 'verified',
+      estimates: 'verified',
+      deadlines: 'verified',
+      reserve: 'verified',
+      prepare: 'verified',
+      expenses: 'verified',
+      vault_types: 'verified',
+    });
+  });
+
+  test('every rule, prepared declaration and vault kind cites gov.uk and was checked on 2026-11-26', () => {
+    const sourced: { source?: string; verified_on?: string }[] = [...(packs.get('GB')?.vault?.kinds ?? [])];
     for (const year of packs.publishedYears('GB')) {
       const rules = rulesOf(year);
-      for (const item of [...rules.thresholds, ...rules.estimates, ...rules.deadlines]) {
-        expect(item.source.startsWith('https://www.gov.uk/')).toBe(true);
-        expect(item.verified_on).toBe('2026-11-24');
-      }
+      sourced.push(...rules.thresholds, ...rules.estimates, ...rules.allowances, ...rules.deadlines);
+      for (const deadline of rules.deadlines) if (deadline.prepare) sourced.push(deadline.prepare);
+      if (rules.reserve) sourced.push(rules.reserve);
+    }
+    for (const item of sourced) {
+      expect(item.source?.startsWith('https://www.gov.uk/')).toBe(true);
+      expect(item.verified_on).toBe('2026-11-26');
     }
   });
 });
@@ -304,6 +322,135 @@ describe('United Kingdom VAT deregistration threshold', () => {
   test('cites gov.uk', () => {
     expect(rulesOf(2026).thresholds.find((rule) => rule.id === 'vat_deregistration')?.source).toBe(
       'https://www.gov.uk/register-for-vat/cancel-your-registration',
+    );
+  });
+});
+
+describe('United Kingdom expenses', () => {
+  const estimates = (pence: number, expensesCents: number) =>
+    Object.fromEntries(
+      computeEstimates(rulesOf(2026), { ...soleTrader, expensesCents }, [
+        { date: '2026-06-30', cents: pence },
+      ]).map((result) => [result.id, result.cents]),
+    );
+  const pack = packs.get('GB');
+  if (!pack) throw new Error('no GB pack');
+  const paid = [{ date: '2026-05-02', netCents: 10_000, vatCents: 2_000 }];
+
+  test('not VAT registered: the VAT paid is part of the allowable cost', () => {
+    expect(allowableExpenses(pack, [], paid)).toEqual([
+      { date: '2026-05-02', netCents: 12_000, vatCents: 0 },
+    ]);
+  });
+
+  test('VAT registered: only the amount before the reclaimable VAT is an expense', () => {
+    expect(allowableExpenses(pack, ['vat_registered'], paid)).toEqual(paid);
+  });
+
+  test('expenses larger than takings leave no profit, the trading allowance never makes a loss', () => {
+    expect(estimates(300_000, 500_000)).toEqual({ income_tax: 0, class4_nic: 0 });
+    expect(estimates(60_000, 0)).toEqual({ income_tax: 0, class4_nic: 0 });
+  });
+
+  test('£1,000 of expenses equals the allowance: the profit is the same either way', () => {
+    expect(estimates(3_000_000, 100_000)).toEqual(estimates(3_000_000, 0));
+    // £1,000.01 of expenses: one more penny off, 28,999.99 − 12,570 = 16,429.99 × 20 % = 3,286.00 (3,285.998).
+    expect(estimates(3_000_000, 100_001).income_tax).toBe(328_600);
+  });
+
+  test('tells what is allowable, VAT included without registration, never both with the allowance', () => {
+    const note = pack.expensesNote?.en ?? '';
+    expect(note).toContain('client entertaining and buying a car are not allowable');
+    expect(note).toContain('not VAT registered, the VAT you paid is part of the cost');
+    expect(note).toContain('you cannot claim both');
+  });
+});
+
+describe('United Kingdom prepared declarations', () => {
+  const prepare = (year: number, deadline: string) => {
+    const rules = rulesOf(year);
+    const block = rules.deadlines.find((rule) => rule.id === deadline)?.prepare;
+    if (!block) throw new Error(`no prepare block for ${deadline}`);
+    return { rules, prepare: block };
+  };
+  const base = { invoiced: [], notice: null, estimatesCents: 0, paidBeforeCents: 0 };
+
+  test('2025-26 return: SA103S box 9 turnover received in the tax year, box 20 total expenses', () => {
+    const result = prepareDeclaration({
+      ...base,
+      ...prepare(2025, 'self_assessment_online'),
+      profile: soleTrader,
+      receipts: [
+        { date: '2025-04-05', cents: 999_999 },
+        { date: '2025-04-06', cents: 1_500_000 },
+        { date: '2026-04-05', cents: 2_000_000 },
+        { date: '2026-04-06', cents: 999_999 },
+      ],
+      expenses: [
+        { date: '2025-04-06', netCents: 30_000, vatCents: 0 },
+        { date: '2026-04-06', netCents: 99_999, vatCents: 0 },
+      ],
+      fiscalStart: '2025-04-06',
+      fiscalYear: 2025,
+      periodStart: '2025-04-06',
+      periodEnd: '2026-04-05',
+    });
+    expect(result.lines.map((line) => [line.label.en, line.cents])).toEqual([
+      ['Box 9 — Turnover', 3_500_000],
+      ['Box 20 — Total allowable expenses', 30_000],
+    ]);
+    expect(result.amount).toBeNull();
+    expect(result.note?.en).toContain('below £90,000');
+    expect(result.note?.en).toContain('trading allowance (box 10.1');
+  });
+
+  test('2026-27 return: the same figures, no box number until HMRC publishes the 2026-27 page', () => {
+    const { prepare: block } = prepare(2026, 'self_assessment_online');
+    expect(block.lines.map((line) => [line.id, line.measure, line.label.en])).toEqual([
+      ['turnover', 'revenue', 'Turnover'],
+      ['expenses', 'expenses', 'Total allowable expenses'],
+    ]);
+  });
+
+  test('MTD update: turnover and consolidated expenses cumulated from 6 April', () => {
+    const result = prepareDeclaration({
+      ...base,
+      ...prepare(2026, 'mtd_quarterly_update'),
+      profile: { ...soleTrader, options: ['mtd_itsa'] },
+      receipts: [
+        { date: '2026-04-10', cents: 300_000 },
+        { date: '2026-08-01', cents: 400_000 },
+        { date: '2026-10-06', cents: 500_000 },
+      ],
+      expenses: [
+        { date: '2026-05-01', netCents: 12_000, vatCents: 0 },
+        { date: '2026-09-30', netCents: 8_000, vatCents: 0 },
+        { date: '2026-10-06', netCents: 5_000, vatCents: 0 },
+      ],
+      fiscalStart: '2026-04-06',
+      fiscalYear: 2026,
+      periodStart: '2026-04-06',
+      periodEnd: '2026-10-05',
+    });
+    expect(result.lines.map((line) => [line.id, line.cents])).toEqual([
+      ['turnover', 700_000],
+      ['expenses', 20_000],
+    ]);
+    expect(result.note?.en).toContain('Below £90,000 of annual turnover the expenses total is enough');
+  });
+});
+
+describe('United Kingdom vault kinds', () => {
+  test('UTR letter, VAT confirmation once registered, insurance with an expiry, employment status check', () => {
+    const kinds = packs.get('GB')?.vault?.kinds ?? [];
+    expect(kinds.map((kind) => [kind.id, kind.expires, kind.appliesTo?.options ?? []])).toEqual([
+      ['utr_letter', false, []],
+      ['vat_certificate', false, ['vat_registered']],
+      ['professional_indemnity', true, []],
+      ['ir35_determination', false, []],
+    ]);
+    expect(kinds.find((kind) => kind.id === 'ir35_determination')?.source).toBe(
+      'https://www.gov.uk/guidance/check-employment-status-for-tax',
     );
   });
 });

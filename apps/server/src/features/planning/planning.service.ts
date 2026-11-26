@@ -4,6 +4,7 @@ import {
   computeEstimates,
   type DeadlineNotice,
   type DeadlineOccurrence,
+  deductibleCents,
   type EstimateResult,
   type ExpenseItem,
   expandDeadlines,
@@ -21,6 +22,7 @@ import {
   type RuleProfile,
   type Situation,
   type ThresholdProgress,
+  type Totals,
 } from '@almanach/shared';
 import { and, asc, eq, gte, inArray, lte, ne, sql } from 'drizzle-orm';
 import type { Database } from '../../db/client.ts';
@@ -43,6 +45,7 @@ import {
   reserveSettings,
   situationChanges,
 } from '../../db/schema.ts';
+import { vatModeFor } from '../documents/vat.ts';
 import type { PackRegistry } from '../packs/packs.ts';
 
 type ProfileRow = typeof profiles.$inferSelect;
@@ -213,6 +216,7 @@ export class PlanningService {
         amount: payments.amountCents,
         received: payments.receivedCents,
         currency: documents.currency,
+        totals: documents.totals,
         category: companyActivities.status,
       })
       .from(payments)
@@ -229,6 +233,7 @@ export class PlanningService {
         amount: externalRevenues.amountCents,
         received: externalRevenues.receivedCents,
         currency: externalRevenues.currency,
+        totals: sql<Totals | null>`null`,
         category: sql<string | null>`null`,
       })
       .from(externalRevenues)
@@ -245,9 +250,11 @@ export class PlanningService {
     let unconverted = 0;
     for (const row of [...rows, ...external]) {
       const category = row.category ? { category: row.category } : {};
-      if (row.currency === mainCurrency) receipts.push({ date: row.date, cents: row.amount, ...category });
-      else if (row.received !== null) receipts.push({ date: row.date, cents: row.received, ...category });
-      else unconverted += 1;
+      if (row.currency === mainCurrency) {
+        receipts.push({ date: row.date, cents: netOfVat(row.amount, row.totals), ...category });
+      } else if (row.received !== null) {
+        receipts.push({ date: row.date, cents: netOfVat(row.received, row.totals), ...category });
+      } else unconverted += 1;
     }
     return { receipts, unconverted };
   }
@@ -704,6 +711,54 @@ export class PlanningService {
   }
 
   /**
+   * Net and VAT of invoices and deposits split over the payments received between two dates, dated by payment, for
+   * VAT on money collected (German Ist-Versteuerung); documents in another currency are left out
+   *
+   * @param companyId {string} - owner
+   * @param currency {string} - main currency
+   * @param from {string} - first day
+   * @param to {string} - last day
+   * @returns {Promise<InvoicedItem[]>} - one item per payment, its share of the document's net and VAT
+   */
+  async collected(companyId: string, currency: string, from: string, to: string): Promise<InvoicedItem[]> {
+    const rows = await this.db
+      .select({
+        date: payments.date,
+        amount: payments.amountCents,
+        totals: documents.totals,
+        vatMode: documents.vatMode,
+        category: companyActivities.status,
+      })
+      .from(payments)
+      .innerJoin(documents, eq(documents.id, payments.documentId))
+      .leftJoin(
+        companyActivities,
+        eq(companyActivities.id, sql`coalesce(${payments.activityId}, ${documents.activityId})`),
+      )
+      .where(
+        and(
+          eq(payments.companyId, companyId),
+          eq(documents.currency, currency),
+          gte(payments.date, from),
+          lte(payments.date, to),
+        ),
+      );
+    return rows.map((row) => {
+      // Deposits deducted from a final invoice were taxed when paid: each payment carries the document's VAT share.
+      const gross = row.totals.netCents + row.totals.vatCents;
+      const netCents = gross === 0 ? 0 : Math.round((row.amount * row.totals.netCents) / gross);
+      return {
+        date: row.date,
+        netCents,
+        vatRateBp: row.totals.vatRateBp,
+        vatCents: row.amount - netCents,
+        vatMode: row.vatMode,
+        ...(row.category ? { category: row.category } : {}),
+      };
+    });
+  }
+
+  /**
    * Prepared declaration of an occurrence whose rule has a prepare block
    *
    * @param companyId {string} - owner
@@ -744,6 +799,9 @@ export class PlanningService {
       profile: ruleProfile(profile, await this.activities(companyId), await this.household(companyId)),
       receipts: [...local.receipts, ...linked],
       invoiced: await this.invoiced(companyId, profile.currency, fiscal.start, periodEnd),
+      ...(prepare.collectedWithOption
+        ? { collected: await this.collected(companyId, profile.currency, fiscal.start, periodEnd) }
+        : {}),
       expenses: await this.expenses(companyId, profile.currency, fiscal.start, periodEnd),
       fiscalStart: fiscal.start,
       fiscalYear: fiscal.year,
@@ -781,7 +839,12 @@ export class PlanningService {
       .limit(1);
     if (!any) return null;
     const rows = await this.db
-      .select({ date: expenses.date, netCents: expenses.amountCents, vatCents: expenses.vatCents })
+      .select({
+        date: expenses.date,
+        netCents: expenses.amountCents,
+        vatCents: expenses.vatCents,
+        category: expenses.category,
+      })
       .from(expenses)
       .where(
         and(
@@ -791,11 +854,12 @@ export class PlanningService {
           lte(expenses.date, to),
         ),
       );
-    return rows;
+    return allowableExpenses(pack, profile.options, rows);
   }
 
   /**
-   * Total of the expenses between two dates, before VAT, for the "profit" base of the estimates
+   * Deductible total of the expenses between two dates, before reclaimable VAT, for the "profit" base of the
+   * estimates (a category the pack only partly allows, such as US business meals, counts for its deductible share)
    *
    * @param companyId {string} - owner
    * @param currency {string} - main currency
@@ -804,10 +868,12 @@ export class PlanningService {
    * @returns {Promise<number>} - cents, 0 when expenses are not tracked
    */
   async expenseTotal(companyId: string, currency: string, from: string, to: string): Promise<number> {
-    return ((await this.expenses(companyId, currency, from, to)) ?? []).reduce(
-      (sum, item) => sum + item.netCents,
-      0,
-    );
+    const items = (await this.expenses(companyId, currency, from, to)) ?? [];
+    const profile = await this.profile(companyId);
+    const pack = profile && this.packs.get(profile.country);
+    const rules =
+      pack && this.packs.rules(pack.country, fiscalYearOf(from, pack.fiscalYearStart).year)?.rules;
+    return items.reduce((sum, item) => sum + (rules ? deductibleCents(rules, item) : item.netCents), 0);
   }
 
   /**
@@ -980,4 +1046,33 @@ function monthlyEstimates(
     });
   }
   return out;
+}
+
+/**
+ * Part of a payment that is revenue: the VAT the invoice charged is collected for the State, never income, so a
+ * payment counts in proportion of the document's amount before VAT (a deposit deduction keeps that proportion)
+ *
+ * @param cents {number} - amount paid, VAT included
+ * @param totals {Totals | null} - totals of the paid document; null when the source already gives the amount before VAT
+ * @returns {number} - the amount before VAT, in minor units
+ */
+export function netOfVat(cents: number, totals: Totals | null): number {
+  if (!totals || totals.vatCents === 0) return cents;
+  const gross = totals.netCents + totals.vatCents;
+  return gross === 0 ? cents : Math.round((cents * totals.netCents) / gross);
+}
+
+/**
+ * Expenses as the profit sees them: without VAT registration the VAT paid cannot be reclaimed and is part of the
+ * cost (UK: https://www.gov.uk/hmrc-internal-manuals/business-income-manual/bim31535), so it moves to the net
+ * amount and nothing is left to deduct as VAT
+ *
+ * @param pack {PackMeta} - country pack of the company
+ * @param options {string[]} - options of the profile
+ * @param rows {ExpenseItem[]} - expenses with the amount before VAT and the VAT paid
+ * @returns {ExpenseItem[]} - the same expenses, VAT added to the net amount when it cannot be reclaimed
+ */
+export function allowableExpenses(pack: PackMeta, options: string[], rows: ExpenseItem[]): ExpenseItem[] {
+  if (vatModeFor(pack, options, 'domestic', 'company') === 'standard') return rows;
+  return rows.map((row) => ({ ...row, netCents: row.netCents + row.vatCents, vatCents: 0 }));
 }

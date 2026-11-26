@@ -39,32 +39,32 @@ données. Les outils libres, eux, ne connaissent pas les règles de ton pays. Al
 Version **0.1.0**, la première version numérotée ([journal des modifications](CHANGELOG.md)).
 La France est le pays de référence :
 ses règles 2026 sont **vérifiées**, chaque chiffre cite sa source officielle et sa date de
-vérification. Le Royaume-Uni est vérifié aussi (année fiscale 2026-27, sur gov.uk). L'Allemagne
-et les États-Unis sont **expérimentaux**, et
-l'application le dit à l'inscription. Le détail est dans le
+vérification. Le Royaume-Uni (année fiscale 2026-27, sur gov.uk), l'Allemagne et les États-Unis (impôt
+fédéral seulement) sont vérifiés aussi. Les fonctionnalités encore expérimentales sont listées
+ci-dessous, et l'application le dit. Le détail est dans le
 [cahier des charges](docs/cahier-des-charges.md).
 
 | Pays | Pack | Ce qui est couvert |
 |---|---|---|
 | France | Vérifié | Micro-entreprise (BNC, BIC services et ventes), URSSAF mensuelle ou trimestrielle, versement libératoire, ACRE, CIPAV, CFE, franchise de TVA |
-| Allemagne | Expérimental | Freiberufler et Gewerbe, Kleinunternehmer, Umsatzsteuer-Voranmeldung, Vorauszahlungen (ESt, GewSt) |
-| Royaume-Uni | Vérifié | Sole trader, Self Assessment (inscription, déclarations, payments on account), income tax avec ou sans Écosse, Class 4 NIC, Making Tax Digital (trimestriel), seuil de TVA. Hors périmètre : partnerships, limited companies, flat rate scheme ; estimations sans frais ni trading allowance |
-| États-Unis | Expérimental | Sole proprietor et single-member LLC, self-employment tax, estimated taxes, Form 1040 |
+| Allemagne | Vérifié | Freiberufler et Gewerbe, Kleinunternehmer, Umsatzsteuer-Voranmeldung (Soll ou Ist, Dauerfristverlängerung), Vorauszahlungen (ESt, GewSt), Solidaritätszuschlag. Hors calcul : impôt d'église, Gewerbesteuer, assurance maladie, imposition commune |
+| Royaume-Uni | Vérifié | Sole trader, Self Assessment (inscription, déclarations, payments on account), income tax avec ou sans Écosse, Class 4 NIC, Making Tax Digital (trimestriel), seuil de TVA. Hors périmètre : partnerships, limited companies, flat rate scheme ; dépenses ou trading allowance déduites |
+| États-Unis | Vérifié | Sole proprietor et single-member LLC, self-employment tax, Additional Medicare Tax, déduction QBI, estimated taxes (safe harbor, méthode annualisée), Form 1040 et Schedule C. Fédéral seulement (ni État ni local), célibataire ou déclaration commune |
 
 Chaque pack déclare aussi la maturité de chaque fonctionnalité (`features` dans `pack.yaml`). Une
 fonctionnalité absente est indisponible pour ce pays, et l'application l'explique.
 
 | Fonctionnalité | France | Allemagne | Royaume-Uni | États-Unis |
 |---|---|---|---|---|
-| Seuils | Vérifié | Expérimental | Vérifié | — |
-| Estimations | Vérifié | Expérimental | Vérifié | Expérimental |
-| Échéances | Vérifié | Expérimental | Vérifié | Expérimental |
-| Activités multiples | Vérifié | Expérimental | — | Expérimental |
-| Réserve | Expérimental | Expérimental | Vérifié | Expérimental |
-| Déclaration préparée | Expérimental | Expérimental | Expérimental | Expérimental |
-| Dépenses | Expérimental | Expérimental | Expérimental | Expérimental |
-| Types de pièces du coffre | Expérimental | Expérimental | Expérimental | Expérimental |
-| Factur-X | Vérifié | Expérimental | — | — |
+| Seuils | Vérifié | Vérifié | Vérifié | — |
+| Estimations | Vérifié | Vérifié | Vérifié | Vérifié |
+| Échéances | Vérifié | Vérifié | Vérifié | Vérifié |
+| Activités multiples | Vérifié | Vérifié | — | Vérifié |
+| Réserve | Expérimental | Vérifié | Vérifié | Vérifié |
+| Déclaration préparée | Vérifié | Vérifié | Vérifié | Vérifié |
+| Dépenses | Vérifié | Expérimental | Vérifié | Vérifié |
+| Types de pièces du coffre | Vérifié | Expérimental | Vérifié | Vérifié |
+| Factur-X | Vérifié | Vérifié | — | — |
 
 ## Ce que ça fait
 

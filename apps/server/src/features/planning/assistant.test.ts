@@ -370,7 +370,7 @@ describe.skipIf(!url)('administrative assistant (database)', () => {
       ).status,
     ).toBe(422);
     const list = await json('a', '/api/expenses');
-    expect(list).toMatchObject({ currency: 'EUR', maturity: 'experimental' });
+    expect(list).toMatchObject({ currency: 'EUR', maturity: 'verified' });
     expect(list.note.fr).toContain('pas déductibles');
     expect((await json('b', '/api/expenses')).expenses).toEqual([]);
     expect((await call('b', `/api/expenses/${row.id}`, { method: 'DELETE' })).status).toBe(404);

@@ -1,19 +1,21 @@
 /**
- * Writes the Factur-X samples (French franchise, VAT, credit note, reverse charge) and validates each with
+ * Writes the Factur-X samples (French and German franchise, VAT, credit note, reverse charge) and validates each with
  * veraPDF (PDF/A-3B), the CEN EN 16931 CII Schematron (official XSLT) and Mustang (Factur-X as a whole).
  * Usage: VERAPDF=… MUSTANG_JAR=… CEN_CII_XSLT=… bun apps/server/src/cli/einvoice-validate.ts <out-dir>
  * A validator whose variable is unset is skipped and reported; any failure exits with status 1.
  */
 import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import { frenchSamples, renderSample } from '../features/documents/einvoice.samples.ts';
+import { frenchSamples, germanSamples, renderSample } from '../features/documents/einvoice.samples.ts';
 import { renderPdf } from '../features/documents/pdf.ts';
 import { PackRegistry } from '../features/packs/packs.ts';
 
 const out = resolve(process.argv[2] ?? 'einvoice-samples');
 const { VERAPDF, MUSTANG_JAR, CEN_CII_XSLT } = process.env;
-const pack = (await PackRegistry.load()).get('FR');
-if (!pack) throw new Error('French pack missing');
+const registry = await PackRegistry.load();
+const pack = registry.get('FR');
+const germanPack = registry.get('DE');
+if (!pack || !germanPack) throw new Error('French or German pack missing');
 await mkdir(out, { recursive: true });
 
 /**
@@ -72,8 +74,11 @@ if (first && VERAPDF) {
   report('classic-draft', 'veraPDF PDF/A-3B', /^PASS /m.test(text), /^PASS /m.test(text) ? '' : text.trim());
 }
 
-for (const sample of frenchSamples(pack)) {
-  const { xml, pdf } = await renderSample(sample, pack);
+for (const [sample, seller] of [
+  ...frenchSamples(pack).map((item) => [item, pack] as const),
+  ...germanSamples(germanPack).map((item) => [item, germanPack] as const),
+]) {
+  const { xml, pdf } = await renderSample(sample, seller);
   const pdfPath = resolve(out, `${sample.name}.pdf`);
   const xmlPath = resolve(out, `${sample.name}.xml`);
   await writeFile(pdfPath, pdf);

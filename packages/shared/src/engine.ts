@@ -302,12 +302,19 @@ function brackets(rule: EstimateRule, baseCents: number, deductionsCents: number
     allowance = Math.max(0, allowance - reduction);
   }
   let taxable = Math.max(0, baseCents - deductionsCents - allowance);
-  if (rule.formula.businessIncomeDeductionBp) {
-    const share = rule.formula.businessIncomeDeductionBp;
-    taxable -= Math.min(
-      applyRate(Math.max(0, baseCents - deductionsCents), share),
-      applyRate(taxable, share),
-    );
+  const { businessIncomeDeductionBp: share, businessIncomeDeductionLimit: limit } = rule.formula;
+  if (share) {
+    const income = Math.max(0, baseCents - deductionsCents);
+    let deduction = applyRate(income, share);
+    // Above the threshold the deduction is reduced in proportion to the excess over the phase-in range.
+    if (limit && taxable > limit.thresholdCents)
+      deduction = Math.max(
+        0,
+        deduction - Math.round((deduction * (taxable - limit.thresholdCents)) / limit.phaseInCents),
+      );
+    deduction = Math.min(deduction, applyRate(taxable, share));
+    if (limit && income >= limit.minimumIncomeCents) deduction = Math.max(deduction, limit.minimumCents);
+    taxable = Math.max(0, taxable - deduction);
   }
   let previous = 0;
   const steps: EstimateResult['steps'] = [];
@@ -334,16 +341,17 @@ function brackets(rule: EstimateRule, baseCents: number, deductionsCents: number
  * Contributions on profits between limits (UK Class 4 National Insurance)
  *
  * @param rule {EstimateRule} - estimate whose formula kind is "profit_bands"
- * @param baseCents {number} - yearly profit
+ * @param baseCents {number} - yearly profit, before the share of it the bands apply to
  * @returns {EstimateResult} - amount and one step per band used
  */
 function profitBands(rule: EstimateRule, baseCents: number): EstimateResult {
   if (rule.formula.kind !== 'profit_bands') throw new Error('not a profit band estimate');
-  const bands = rule.formula.bands;
+  const { bands, baseShareBp } = rule.formula;
+  const base = baseShareBp === undefined ? baseCents : applyRate(baseCents, baseShareBp);
   const steps: EstimateResult['steps'] = [];
   bands.forEach((band, index) => {
     const upper = bands[index + 1]?.fromCents ?? Number.POSITIVE_INFINITY;
-    const portion = Math.max(0, Math.min(baseCents, upper) - band.fromCents);
+    const portion = Math.max(0, Math.min(base, upper) - band.fromCents);
     if (portion > 0)
       steps.push({ baseCents: portion, rateBp: band.rateBp, cents: applyRate(portion, band.rateBp) });
   });
@@ -415,6 +423,34 @@ function deIncomeTax(rule: EstimateRule, baseCents: number): EstimateResult {
     label: rule.label,
     cents,
     steps: cents > 0 ? [{ baseCents, rateBp: Math.round((cents * 10_000) / baseCents), cents }] : [],
+    source: rule.source,
+    verifiedOn: rule.verified_on,
+  };
+}
+
+/**
+ * German Solidaritätszuschlag on an income tax amount (§§ 3 and 4 SolZG): nothing up to the Freigrenze, then the
+ * rate capped at a share of the excess over it; fractions of a cent are dropped
+ *
+ * @param rule {EstimateRule} - estimate whose formula kind is "de_solidarity"
+ * @param taxCents {number} - income tax it is levied on
+ * @returns {EstimateResult} - amount with one step on the income tax
+ */
+function deSolidarity(rule: EstimateRule, taxCents: number): EstimateResult {
+  if (rule.formula.kind !== 'de_solidarity') throw new Error('not a solidarity surcharge estimate');
+  const { rateBp, exemptionCents, excessRateBp } = rule.formula;
+  const cents =
+    taxCents <= exemptionCents
+      ? 0
+      : Math.min(
+          Math.floor((taxCents * rateBp) / 10_000),
+          Math.floor(((taxCents - exemptionCents) * excessRateBp) / 10_000),
+        );
+  return {
+    id: rule.id,
+    label: rule.label,
+    cents,
+    steps: cents > 0 ? [{ baseCents: taxCents, rateBp: Math.round((cents * 10_000) / taxCents), cents }] : [],
     source: rule.source,
     verifiedOn: rule.verified_on,
   };
@@ -575,6 +611,8 @@ function activityEstimates(
     } else if (formula.kind === 'profit_bands') result = profitBands(rule, base);
     else if (formula.kind === 'us_self_employment') result = usSelfEmployment(rule, base);
     else if (formula.kind === 'fr_income_tax') result = frIncomeTax(rule, base, profile.household);
+    else if (formula.kind === 'de_solidarity')
+      result = deSolidarity(rule, results.get(formula.of)?.cents ?? 0);
     else result = deIncomeTax(rule, base);
     results.set(rule.id, result);
   }
@@ -777,6 +815,9 @@ export function measureThresholds(
   return rules.thresholds
     .filter((rule) => applies(rule.appliesTo, business))
     .map((rule) => {
+      const startYear = profile.activityStart >= fiscalYear.start && profile.activityStart <= fiscalYear.end;
+      const limit =
+        startYear && rule.startYearLimitCents !== undefined ? rule.startYearLimitCents : rule.limitCents;
       let start = fiscalYear.start;
       let end = fiscalYear.end;
       if (rule.window === 'previous_fiscal_year') {
@@ -803,9 +844,9 @@ export function measureThresholds(
       }
       let projected: string | null = null;
       const below = rule.direction === 'below';
-      if (!below && rule.window === 'fiscal_year' && reached > 0 && reached < rule.limitCents) {
+      if (!below && rule.window === 'fiscal_year' && reached > 0 && reached < limit) {
         const elapsed = Math.max(1, daysBetween(start, today) + 1);
-        const date = addDays(start, Math.ceil((rule.limitCents * elapsed) / reached) - 1);
+        const date = addDays(start, Math.ceil((limit * elapsed) / reached) - 1);
         if (date <= end) projected = date;
       }
       return {
@@ -816,16 +857,16 @@ export function measureThresholds(
         direction: rule.direction,
         windowStart: start,
         windowEnd: end,
-        limitCents: rule.limitCents,
+        limitCents: limit,
         toleranceCents: rule.toleranceCents ?? null,
         reachedCents: reached,
         linkedCents: linked,
-        reachedBp: rule.limitCents === 0 ? 0 : Math.round((reached * 10_000) / rule.limitCents),
-        remainingCents: below ? 0 : Math.max(0, rule.limitCents - reached),
+        reachedBp: limit === 0 ? 0 : Math.round((reached * 10_000) / limit),
+        remainingCents: below ? 0 : Math.max(0, limit - reached),
         projectedDate: projected,
-        exceeded: !below && reached > rule.limitCents,
+        exceeded: !below && reached > limit,
         toleranceExceeded: rule.toleranceCents !== undefined && reached > rule.toleranceCents,
-        fellBelow: below && reached < rule.limitCents,
+        fellBelow: below && reached < limit,
         source: rule.source,
         verifiedOn: rule.verified_on,
       };
@@ -914,6 +955,20 @@ export interface ExpenseItem {
   date: string;
   netCents: number;
   vatCents: number;
+  /** Category of the expense, for form boxes per category and deductible shares. */
+  category?: string;
+}
+
+/**
+ * Deductible part of an expense: its amount before VAT times the share the rules allow for its category
+ *
+ * @param rules {YearRules} - rules of the fiscal year
+ * @param item {ExpenseItem} - the expense
+ * @returns {number} - deductible cents
+ */
+export function deductibleCents(rules: YearRules, item: ExpenseItem): number {
+  const share = rules.expenseShares.find((rule) => rule.category === item.category);
+  return share ? applyRate(item.netCents, share.deductibleBp) : item.netCents;
 }
 
 /** Amounts read from a notice or entered by the person for one deadline rule and fiscal year. */
@@ -958,6 +1013,9 @@ export interface PreparedDeclaration {
  * @param input.profile {RuleProfile} - the person's situation
  * @param input.receipts {Receipt[]} - money collected from the start of the fiscal year to the end of the period
  * @param input.invoiced {InvoicedItem[]} - invoices and credit notes issued over the same dates
+ * @param input.collected {InvoicedItem[] | undefined} - net and VAT of invoices and deposits split over the
+ * payments received over the same dates, dated by payment; the taxable bases and VAT of a collected basis come
+ * from them (operations in another VAT mode stay dated by invoice: § 18b UStG declares them when performed)
  * @param input.expenses {ExpenseItem[] | null} - expenses over the same dates; null when none are tracked
  * @param input.fiscalStart {string} - first day of the fiscal year
  * @param input.fiscalYear {number} - the fiscal year
@@ -974,6 +1032,7 @@ export function prepareDeclaration(input: {
   profile: RuleProfile;
   receipts: Receipt[];
   invoiced: InvoicedItem[];
+  collected?: InvoicedItem[];
   expenses: ExpenseItem[] | null;
   fiscalStart: string;
   fiscalYear: number;
@@ -984,27 +1043,34 @@ export function prepareDeclaration(input: {
   paidBeforeCents: number;
 }): PreparedDeclaration {
   const { prepare, notice } = input;
+  const basis =
+    prepare.collectedWithOption && input.profile.options.includes(prepare.collectedWithOption)
+      ? 'collected'
+      : prepare.basis;
   const from = prepare.span === 'period' ? input.periodStart : input.fiscalStart;
   const within = (date: string) => date >= from && date <= input.periodEnd;
   const statusOf = (category: string | undefined) => category ?? input.profile.status ?? '';
   const invoiced = input.invoiced.filter((item) => within(item.date));
+  const taxed =
+    basis === 'collected' && input.collected ? input.collected.filter((item) => within(item.date)) : invoiced;
   const expenses = input.expenses?.filter((item) => within(item.date)) ?? null;
   const sum = (values: number[]) => values.reduce((total, value) => total + value, 0);
 
   const own = activityStatuses(input.profile);
   const lines = prepare.lines
     .filter((line) => !line.statuses || line.statuses.some((status) => own.includes(status)))
+    .filter((line) => applies({ options: line.options, withoutOptions: line.withoutOptions }, input.profile))
     .map((line) => {
       const statuses = (category: string | undefined) =>
         !line.statuses || line.statuses.includes(statusOf(category));
-      const standard = invoiced.filter(
+      const standard = taxed.filter(
         (item) =>
           item.vatMode === 'standard' && (line.vatRateBp === undefined || item.vatRateBp === line.vatRateBp),
       );
       let cents: number | null;
       if (line.measure === 'revenue')
         cents =
-          prepare.basis === 'collected'
+          basis === 'collected'
             ? sum(
                 input.receipts
                   .filter((item) => within(item.date) && statuses(item.category))
@@ -1015,7 +1081,16 @@ export function prepareDeclaration(input: {
       else if (line.measure === 'vat_collected') cents = sum(standard.map((item) => item.vatCents));
       else if (line.measure === 'vat_mode_base')
         cents = sum(invoiced.filter((item) => item.vatMode === line.vatMode).map((item) => item.netCents));
-      else if (line.measure === 'expenses') cents = expenses && sum(expenses.map((item) => item.netCents));
+      else if (line.measure === 'expenses')
+        cents =
+          expenses &&
+          sum(
+            expenses
+              .filter(
+                (item) => !line.categories?.length || line.categories.some((id) => id === item.category),
+              )
+              .map((item) => deductibleCents(input.rules, item)),
+          );
       else cents = expenses && sum(expenses.map((item) => item.vatCents));
       return { id: line.id, label: line.label, measure: line.measure, cents };
     });
@@ -1059,8 +1134,19 @@ export function prepareDeclaration(input: {
           (item) => item.date >= input.fiscalStart && item.date <= input.periodEnd,
         );
         const annualized = toDate.map((item) => ({ ...item, cents: applyRate(item.cents, period.factorBp) }));
+        // Expenses to date are annualized like income, so the annualized profit is what is taxed.
+        const expensesToDate = (input.expenses ?? []).filter(
+          (item) => item.date >= input.fiscalStart && item.date <= input.periodEnd,
+        );
+        const profile = {
+          ...input.profile,
+          expensesCents: applyRate(
+            sum(expensesToDate.map((item) => deductibleCents(input.rules, item))),
+            period.factorBp,
+          ),
+        };
         const yearly = sum(
-          computeEstimates(input.rules, input.profile, annualized, rule.estimates).map((item) => item.cents),
+          computeEstimates(input.rules, profile, annualized, rule.estimates).map((item) => item.cents),
         );
         const due = applyRate(yearly, period.shareBp);
         steps.push(
@@ -1069,6 +1155,9 @@ export function prepareDeclaration(input: {
             cents: sum(annualized.map((item) => item.cents)),
             rateBp: period.factorBp,
           },
+          ...(input.expenses
+            ? [{ kind: 'annualized_expenses', cents: -(profile.expensesCents ?? 0), rateBp: period.factorBp }]
+            : []),
           { kind: 'annualized_tax', cents: yearly },
           { kind: 'cumulative_share', cents: due, rateBp: period.shareBp },
           { kind: 'paid_before', cents: -input.paidBeforeCents },
@@ -1087,7 +1176,7 @@ export function prepareDeclaration(input: {
   }
   return {
     fiscalYear: input.fiscalYear,
-    basis: prepare.basis,
+    basis,
     span: prepare.span,
     periodStart: from,
     periodEnd: input.periodEnd,

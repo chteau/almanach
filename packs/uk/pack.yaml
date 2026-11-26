@@ -1,5 +1,5 @@
 # Pack United Kingdom — metadata used by onboarding. Yearly rules live in <year>.yaml.
-# Checked on gov.uk on 2026-11-24. Only sole traders are modelled: partnerships and limited companies are not.
+# Checked on gov.uk on 2026-11-26. Only sole traders are modelled: partnerships and limited companies are not.
 # Income tax depends on where you live: rest of the UK (England, Wales, Northern Ireland share the same bands
 # while the Welsh rates equal them) or Scotland (option `scotland`).
 country: GB
@@ -7,34 +7,53 @@ maturity: verified
 # Maturity per function (verified = sourced and covered by tests); a function not listed is unavailable.
 # `activities` is not offered: the pack has a single status, so several trades are kept in one company. That is
 # what the tax needs (income tax, Class 4, the trading allowance and the VAT threshold all apply to the total of
-# the person's trades), but quarterly MTD updates are due for each business and are not split per trade.
+# the person's trades), but quarterly MTD updates are due "for each self-employment and property business you have"
+# (https://www.gov.uk/guidance/use-making-tax-digital-for-income-tax/send-quarterly-updates, 2026-11-26) and each
+# trade has its own SA103 page: prepared lines can only be split by status, so two trades of one sole trader
+# cannot be told apart. Kept absent rather than shown with wrong per-trade figures.
+# `einvoicing` is not offered: no UK e-invoicing obligation is in force. VAT e-invoices are announced from April
+# 2029, with the detailed requirements still to be set by secondary legislation
+# (https://www.gov.uk/government/publications/vat-electronic-invoicing/e-invoicing-requirements, 2026-11-26).
 features:
   thresholds: verified
   estimates: verified
   deadlines: verified
   # Reserve: Income Tax and Class 4 from gov.uk, payments on account per gov.uk, hand-computed cases in reserve tests.
   reserve: verified
-  # Prepared declaration: experimental — MTD figures only (no HMRC submission), expenses not split by category.
-  prepare: experimental
-  # Expenses: experimental — fill the MTD expenses total and lower the profit (instead of the trading allowance when
-  # larger); HMRC categories not mapped, allowability not checked.
-  expenses: experimental
-  # Vault kinds: experimental — usual documents, no legal validity period is claimed.
-  vault_types: experimental
+  # Prepared declaration: turnover collected (cash basis) and total allowable expenses for the MTD quarterly updates
+  # (cumulative from 6 April; a single expenses total is accepted below £90,000 of annual turnover) and for the
+  # Self Assessment self-employment page (SA103S boxes 9 and 20, the page for turnover below £90,000), payments on
+  # account at half of last year's bill. Almanach sends nothing to HMRC; above £90,000 the note asks to split the
+  # expenses by category in the software. Sources in 2025.yaml and 2026.yaml, tests in rules.gb.test.ts.
+  prepare: verified
+  # Expenses: recorded expenses lower the profit of the estimates, the reserve and the prepared figures, by date paid
+  # (cash basis, the standard method), instead of the £1,000 trading allowance when larger (never both, never a loss
+  # from the allowance); VAT paid is part of the cost when not VAT registered (HMRC BIM31535). Which expenses are
+  # allowable is told in expensesNote, not checked per expense.
+  expenses: verified
+  # Vault kinds: documents a sole trader keeps (HMRC letter with the UTR, VAT registration confirmation, insurance,
+  # employment status check), each sourced below; no legal validity period is claimed.
+  vault_types: verified
 # Packs using fields added in Almanach 0.1.0 (reserve, fr_income_tax, prepare, expenses, vault).
 minAppVersion: "0.1.0"
 vault:
   kinds:
+    # The UTR is on previous returns and HMRC documents such as notices to file a return and payment reminders.
     - id: utr_letter
       label: { fr: "Courrier HMRC avec l'UTR", en: "HMRC letter with your UTR", de: "HMRC-Schreiben mit UTR" }
+      source: https://www.gov.uk/find-utr-number
+      verified_on: "2026-11-26"
+    # After registering, HMRC sends by post the 9-digit VAT number and the effective date of registration.
     - id: vat_certificate
       label:
         {
-          fr: "Certificat d'enregistrement à la TVA",
-          en: "VAT registration certificate",
-          de: "Umsatzsteuer-Registrierungsbescheinigung",
+          fr: "Confirmation d'immatriculation à la TVA (HMRC)",
+          en: "VAT registration confirmation from HMRC",
+          de: "Bestätigung der Umsatzsteuerregistrierung (HMRC)",
         }
       appliesTo: { options: [vat_registered] }
+      source: https://www.gov.uk/register-for-vat/how-register-for-vat
+      verified_on: "2026-11-26"
     - id: professional_indemnity
       label:
         {
@@ -44,18 +63,31 @@ vault:
         }
       expires: true
       remindDays: [30, 7]
+      # Not compulsory in general; its premiums are an allowable expense.
+      source: https://www.gov.uk/expenses-if-youre-self-employed/legal-financial
+      verified_on: "2026-11-26"
+    # Off-payroll (IR35) rules only apply through an intermediary such as a limited company, not to a sole trader:
+    # the kind keeps its id but holds HMRC's employment status check (CEST) result, whose saved answers and result
+    # a client or the worker can keep.
     - id: ir35_determination
       label:
         {
-          fr: "Décision de statut IR35 d'un client",
-          en: "IR35 status determination from a client",
-          de: "IR35-Statusfeststellung eines Kunden",
+          fr: "Résultat du test de statut d'emploi HMRC (CEST)",
+          en: "HMRC employment status check (CEST) result",
+          de: "Ergebnis der HMRC-Statusprüfung (CEST)",
         }
+      source: https://www.gov.uk/guidance/check-employment-status-for-tax
+      verified_on: "2026-11-26"
+# https://www.gov.uk/expenses-if-youre-self-employed (2026-11-26): business costs only, business part of mixed use.
+# SA103S notes 2026 (https://www.gov.uk/government/publications/self-assessment-self-employment-short-sa103s,
+# 2026-11-26): entertaining is not allowable; with cash basis capital purchases are allowable expenses, except cars
+# (capital allowances); the trading income allowance excludes any expense. Not VAT registered: VAT paid is part of
+# the cost (https://www.gov.uk/hmrc-internal-manuals/business-income-manual/bim31535, 2026-11-26).
 expensesNote:
   {
-    fr: "Les dépenses saisies donnent le total des dépenses des mises à jour MTD et réduisent le bénéfice estimé ; quand elles dépassent le trading allowance de 1 000 £, elles le remplacent (on ne peut pas cumuler les deux).",
-    en: "Recorded expenses give the expenses total of the MTD updates and lower the estimated profit; when they exceed the £1,000 trading allowance they replace it (you cannot claim both).",
-    de: "Erfasste Ausgaben ergeben die Ausgabensumme der MTD-Meldungen und mindern den geschätzten Gewinn; übersteigen sie die Trading Allowance von 1.000 £, ersetzen sie diese (beides zugleich ist nicht möglich).",
+    fr: "Saisissez à la date du paiement les seules dépenses professionnelles (part professionnelle d'un usage mixte) ; les frais de réception de clients et l'achat d'une voiture ne sont pas des dépenses admissibles. Si vous n'êtes pas assujetti à la TVA, la TVA payée fait partie du coût et est comptée avec. Les dépenses donnent le total des mises à jour MTD et de la déclaration, et réduisent le bénéfice estimé ; quand elles dépassent le trading allowance de 1 000 £, elles le remplacent (on ne peut pas cumuler les deux).",
+    en: "Record on the date you paid them only business costs (the business part of mixed use); client entertaining and buying a car are not allowable expenses. If you are not VAT registered, the VAT you paid is part of the cost and counted with it. Expenses give the total for the MTD updates and the tax return and lower the estimated profit; when they exceed the £1,000 trading allowance they replace it (you cannot claim both).",
+    de: "Erfassen Sie zum Zahlungsdatum nur betriebliche Kosten (den betrieblichen Anteil bei gemischter Nutzung); Kundenbewirtung und der Kauf eines Autos sind keine abzugsfähigen Ausgaben. Ohne Umsatzsteuerregistrierung gehört die gezahlte Umsatzsteuer zu den Kosten und wird mitgezählt. Die Ausgaben ergeben die Summe der MTD-Meldungen und der Steuererklärung und mindern den geschätzten Gewinn; übersteigen sie die Trading Allowance von 1.000 £, ersetzen sie diese (beides zugleich ist nicht möglich).",
   }
 name: { fr: Royaume-Uni, en: United Kingdom, de: Vereinigtes Königreich }
 currency: GBP
@@ -73,7 +105,7 @@ options:
   - id: northern_ireland
     label:
       { fr: "Résident en Irlande du Nord", en: "Living in Northern Ireland", de: "Wohnsitz in Nordirland" }
-  # https://www.gov.uk/guidance/check-if-youre-eligible-for-making-tax-digital-for-income-tax (2026-11-24):
+  # https://www.gov.uk/guidance/check-if-youre-eligible-for-making-tax-digital-for-income-tax (2026-11-26):
   # from 6 April 2026 above £50,000 (2024-25), 6 April 2027 above £30,000 (2025-26), 6 April 2028 above £20,000
   # (2026-27). The 2026 rules gate the 2026-27 quarterly updates on this option.
   - id: mtd_itsa
@@ -83,7 +115,7 @@ options:
         en: "Using Making Tax Digital for Income Tax from April 2026 (qualifying income over £50,000 in 2024-25)",
         de: "Making Tax Digital für Einkommensteuer ab April 2026 (qualifizierte Einkünfte über 50.000 £ in 2024-25)",
       }
-  # https://www.gov.uk/register-for-self-assessment (2026-11-24): first return, register by 5 October.
+  # https://www.gov.uk/register-for-self-assessment (2026-11-26): first return, register by 5 October.
   - id: sa_not_registered
     label:
       {
@@ -94,19 +126,19 @@ options:
 identifiers:
   - id: utr
     label: { fr: UTR, en: Unique Taxpayer Reference (UTR), de: UTR }
-    # https://www.gov.uk/find-utr-number (2026-11-24): a 10-digit number.
+    # https://www.gov.uk/find-utr-number (2026-11-26): a 10-digit number.
     pattern: "^\\d{10}$"
     example: "1234567890"
     required: true
   - id: vat
     label: { fr: N° de TVA, en: VAT number, de: USt-Nummer }
     # 9 digits, plus a 3-digit subsidiary identifier for some businesses:
-    # https://www.gov.uk/guidance/submitting-ec-sales-list-declarations-online-using-csvs (2026-11-24).
+    # https://www.gov.uk/guidance/submitting-ec-sales-list-declarations-online-using-csvs (2026-11-26).
     pattern: "^GB(\\d{9}|\\d{12})$"
     example: "GB123456789"
     required: false
 invoice:
-  # Standard rate 20 %: https://www.gov.uk/vat-rates (2026-11-24).
+  # Standard rate 20 %: https://www.gov.uk/vat-rates (2026-11-26).
   vatRateBp: 2000
   defaultMode: none
   toggle: { option: vat_registered, mode: standard }

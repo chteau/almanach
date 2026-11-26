@@ -4,6 +4,30 @@ Toutes les évolutions notables d'Almanach sont notées ici. Le format suit
 [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le projet suit le
 [versionnage sémantique](https://semver.org/lang/fr/).
 
+## [Non publié]
+
+### Modifié
+
+- Packs revérifiés le 2026-11-26 sur les sources officielles : chaque valeur cite sa page et sa date.
+  - **Allemagne** et **États-Unis** passent en pack vérifié. Restent expérimentales : les dépenses et les types de
+    pièces du coffre en Allemagne, la réserve en France (barème 2026 pas encore adopté).
+  - **France** : déclaration préparée (case CIPAV séparée), dépenses et types de pièces du coffre vérifiés ;
+    « extrait K » au lieu de « Kbis » pour une entreprise individuelle.
+  - **Royaume-Uni** : déclaration préparée (MTD trimestriel, SA103S), dépenses et types de pièces du coffre vérifiés ;
+    le type IR35 devient le résultat du test CEST.
+  - **Allemagne** : Solidaritätszuschlag, Ist-Versteuerung, Dauerfristverlängerung et Sondervorauszahlung,
+    numéros de cases de l'USt-Voranmeldung 2026.
+  - **États-Unis** : Additional Medicare Tax, plafond de la déduction QBI, dépenses dans la méthode annualisée,
+    Schedule C, repas à 50 %.
+
+### Corrigé
+
+- Les encaissements comptaient la TVA facturée : seuils, estimations et réserve d'un assujetti étaient surévalués.
+  Ils sont maintenant comptés hors TVA, dans tous les pays.
+- Sans assujettissement à la TVA, la TVA payée sur une dépense fait partie du coût.
+- Allemagne : la limite de 25 000 € s'applique l'année du début d'activité ; un Kleinunternehmer ne dépose pas de
+  déclaration annuelle de TVA ; une Factur-X avec le seul Steuernummer échouait à la règle EN 16931 BR-CO-26.
+
 ## [0.1.0] - 2026-11-24
 
 Première version numérotée. Elle regroupe tout ce qui a été fait depuis le dernier état publié (`a19147d`).

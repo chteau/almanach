@@ -773,6 +773,7 @@ export const planDe: Record<keyof typeof planEn, string> = {
   'prepared.step.prior_year_tax': 'Vorjahressteuer × {rate} %',
   'prepared.step.prior_year_tax_higher_income': 'Vorjahressteuer × {rate} % (Einkommen über der Grenze)',
   'prepared.step.annualized_income': 'Annualisiertes Einkommen bis heute (× {rate} %)',
+  'prepared.step.annualized_expenses': 'Annualisierte Ausgaben bis heute (× {rate} %)',
   'prepared.step.annualized_tax': 'Steuer auf das annualisierte Einkommen',
   'prepared.step.cumulative_share': 'Fälliger kumulierter Anteil ({rate} %)',
   'prepared.step.paid_before': 'Bei früheren Raten gezahlt',

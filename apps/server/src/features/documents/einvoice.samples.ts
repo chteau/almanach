@@ -4,6 +4,7 @@ import {
   type EinvoiceSource,
   facturxRules,
   type Line,
+  type Locale,
   type PackMeta,
   type VatMode,
   vatMentionIn,
@@ -61,10 +62,32 @@ const LINES: Line[] = [
   { description: 'Réunion de cadrage', quantity: 1500, unit: 'hour', unitPriceCents: 8_000, discountBp: 0 },
 ];
 
-/** A sample document: the issued facts an e-invoice is built from. */
+/** Fictitious German seller (Steuernummer as BT-32) and client; VAT numbers have valid check digits. */
+const DE_SELLER: PartySnapshot = {
+  name: 'Jonas Becker',
+  address: 'Lindenstraße 12\n50674 Köln',
+  country: 'DE',
+  email: 'jonas@example.de',
+  vatNumber: 'DE136695976',
+  identifiers: { steuernummer: '21/815/08150', vat: 'DE136695976' },
+  postal: { lines: ['Lindenstraße 12'], postalCode: '50674', city: 'Köln' },
+  bank: { format: 'iban', iban: 'DE89370400440532013000', bic: 'COBADEFFXXX' },
+};
+const DE_BUYER: PartySnapshot = {
+  name: 'Schmidt & Partner GmbH',
+  address: 'Marktplatz 3\n80331 München',
+  country: 'DE',
+  email: 'buchhaltung@schmidt.example',
+  vatNumber: null,
+  identifiers: {},
+  postal: { lines: ['Marktplatz 3'], postalCode: '80331', city: 'München' },
+};
+
+/** A sample document: the issued facts an e-invoice is built from, and the language of its PDF. */
 export interface EinvoiceSample {
   name: string;
   source: EinvoiceSource;
+  language?: Locale;
 }
 
 /**
@@ -125,6 +148,32 @@ export function frenchSamples(pack: PackMeta): EinvoiceSample[] {
 }
 
 /**
+ * Validation samples for a German seller: Kleinunternehmer, VAT with discounts and a deposit deducted, credit note,
+ * reverse charge to an EU business; the Steuernummer goes into BT-32
+ *
+ * @param pack {PackMeta} - German pack
+ * @returns {EinvoiceSample[]} - samples
+ */
+export function germanSamples(pack: PackMeta): EinvoiceSample[] {
+  return frenchSamples(pack).map((sample) => {
+    const vatMode = sample.source.vatMode;
+    const mentions = mentionsFor(pack, vatMode, 'company', 'de');
+    return {
+      name: sample.name.replace(/^fr-/, 'de-'),
+      language: 'de',
+      source: {
+        ...sample.source,
+        mentions,
+        vatMention: vatMentionIn(pack, vatMode, mentions),
+        note: 'Vielen Dank für Ihren Auftrag.',
+        seller: DE_SELLER,
+        buyer: vatMode === 'reverse_charge' ? BUYER : DE_BUYER,
+      },
+    };
+  });
+}
+
+/**
  * Builds the Factur-X XML and PDF of a sample
  *
  * @param sample {EinvoiceSample} - sample
@@ -145,7 +194,7 @@ export async function renderSample(
     ...source,
     draft: false,
     validUntil: null,
-    language: 'fr',
+    language: sample.language ?? 'fr',
     relatedNumber: source.related?.number ?? null,
     createdAt: new Date('2026-11-24T10:00:00Z'),
     facturx: { xml, conformance: 'EN 16931' },

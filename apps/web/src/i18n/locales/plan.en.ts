@@ -749,6 +749,7 @@ export const planEn = {
   'prepared.step.prior_year_tax': "Last year's tax × {rate} %",
   'prepared.step.prior_year_tax_higher_income': "Last year's tax × {rate} % (income above the limit)",
   'prepared.step.annualized_income': 'Income to date annualized (× {rate} %)',
+  'prepared.step.annualized_expenses': 'Expenses to date annualized (× {rate} %)',
   'prepared.step.annualized_tax': 'Tax on the annualized income',
   'prepared.step.cumulative_share': 'Cumulative share due ({rate} %)',
   'prepared.step.paid_before': 'Paid at earlier instalments',

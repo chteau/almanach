@@ -53,7 +53,7 @@ que celle du pays (le montant de TVA en devise comptable, BT-111, n'est pas enco
 | Pays | `einvoicing` | Détail |
 | --- | --- | --- |
 | France | `verified` | Factur-X EN16931, validée par veraPDF et le Schematron CEN EN 16931 |
-| Allemagne | `experimental` | ZUGFeRD/Factur-X EN16931 (Steuernummer en BT-32) ; XRechnung non produit |
+| Allemagne | `verified` | ZUGFeRD/Factur-X EN16931 (Steuernummer en BT-32, USt-IdNr. exigée : BR-CO-26), validée comme la France ; XRechnung non produit |
 | Royaume-Uni, États-Unis | absent | aucune obligation B2B aujourd'hui |
 
 Le modèle sémantique (`packages/shared/src/einvoice.ts`) est indépendant de la syntaxe : UBL / XRechnung pourra
@@ -65,8 +65,8 @@ s'y brancher (le schéma de pack accepte déjà le format `ubl`, non proposé).
 scripts/validate-einvoice.sh /tmp/einvoice   # télécharge et vérifie (SHA-256) les outils, puis valide
 ```
 
-Le script génère des exemples (franchise, TVA avec remises et acompte déduit, avoir, autoliquidation intra-UE,
-devis brouillon classique) et les passe dans :
+Le script génère des exemples français et allemands (franchise, TVA avec remises et acompte déduit, avoir,
+autoliquidation intra-UE, devis brouillon classique) et les passe dans :
 
 - **veraPDF 1.30.4**, profil PDF/A-3B ;
 - **Schematron EN 16931 CII** du CEN TC 434 (artefacts de validation 1.3.17, XSLT officiel exécuté par Saxon) ;

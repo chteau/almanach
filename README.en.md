@@ -39,31 +39,31 @@ tools don't know your country's rules. Almanach does both.
 Version **0.1.0**, the first numbered release ([changelog, French](CHANGELOG.md)).
 France is the reference country: its 2026 rules
 are **verified**, and every figure cites its official source and the date it was checked.
-The UK is verified too (2026-27 tax year, against gov.uk). Germany and the US are
-**experimental**, and the app says so at sign-up. The full
+The UK (2026-27 tax year, against gov.uk), Germany and the US (federal tax only) are verified
+too. The features still experimental are listed below, and the app says so. The full
 picture is in the [specification](docs/cahier-des-charges.md) (French).
 
 | Country | Pack | What it covers |
 |---|---|---|
 | France | Verified | Micro-entreprise (BNC, BIC services and sales), monthly or quarterly URSSAF, versement libératoire, ACRE, CIPAV, CFE, VAT exemption |
-| Germany | Experimental | Freiberufler and Gewerbe, Kleinunternehmer, Umsatzsteuer-Voranmeldung, prepayments (ESt, GewSt) |
-| United Kingdom | Verified | Sole trader, Self Assessment (registration, returns, payments on account), income tax with or without Scotland, Class 4 NIC, Making Tax Digital (quarterly), VAT threshold. Out of scope: partnerships, limited companies, flat rate scheme; estimates ignore expenses and the trading allowance |
-| United States | Experimental | Sole proprietor and single-member LLC, self-employment tax, estimated taxes, Form 1040 |
+| Germany | Verified | Freiberufler and Gewerbe, Kleinunternehmer, Umsatzsteuer-Voranmeldung (Soll or Ist, Dauerfristverlängerung), prepayments (ESt, GewSt), Solidaritätszuschlag. Not computed: church tax, Gewerbesteuer, health insurance, joint assessment |
+| United Kingdom | Verified | Sole trader, Self Assessment (registration, returns, payments on account), income tax with or without Scotland, Class 4 NIC, Making Tax Digital (quarterly), VAT threshold. Out of scope: partnerships, limited companies, flat rate scheme; expenses or the trading allowance deducted |
+| United States | Verified | Sole proprietor and single-member LLC, self-employment tax, Additional Medicare Tax, QBI deduction, estimated taxes (safe harbor, annualized method), Form 1040 and Schedule C. Federal only (no state or local tax), single or married filing jointly |
 
 Each pack also declares the maturity of every feature (`features` in `pack.yaml`). A feature that
 is not listed is unavailable for that country, and the app explains it.
 
 | Feature | France | Germany | United Kingdom | United States |
 |---|---|---|---|---|
-| Thresholds | Verified | Experimental | Verified | — |
-| Estimates | Verified | Experimental | Verified | Experimental |
-| Deadlines | Verified | Experimental | Verified | Experimental |
-| Multiple activities | Verified | Experimental | — | Experimental |
-| Reserve | Experimental | Experimental | Verified | Experimental |
-| Prepared declaration | Experimental | Experimental | Experimental | Experimental |
-| Expenses | Experimental | Experimental | Experimental | Experimental |
-| Vault document kinds | Experimental | Experimental | Experimental | Experimental |
-| Factur-X | Verified | Experimental | — | — |
+| Thresholds | Verified | Verified | Verified | — |
+| Estimates | Verified | Verified | Verified | Verified |
+| Deadlines | Verified | Verified | Verified | Verified |
+| Multiple activities | Verified | Verified | — | Verified |
+| Reserve | Experimental | Verified | Verified | Verified |
+| Prepared declaration | Verified | Verified | Verified | Verified |
+| Expenses | Verified | Experimental | Verified | Verified |
+| Vault document kinds | Verified | Experimental | Verified | Verified |
+| Factur-X | Verified | Verified | — | — |
 
 ## What it does
 

@@ -257,6 +257,11 @@ export function einvoiceMissing(
   const taxId = rules.taxId ? source.seller.identifiers[rules.taxId] : undefined;
   if (category && category !== 'O' && !source.seller.vatNumber && (category === 'AE' || !taxId))
     missing.push('seller.vat');
+  // BR-CO-26: the buyer identifies the seller by BT-29, BT-30 or BT-31; BT-32 (German Steuernummer) alone fails,
+  // and an invoice outside the scope of VAT carries no BT-31 (BR-O-02).
+  if (category && !(rules.legalId && legalIdOf(source.seller.identifiers, rules.legalId)))
+    if (category === 'O') missing.push('seller.identifier');
+    else if (!source.seller.vatNumber) missing.push('seller.vat');
   // BR-AE-02: reverse charge also needs the buyer's VAT identifier.
   if (category === 'AE' && !source.buyer.vatNumber) missing.push('client.vat');
   // BR-E-10, BR-AE-10, BR-O-10: an exemption needs its reason, as text (the mention) or VATEX code.

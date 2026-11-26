@@ -125,6 +125,8 @@ export const docsFr: Record<keyof typeof docsEn, string> = {
   'documents.missing.einvoice.seller.siret': 'votre SIRET (profil), dont est tiré le SIREN',
   'documents.missing.einvoice.seller.vat':
     'votre numéro de TVA (profil), exigé par la norme EN 16931 même en franchise',
+  'documents.missing.einvoice.seller.identifier':
+    'un identifiant du vendeur hors numéro de TVA (immatriculation), exigé par la norme EN 16931 pour une opération hors champ de la TVA',
   'documents.missing.einvoice.client.vat': 'le numéro de TVA du client, obligatoire en autoliquidation',
   'documents.deleteDraft': 'Supprimer le brouillon',
   'documents.deleteDraft.body': 'Le brouillon sera effacé. Les documents émis ne sont jamais supprimés.',

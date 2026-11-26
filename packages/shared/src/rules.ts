@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { EXPENSE_CATEGORIES } from './expenses.ts';
 import { DECLARATION_PERIODS } from './packs.ts';
 
 const localized = z.object({ fr: z.string().min(1), en: z.string().min(1), de: z.string().min(1) }).strict();
@@ -40,6 +41,11 @@ export const thresholdSchema = z
     limitCents: cents,
     /** Higher ceiling that triggers the consequence immediately, when the country has one. */
     toleranceCents: cents.optional(),
+    /**
+     * Limit in the fiscal year the activity starts, when the law sets another one there (German Kleinunternehmer:
+     * 25,000 € instead of 100,000 €).
+     */
+    startYearLimitCents: cents.optional(),
     /**
      * Statuses whose revenue counts towards the limit when one business mixes activities (tracked in linked
      * instances); every activity counts when absent.
@@ -94,6 +100,15 @@ const bracketEstimate = z
     deductHalfOf: z.array(ruleId).default([]),
     /** Deduction of a share of business income, capped at that share of taxable income (US section 199A). */
     businessIncomeDeductionBp: basisPoints.optional(),
+    /**
+     * Limits of that deduction (US section 199A): above `thresholdCents` of taxable income it phases out over
+     * `phaseInCents` (no W-2 wages or qualified property assumed), and it is at least `minimumCents` when the
+     * business income reaches `minimumIncomeCents`.
+     */
+    businessIncomeDeductionLimit: z
+      .object({ thresholdCents: cents, phaseInCents: cents, minimumCents: cents, minimumIncomeCents: cents })
+      .strict()
+      .optional(),
   })
   .strict();
 
@@ -102,6 +117,8 @@ const profitBandEstimate = z
   .object({
     kind: z.literal('profit_bands'),
     bands: z.array(z.object({ fromCents: cents, rateBp: basisPoints }).strict()).min(1),
+    /** Share of the profit the bands apply to (US Additional Medicare Tax: 92.35 % net earnings). */
+    baseShareBp: basisPoints.optional(),
   })
   .strict();
 
@@ -128,6 +145,21 @@ const deIncomeTaxEstimate = z
     zone3: z.tuple([z.number(), z.number(), z.number()]),
     zone4: z.tuple([z.number(), z.number()]),
     zone5: z.tuple([z.number(), z.number()]),
+  })
+  .strict();
+
+/**
+ * German Solidaritätszuschlag (SolZG): a rate of another person-wide estimate (income tax), nothing up to an
+ * exemption limit (Freigrenze), then at most a share of the excess over that limit (Milderungszone).
+ */
+const deSolidarityEstimate = z
+  .object({
+    kind: z.literal('de_solidarity'),
+    /** Id of the estimate it is levied on; must come earlier in the file and have the same scope. */
+    of: ruleId,
+    rateBp: basisPoints,
+    exemptionCents: cents,
+    excessRateBp: basisPoints,
   })
   .strict();
 
@@ -171,6 +203,7 @@ export const estimateSchema = z
       profitBandEstimate,
       usSelfEmploymentEstimate,
       deIncomeTaxEstimate,
+      deSolidarityEstimate,
       frIncomeTaxEstimate,
     ]),
     ...sourced,
@@ -256,10 +289,15 @@ const prepareLineSchema = z
     measure: z.enum(PREPARE_MEASURES),
     /** Revenue of these activity statuses only (one line per activity on a mixed declaration). */
     statuses: z.array(z.string().min(1)).optional(),
+    /** Line shown only when all these options are chosen / none of these (e.g. the Cipav box in France). */
+    options: z.array(z.string().min(1)).min(1).optional(),
+    withoutOptions: z.array(z.string().min(1)).min(1).optional(),
     /** vat_base / vat_collected: lines at this rate only. */
     vatRateBp: basisPoints.optional(),
     /** vat_mode_base: base of the operations in this mode. */
     vatMode: z.enum(['reverse_charge', 'export', 'franchise']).optional(),
+    /** expenses: expenses of these categories only (one box per group of categories). */
+    categories: z.array(z.enum(EXPENSE_CATEGORIES)).optional(),
   })
   .strict();
 
@@ -268,6 +306,8 @@ export const prepareSchema = z
   .object({
     /** Revenue counted when collected or when invoiced (issue date). */
     basis: z.enum(['collected', 'invoiced']),
+    /** Option that switches the basis to collected (German Ist-Versteuerung, § 20 UStG). */
+    collectedWithOption: z.string().optional(),
     /** The period of the occurrence, or the fiscal year up to its end (UK MTD cumulative updates). */
     span: z.enum(['period', 'fiscal_year_to_period_end']),
     lines: z.array(prepareLineSchema).default([]),
@@ -379,6 +419,12 @@ export const yearRulesSchema = z
     allowances: z.array(allowanceSchema).default([]),
     deadlines: z.array(deadlineRuleSchema).default([]),
     reserve: reserveSchema.optional(),
+    /** Share of an expense category that is deductible (US: 50 % of business meals); 100 % when not listed. */
+    expenseShares: z
+      .array(
+        z.object({ category: z.enum(EXPENSE_CATEGORIES), deductibleBp: basisPoints, ...sourced }).strict(),
+      )
+      .default([]),
   })
   .strict();
 

@@ -121,6 +121,8 @@ export const docsEn = {
   'documents.missing.einvoice.seller.siret': 'your SIRET (profile), which gives the SIREN',
   'documents.missing.einvoice.seller.vat':
     'your VAT number (profile), required by EN 16931 even under the franchise',
+  'documents.missing.einvoice.seller.identifier':
+    'a seller identifier other than the VAT number (company registration), required by EN 16931 outside the scope of VAT',
   'documents.missing.einvoice.client.vat': 'the client’s VAT number, required for reverse charge',
   'documents.deleteDraft': 'Delete draft',
   'documents.deleteDraft.body': 'The draft will be erased. Issued documents are never deleted.',
